@@ -118,7 +118,9 @@ $G build/ghidra renfs -process nfs_flat.bin -noanalysis -scriptPath tools \
 `0x42c30` → `race_from_menu` `0x3770c` → `race_run` `0x37228` → `race_main` `0x6356c`:
 `race_step` `0x6348c` once per race-clock tick, then `race_draw_frame` `0x5bc40`. The timer
 runs at 100 Hz; the race clock divides it in a 3-cycle (`race_timer_tick` `0x4c454`):
-33.3 Hz by default, 30–60 Hz by `0x12dd0c`. Names: `tools/names.txt`.
+33.3 Hz by default (measured in DOSBox), 30–60 Hz by `0x12dd0c`. Names: `tools/names.txt`.
+Arithmetic: 16.16 fixed point, the multiply rounds, 65,536 = a full turn (NOTES §4.5).
+The original in DOSBox: `nfs-dos`, `tools/nfsdos.py` (unseen, keys, memory; NOTES §5).
 
 ## File formats (details in `docs/NOTES.md`, "Formats")
 

@@ -194,8 +194,11 @@ race_from_menu 0x3770c (from fe_main_menu)
 
   `race_setup_record` sets 1; `race_run` sets 3 when bit 8 of `0x12da28` is set (what that
   bit is: to find). Single player: steps due `0xf6d64` = the clock, so **one `race_step`
-  per clock tick**, then one frame drawn: the physics' rate is the clock's (33.3 a second
-  unless changed; to confirm in DOSBox). In the modes `0x15d134` = 1..3 (network, replay?)
+  per clock tick**, then one frame drawn: the physics' rate is the clock's.
+  **Measured in the original (DOSBox, §5, 2026-10-19): 33.31 race-clock ticks per 100
+  system ticks** in a single race on City (setting 1, reloads 3 and 3), the steps done
+  equal to the steps due all along, and the race time on the screen = clock / 33.33
+  (1,449 ticks, "00:43.4"). The system clock runs at 100 a second. In the modes `0x15d134` = 1..3 (network, replay?)
   the steps due come from elsewhere (`0x12dd18`, `0xf6d68`).
 - `race_step` `0x6348c`: the controls (`0x71cec` or `0x83908`), `0x1fa1c`, `0x63304`,
   `0x47c88` (1.5 KB: the race's rules? reads the clock against 100 / 400), then
@@ -302,8 +305,8 @@ race_from_menu 0x3770c (from fe_main_menu)
   `race_stats_max` `0x2d71c` (the race's greatest values, capped at 1200).
 - `replay_mark_highlight` `0x5c6d4`: for each slot of 60 half-steps (`0x145c94` counts 2
   a step) keeps the greatest event and its time (`0x144da8`): the replay's highlights
-  ("Load highlight ?"). 60 half-steps = 1 s at 30 steps a second: a hint that the game was
-  made for 30 (race clock setting 0) while `race_setup_record` sets 1 (33.3). To measure.
+  ("Load highlight ?"). 60 half-steps = 0.9 s at the measured 33.3 steps a second (1 s at
+  setting 0's 30: perhaps what it was made for).
 - `car_check_lap` `0x5056c` (called by the opponents too; speaks `besttime` / `bestlast` /
   `finallap` for the player).
 
@@ -331,3 +334,23 @@ The opponents' and traffic routines under `drive_opponent` (`0x7cf98` 2.6 KB, `0
 (`0x30424` shows the tickets; the chase itself?), `0x47c88` (the race's rules), `0x1fa1c`
 / `0x63304` in `race_step`, the second drawing pass `0x5a4f0`, the widget block
 `0x71208`..`0x74dcc`, Watcom's runtime.
+
+## 5. The original in DOSBox (2026-10-19)
+
+- The game for DOSBox is a COPY of the installed game in `~/dosgames/nfs` (`NFSSE/` +
+  `UNIVBE.EXE`, from the download's `TNFSSE/`); the CD image is read where it was
+  downloaded (`.../TNFSSE/cd/NFSSE.iso`, `NFS_ISO` overrides). `nfs-dos` (`~/.local/bin`)
+  starts it in DOSBox Staging (flatpak) with `~/dosgames/nfs.conf` (Screamer's settings:
+  S3, 60000 cycles, Pentium, SB16): `mount C ~/dosgames/nfs`, `imgmount D <iso> -t iso`,
+  `C:\NFSSE\NFS`. UNIVBE is not needed (DOSBox's VESA is enough).
+- **`tools/nfsdos.py <prefix> "<plan>"`** runs it unseen on `Xvfb :77` as its own child,
+  presses keys (XTEST), takes pictures, finds the data object in DOSBox's memory by the
+  car sound banks' names (`0xe2d14`) and reads the clocks (the header lists what).
+- The way into a single race with the defaults (Ferrari 512TR against the Diablo,
+  head to head, City), in seconds from the start: `wait:20` (the EA logo, Pioneer, the
+  intro, the title), `key:Return:5` ×3 (title, game mode SINGLE PLAYER, the name
+  "Player"), `key:Return:7` (into CONTROL CENTRAL), `key:Down:1.5` ×3 (to RACE),
+  `key:Return`. The race's clock starts about 2 s later.
+- The race in 640x480: the cockpit view, the HUD line on top (best lap? 02:02.2, the race
+  time, the gear, the distance 5.2 miles, the lap 2/2), a mirror, the map at the bottom
+  right.

@@ -50,6 +50,12 @@ Ghidra project and `build/decomp`, one command). The git history was started aga
   physics' rate) is 100 Hz divided in a 3-cycle: 33.3 steps a second by default, 30 to 60
   by a setting (NOTES §4.3). `tools/strmap.py` lists the strings each routine uses.
 
+- (continued) The libraries the game uses, its fixed-point arithmetic (16.16, a rounding
+  multiply, 65,536 a turn: the port can match it to the bit), the cars' six driving kinds,
+  the frame's drawing (NOTES §4.4-4.8).
+- **The original runs here, unseen** (`nfs-dos`, `tools/nfsdos.py`, NOTES §5): into a race
+  with keys, its memory read. **The race's 33.3 steps a second is measured**, not only read.
+
 ## Waiting for Danik
 
 Nothing. Decided 2026-10-18: menus 640x480 on the MiSTer (interlaced at 15 kHz),
@@ -57,11 +63,9 @@ races 320x200 / 320x240; commit locally as the work goes.
 
 ## Next, in order
 
-1. **Finish the map** (NOTES §4.4): `0x83908`, the widgets `0x71208`.., the renderer under
-   `race_draw_frame`, the car physics under `0x519d8` / `0x136b0`, opponents / traffic /
-   police, the Watcom runtime. Then set up the original in DOSBox (the skill's
-   `reference/verification.md`; the download's `TNFSSE/` has a `dosbox.conf`) and confirm
-   the race clock's 33.3 steps a second.
+1. **Finish the map** (NOTES §4.8): the opponents and traffic under `drive_opponent`, the
+   collisions, the police, `0x47c88` (the race's rules), the second drawing pass `0x5a4f0`,
+   the widgets `0x71208`.., the Watcom runtime.
 2. **Formats**, each from the code that reads it: `wwww`, TRI + INFO, CFM (car models),
    FAM (track textures and objects), PBS/PDN (`30FB`), FFN fonts, INV, BAMF, EA ADPCM
    (`EACS`/`1SNh`), BNK, TGV, RPL, CONFIG.DAT. A Python reader and a picture for each
