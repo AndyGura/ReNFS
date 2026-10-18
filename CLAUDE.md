@@ -150,6 +150,30 @@ German has a `G` in front (`GART`, `GSHOW`, ...).
 
 ---
 
+## The port (`port/`)
+
+```bash
+cmake -S port -B port/build && cmake --build port/build
+port/build/renfs                                   # the game (the title, for now)
+port/build/renfs --shot build/shots/title.ppm 120  # no window: the picture of retrace 120
+port/build/renfs --help
+```
+
+C, CMake, SDL2 linked dynamically. A framebuffer of palette numbers at the game's mode
+(640x480 the front end, 320x200 a race), shown 4:3 through the palette at each vertical
+retrace (60 a second at 640x480, 70 at 320x200, kept whatever the monitor); the palette is
+8 bits a channel as the game keeps it and 6 on the card, as the VGA's DAC (so fades are
+palette fades, step for step). The 100 Hz clock is real time, or the retraces counted
+under `--shot`. The game's blocking loops stay loops that wait for a retrace.
+Data folder: `-data`, else `$RENFS_DATA`, else `./NFSSE`, else `NFSSE` beside the program
+(a folder asked for is used or refused). Home: `-home`, `$RENFS_HOME`, `~/.config/renfs`
+(the port's own formats, never the game's files). `RENFS_LANG=de`: the German art.
+`src/files.c` (case-insensitive paths), `unpack.c` (all of EA's packers on the CD),
+`fsh.c`, `video.c` (screen, clock, keys), `fe.c` (front end), `main.c`.
+**Headless tests set `RENFS_HOME` to a scratch folder** (once the port writes settings).
+
+---
+
 ## Video
 
 The game uses two modes: **320x200** (low detail, `initgraphics(320, 200, 0)`) and

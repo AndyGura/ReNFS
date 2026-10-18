@@ -106,6 +106,12 @@ Ghidra project and `build/decomp`, one command). The git history was started aga
   top speeds, three tables of race times). The CD's records are not the ones built into
   the program (a revised set), so the port should start from the CD's file.
 
+- **The port runs: the title picture on the screen** (`port/`, NOTES and `CLAUDE.md` "The
+  port"). One command builds it; it finds the CD's folder, reads the game's own
+  `TITLE.QFS`, fades it in and out as the original does and shows it for its 5 seconds
+  (`build/shots/title_120.png`; `RENFS_LANG=de` the German one). The picture equals the
+  reader's pixel for pixel; the port's unpacker equals the game's on all 527 packed files.
+
 ## Waiting for Danik
 
 Nothing. Decided 2026-10-18: menus 640x480 on the MiSTer (interlaced at 15 kHz),
@@ -120,11 +126,9 @@ races 320x200 / 320x240; commit locally as the work goes.
 2. **Formats: done.** Every file type on the CD has a reader in `tools/` (TRI, `wwww`,
    `ORIP`, textures, FFN, EA sound, the packers, PBS/PDN first reading, INFO, INV, BAMF,
    TGV, RPL, CONFIG.DAT). What is still open inside them is listed in NOTES §3.4.
-3. **The port's skeleton** (`port/`, CMake, SDL2, C): an 8-bit framebuffer at 640x480 and
-   320x200, palette, the file layer (case-insensitive names in the CD folder; the data
-   directory from `-data`, `$RENFS_DATA`, `./NFSSE`), the title picture on the screen.
-   OpenScreamer's `port/` layout is the model (one process, `--shot` for headless
-   pictures, a home directory for settings).
+3. **The port's skeleton: done** (title picture). Next in it: the main menu
+   (`fe_main_menu` `0x42c30`: its pictures, the font, the mouse and keys, the music), the
+   widget routines `0x71208`.. on the way.
 4. Front end (menus, car and track choice), then the race (track, cars, physics, HUD,
    sound), then the rest (replays, championship/tournament, cops, the showcase).
 5. MiSTer (`~/MiSTer-ReNFS`): the skill's steps 5–8 — `MISTER_HYBRID`, `mister_port.[ch]`,
