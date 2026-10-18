@@ -22,6 +22,10 @@ import java.util.TreeSet;
 public class DecompTo extends GhidraScript {
     @Override
     public void run() throws Exception {
+        /* globals from here up (the BSS: what the file does not load) that hold an address are
+           shown as ints; the initialised tables keep their pointers. DECOMP_BSS=0x... */
+        String eb = System.getenv("DECOMP_BSS");
+        long bss = eb != null ? Long.decode(eb) : 0x119000L;
         String[] args = getScriptArgs();
         DecompInterface di = new DecompInterface();
         di.openProgram(currentProgram);
@@ -124,7 +128,7 @@ public class DecompTo extends GhidraScript {
                                 if (!(hs.getDataType() instanceof Pointer) || hs.getSize() != 4) continue;
                                 if (hs.getStorage() == null || !hs.getStorage().isMemoryStorage()) continue;
                                 ghidra.program.model.address.Address ga = hs.getStorage().getMinAddress();
-                                if (ga.getOffset() < 0x119000L) continue;        /* (not the initialised tables) */
+                                if (ga.getOffset() < bss) continue;        /* (not the initialised tables) */
                                 try {
                                     currentProgram.getListing().clearCodeUnits(ga, ga.add(3), false);
                                     currentProgram.getListing().createData(ga, IntegerDataType.dataType);

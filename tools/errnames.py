@@ -13,7 +13,12 @@ import bisect, json, re, struct, sys
 L = json.load(open(sys.argv[1]))
 img = open(sys.argv[2], "rb").read()
 entries = sorted(int(l.split()[0], 16) for l in open(sys.argv[3]))
-CODE_END = 0x10000 + L["objects"][0]["vsize"]
+# the code objects (LE object flag 4: executable); everything else is data
+CODE = [(o["base"], o["base"] + o["vsize"]) for o in L["objects"] if o["flags"] & 4]
+
+
+def in_code(a):
+    return any(lo <= a < hi for lo, hi in CODE)
 
 byval = {}
 for s in L["fixup_sites"]:
@@ -22,13 +27,13 @@ for s in L["fixup_sites"]:
 pat = re.compile(rb"([a-z_][a-z_0-9]{3,})( ?\(\))? -+ ")
 names = {}
 for t, sites in byval.items():
-    if t < 0xD0000 or t >= len(img):
+    if in_code(t) or t >= len(img):
         continue
     m = pat.match(img, t)
     if not m:
         continue
     for s in sites:
-        if s >= CODE_END:
+        if not in_code(s):
             continue
         i = bisect.bisect_right(entries, s) - 1
         if i >= 0:

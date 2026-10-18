@@ -25,6 +25,10 @@ to review, patches to apply or compiler errors to sort out.
 "Here is a build and a screenshot" beats "please check this function". Everything builds
 with one command. Plain language, not jargon.
 
+**The method is the skill `reverse-engineer-dos-game`** (`~/.claude/skills/`: the steps,
+the toolkit, the decompiler's traps, checking against the original). What ReNFS learns that
+holds for any game goes into the skill too.
+
 The model project is **OpenScreamer** (`~/openscreamer`, its `CLAUDE.md` and
 `docs/NOTES.md`): the same kind of program (Watcom C, DOS/4GW, LE), the same tools, the
 same rules. Its "Hard-won rules" hold here too, above all: **when a format question
@@ -67,7 +71,9 @@ bytes) + **LE** image. Objects: 1 code `0x10000` (698,877 bytes), 2 code `0xC000
 3 data `0xD0000` (24), 4 data + BSS + stack `0xE0000` (563,728). Entry `0x94444` (a jump
 over the Watcom banner to `0x944bc`); **`main` = `0x4716c`**. No symbols.
 
-**One command: `tools/rebuild.sh`** (about an hour, logs in `build/logs/`). What it does:
+**One command: `tools/rebuild.sh`** (about an hour, logs in `build/logs/`;
+`tools/rebuild.sh --decomp` = names from `tools/names.txt` + decompile again, minutes).
+What it does:
 
 ```bash
 tools/ghidra-ext/install.sh   # once per Ghidra install: x86:LE:32:watcom (already done on this machine)
@@ -85,6 +91,7 @@ $G build/ghidra renfs -process nfs_flat.bin -analysisTimeoutPerFile 3600
 $G build/ghidra renfs -process nfs_flat.bin -noanalysis -scriptPath tools -postScript RenameFuncs.java tools/names.txt
 $G build/ghidra renfs -process nfs_flat.bin -noanalysis -scriptPath tools \
    -postScript DecompRange.java build/decomp 0x10000 0xC0100      # one file a function + INDEX.txt
+# (with DECOMP_BSS=0x129000: globals from there up that hold addresses are shown as ints)
 ```
 
 - `--fixups` applies the LE relocation records, so every pointer in the image is a real
@@ -94,6 +101,8 @@ $G build/ghidra renfs -process nfs_flat.bin -noanalysis -scriptPath tools \
   EBX, ECX, then the stack). **EA's libraries take their arguments on the stack**
   (`initgraphics(640, 480, 8)` is `push 8; push 0x1e0; push 0x280`): Ghidra drops them,
   so read call sites with `objdump -D -b binary -m i386 -M intel --start-address=... build/nfs_flat.bin`.
+- `tools/strmap.py build/nfs_layout.json build/nfs_flat.bin build/decomp/INDEX.txt [addr..]`:
+  the strings each function uses (the map's first draft; the full list `build/strs_by_site.txt`).
 - `tools/errnames.py` names functions after EA's error messages ("openhandle - %s FILE
   ERROR") → `tools/names.txt` → `RenameFuncs.java`. Names given by hand go into
   `tools/names.txt` too, so a rebuilt project gets them back.

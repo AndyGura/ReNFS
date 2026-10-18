@@ -12,17 +12,22 @@ import json, struct, sys
 L = json.load(open(sys.argv[1]))
 img = open(sys.argv[2], "rb").read()
 starts = {int(l.split()[0], 16) for l in open(sys.argv[3])}
-CODE_END = 0x10000 + L["objects"][0]["vsize"]
+# the code objects (LE object flag 4: executable); everything else is data
+CODE = [(o["base"], o["base"] + o["vsize"]) for o in L["objects"] if o["flags"] & 4]
+
+
+def in_code(a):
+    return any(lo <= a < hi for lo, hi in CODE)
 sites = set(L["fixup_sites"])
 
 seeds = set()
 for s in sites:
     t = struct.unpack_from("<I", img, s)[0]
-    if not 0x10000 <= t < CODE_END:
+    if not in_code(t):
         continue
-    if s >= 0xD0000:
+    if not in_code(s):
         seeds.add(t)
-    elif s < CODE_END:
+    else:
         if s - 4 in sites or s + 4 in sites:
             continue
         op = img[s - 1]
