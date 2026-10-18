@@ -141,7 +141,7 @@ The original in DOSBox: `nfs-dos`, `tools/nfsdos.py` (unseen, keys, memory; NOTE
 | `.BNK` | EA sound bank (engines, collisions): 128 offsets, `EACS` records | read (`tools/eacs.py`) |
 | `.TGV` | EA video (`kVGT`): intro, attract, car showcase | to do |
 | `.FFN` | fonts (`FNTF`): 4-bit smoothed bitmap + character table | read (`tools/ffn.py`) |
-| `.INV` | 32 KB tables beside menu art (hit masks?) | to do |
+| `.INV` | the menus' inverse palettes (15-bit colour → entry), 32 KB | read (`tools/inv.py`) |
 | `.B00`.. `.FSB` | `BAMF` (cockpit masks) | to do |
 | `.RPL` | replays (the CD has four) | to do |
 

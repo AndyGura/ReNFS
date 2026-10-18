@@ -336,9 +336,23 @@ found), and one last value → `0x12efb4` (1 on CL3, AL3). Users: `load_horizon`
 does the game take the built-in table (33 values a track from `0xec5dc`, 0x84 apart, picked
 by the names cl1 .. tr1), which holds older values than the files.
 
+### 3.12 INV (the menus' inverse palettes) — read (`tools/inv.py`, 2026-10-19)
+
+32768 bytes beside a menu picture, loaded with it (e.g. the audio screen `0x10853`:
+`option/audio.fsh`, its `!pal` through `pal_from_shape` `0x718a4`, `option/audio.inv` into
+`0xf77c4`). Read by EA's `nearestcolour` `0x80c80` in 8-bit modes: a colour `0xRRGGBB` →
+the palette entry at `(R>>3)<<10 | (G>>3)<<5 | B>>3`; with no table it searches the palette
+at `0x1607a4` itself (only the entries flagged at `0xf77c8`); in 15/16/24/32-bit modes it
+packs the colour instead. 30 routines call it (menus, fonts, the 3D library).
+**36 of the 51 tables are their screen's nearest-colour table** (90–93 % the nearest entry,
+the rest ties); **15 fit no palette on the CD** (all the installer's `IART` screens, `AUDIO`,
+`OPTIONS`, `MODEMSET`, `FINSTND`, and the bonus tracks' `BRUN`/`TROP` screens that share
+City's tables): made for older art, so the original picks odd colours through them. The port
+reads the files as they are, and that stays faithful.
+
 ### 3.4 Still to read
 
-`kVGT` (TGV video, 320x192?), `.INV` (32 KB), `BAMF` (`MASKHI.B00` ..), `.RPL`, `CONFIG.DAT` (player name, replay
+`kVGT` (TGV video, 320x192?), `BAMF` (`MASKHI.B00` ..), `.RPL`, `CONFIG.DAT` (player name, replay
 names).
 
 ## 4. Map of the program (2026-10-19)
