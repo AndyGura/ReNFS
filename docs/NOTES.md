@@ -220,12 +220,23 @@ proves:
 The camera here is a guess (1.3 above the road, 70° wide); the game's own is still to
 read, and the horizon (`horz`, entry 2) and the sky are not drawn yet.
 
+### 3.7 FFN (fonts) — read (`tools/ffn.py`, 2026-10-19)
+
+Read by `setfont` `0x91ed0`. "FNTF" (setfont also takes `FNT3` `FNTP` `FNTS` `FNTU`),
+u32 size, u16 100, u16 characters (224), u16 `+0xc`, u16 `+0xe` (`& 3 == 2` picks the other
+drawer), bytes `+0x10`..`+0x13` (`+0x12` + `+0x13` = the line's height), u32 `+0x14` the
+character table, u32 `+0x1c` the bitmap. A character, 11 bytes: u16 code, u8 width, u8
+height, u16 x, u16 y (in the bitmap), u8 advance, i8 x offset, i8 y offset (from the line's
+top). The bitmap is an FSH shape (16-byte header, type `0x7a` = 4 bits a pixel, high nibble
+first, rows of (4 × width + 7) / 8 bytes); a pixel is a level 0..15 (the edges' smoothing),
+mixed with the text's colour when drawn. Checked by drawing a line of text with each font
+(`build/ffn/`).
+
 ### 3.4 Still to read
 
 `BAMF`, `30FB`-headed
 `.PBS` / `.PDN` (RefPack with flag bits `0x20`?), `.BNK` (EA sound bank), `EACS` / `1SNh`
-(EA ADPCM: `.EAS` speech, `.ASF` / `.AS4` music), `kVGT` (TGV video, 320x192?), `FNTF`
-fonts, `.INV` (32 KB), `BAMF` (`MASKHI.B00` ..), `.RPL`, `CONFIG.DAT` (player name, replay
+(EA ADPCM: `.EAS` speech, `.ASF` / `.AS4` music), `kVGT` (TGV video, 320x192?), `.INV` (32 KB), `BAMF` (`MASKHI.B00` ..), `.RPL`, `CONFIG.DAT` (player name, replay
 names).
 
 ## 4. Map of the program (2026-10-19)

@@ -89,9 +89,8 @@ races 320x200 / 320x240; commit locally as the work goes.
    `drive_opponent`, `0x5efb0` (the replay?), the second drawing pass `0x5a4f0`, the
    widgets `0x71208`.., the Watcom runtime. Small enough now to leave for when the port
    reaches them; the formats are the better next step.
-2. **Formats**, each from the code that reads it (TRI, `wwww`, `ORIP` done): INFO, the 32 roadside pictures and the road's textures (which picture a kind / a strip uses), CFM (car models),
-   FAM (track textures and objects), PBS/PDN (`30FB`), FFN fonts, INV, BAMF, EA ADPCM
-   (`EACS`/`1SNh`), BNK, TGV, RPL, CONFIG.DAT. A Python reader and a picture for each
+2. **Formats**, each from the code that reads it (TRI, `wwww`, `ORIP`, the road's textures and
+   roadside pictures, FFN fonts done): EA sound (`EACS`/`1SNh`, BNK), INFO, PBS/PDN (`30FB`), INV, BAMF, TGV, RPL, CONFIG.DAT. A Python reader and a picture for each
    (`tools/`).
 3. **The port's skeleton** (`port/`, CMake, SDL2, C): an 8-bit framebuffer at 640x480 and
    320x200, palette, the file layer (case-insensitive names in the CD folder; the data

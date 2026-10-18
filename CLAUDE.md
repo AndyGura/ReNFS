@@ -139,7 +139,7 @@ The original in DOSBox: `nfs-dos`, `tools/nfsdos.py` (unseen, keys, memory; NOTE
 | `.EAS` `.ASF` `.AS4` | EA ADPCM sound/music (`EACS`, `1SNh`) | to do |
 | `.BNK` | EA sound bank (engines, collisions) | to do |
 | `.TGV` | EA video (`kVGT`): intro, attract, car showcase | to do |
-| `.FFN` | fonts (`FNTF`) | to do |
+| `.FFN` | fonts (`FNTF`): 4-bit smoothed bitmap + character table | read (`tools/ffn.py`) |
 | `.INV` | 32 KB tables beside menu art (hit masks?) | to do |
 | `.B00`.. `.FSB` | `BAMF` (cockpit masks) | to do |
 | `.RPL` | replays (the CD has four) | to do |
