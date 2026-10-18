@@ -73,6 +73,11 @@ Ghidra project and `build/decomp`, one command). The git history was started aga
   steering), drawn textured from eight sides: the cars and the circuits' grandstands, water
   tower, arches look right. Units are 1/128 m (the NSX model is the real car's size).
 
+- **A track drawn from its own files matches the original** (`tools/trackview.py`, NOTES
+  §3.6): the view at the start of the City race, road, textures, roadside pictures and
+  buildings, next to the DOSBox screenshot of the same spot (`build/tri/compare_cy1.png`).
+  The track, model and texture formats are proved together.
+
 ## Waiting for Danik
 
 Nothing. Decided 2026-10-18: menus 640x480 on the MiSTer (interlaced at 15 kHz),

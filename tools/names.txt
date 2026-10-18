@@ -242,3 +242,6 @@
 0x9868a orip_draw_list
 0x98482 orip_draw_poly
 0x91b90 map_quad_whole
+0x5b34c load_track_textures
+0x59490 draw_object
+0x59430 object_on_screen

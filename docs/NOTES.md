@@ -124,13 +124,21 @@ read from it section by section as the car goes (`0x4ee30` → `0x4ed74` → `0x
    mountains, 33 in the city, 9 / 16 / 18 on the circuits, 2 or 9 or 10 in a few places;
    `[2]` read by the traffic (`0x786d4`, `0x7e64c`), about 0.6 × `[0]`, 5 on most circuits.
 2. **"RoadObjects"** (`0x13bb84`): "SJBO", u32 size (with this 12-byte head), u32 0. Then
-   64 **kinds** × 16 bytes: `+1` type (1 = a point only, else a flat picture), `+2` u16 the
-   picture × 4, `+4` i32 width, `+0xc` i32 height (16.16). Then the **placements**
+   64 **kinds** × 16 bytes (read by `0x59490` drawing, `tri_section_objects` `0x4f7d4`):
+   `+0` flags (4 = animated: `+8` frames, `+9` steps a frame on the step counter), **`+1`
+   the type = the 3D points it takes**: 1 = a 3D model (`+2` = its number among the
+   family's models), 4 = one flat picture, 6 = two flat faces at a right angle (the second
+   `+8` wide, going back from corner 3); `+2` the picture (`0x141ed8[+2 + variant]`, the
+   variant 0..3 from `0xf4604` / `0xf458c` by distance; `/ 4` = the family's entry-1
+   `SHPI`), `+3` the second face's picture, `+4` i32 width, `+0xc` i32 height (16.16). Then the **placements**
    (`0x13bb94`) × 16 bytes up to an i32 −1, in node order: `+0` i32 node, `+4` u8 kind,
    `+5` u8 angle (256 a turn, added to the node's heading), `+0xa` 3 × i16 x, y, z from the
-   node's position (8.8, the world's axes). Read by `0x4f7d4` (the corners of a flat
-   object: ± width / 2 along its angle, height up) and `car_node_in_list` (walks them by
-   node). 584..998 placements on the open roads, 138..595 on the circuits.
+   node's position (8.8, the world's axes). Read by `0x4f7d4` and `car_node_in_list`
+   (walks them by node). A flat object's corners (`0x4f7d4`): 0 = (x − c, y + height,
+   z − s), 1 = (x + c, y + height, z + s), 2 = (x + c, y, z + s), 3 = (x − c, y, z − s), with
+   (c, s) = width / 2 × (cos, sin) of −(`+5` / 256 + heading / 16384) turns: at angle 0
+   along the road's right, the picture facing the driver. **The picture's right edge goes
+   on corner 0**: the other way the original's "MALL" sign on CY1 reads "LLAM" (§3.6). 584..998 placements on the open roads, 138..595 on the circuits.
 3. **"TrackSlices"** (`0x136604`), one record a section: "TRKD", u32, u32, 12 bytes
    (copied as they are: the strips' textures?), then **4 rows (one a node) of 11 points ×
    3 × i16** in 1/128 units: point 0 from the node's position, points 1 and 6 from point 0,
@@ -183,6 +191,34 @@ the open parts of the grandstands. A texture with a part's name and no picture
 Car tail lights are drawn in colours the second palette (`!xxx`) changes (to check).
 `tools/orip.py png` draws a model from eight sides (`build/orip/`): the NSX and TR1's
 models look right from all of them.
+
+### 3.6 A track drawn from its files, against the original (2026-10-19)
+
+`tools/trackview.py <NFSSE> <track> <node> <out> [across eye fov]` draws the view along a
+track from the TRI (road points, strips, objects) and the FAM (road textures, roadside
+pictures, models), textures in perspective. **At the start of CY1 it shows what the
+original shows** (`build/tri/compare_cy1.png`: the DOSBox screenshot above, the drawing
+below): the road and its lines, the bank and curved barrier on the right, the "MALL" sign
+and building on the hill, the lamp posts, the trees and buildings on the left. What that
+proves:
+- **The road strips.** `draw_road_sections` `0x5aa84` draws from the quad lists at
+  `0xf4880` (11 bytes: 4 point numbers, the strip, a drawing record, a flag), one list a
+  detail level (`0xf61c0`: 32, 18, 10 quads a section). At full detail the inner strips
+  (0-2 and 5-7: between points 0/1, 1/2, 2/3 and 0/6, 6/7, 7/8) go row by row and the outer
+  ones (3, 4, 8, 9) over two rows. Strip s's texture is the section header's byte `2 + s`
+  (bytes 0, 1: 0 so far).
+- **The road textures.** The table `0x140cd8` (144 textures × 8 slots, filled by `0x5b34c`
+  from the family's entry 0): texture t = bank t / 3, picture `A`/`B`/`C` by t % 3, slot
+  digit 0..7 (`A000` .. `A007`; a missing slot repeats the one before, the families have 0
+  = 128 × 256 near and 4 = 32 × 96 far). The picture's width runs along the road over two
+  rows (the second drawing record, `[1]` = 0 / 1, picks the half), its height across the
+  strip, top = the outer side: CY1's lane picture has its solid line at the top (the edge)
+  and dashes at the bottom (the middle of the road).
+- **The roadside pictures**: `0x141ed8`, 4 slots a picture, filled from entry 1 (one
+  `SHPI` a picture named `0000`, or one `SHPI` of `0000`, `0100` ..).
+- **Left and right** a second time: the bank and barrier are on the right in both.
+The camera here is a guess (1.3 above the road, 70° wide); the game's own is still to
+read, and the horizon (`horz`, entry 2) and the sky are not drawn yet.
 
 ### 3.4 Still to read
 

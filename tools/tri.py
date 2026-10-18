@@ -26,8 +26,11 @@ The file, in the order load_tri reads it:
           difficulty), the speed limit (the police), a traffic speed
     +0x16214 u32 object kinds (64), +0x16218 u32 most placements (1000)
   "RoadObjects": "SJBO", u32 size (with this 12-byte head), u32 0, then
-    kinds x 16 bytes: +1 u8 type (1 = a point), +2 u16 picture x 4, +4 i32 width,
-          +0xc i32 height (16.16)
+    kinds x 16 bytes (read by 0x59490, 0x4f7d4): +0 u8 flags (4 = animated: +8 frames,
+          +9 steps a frame), +1 u8 type = the 3D points it takes: 1 = a 3D model (+2 its
+          number in the family's models), 4 = a flat picture, 6 = two flat faces; +2 u8 the
+          picture (/ 4 = the family's entry-1 SHPI; + 0..3 a variant), +3 u8 (the second
+          face's?), +4 i32 width, +8 i32 (the second face's width?), +0xc i32 height (16.16)
     placements x 16 bytes, ended by -1: +0 i32 node, +4 u8 kind, +5 u8 angle
           (256 a turn, on top of the road's heading), +0xa 3 x i16 offset x, y, z
           from the node (8.8)
@@ -67,8 +70,9 @@ class Track:
         self.kinds = []
         for i in range(self.kinds_n):
             r = b[d + i * 16:d + i * 16 + 16]
-            self.kinds.append(dict(type=r[1], picture=struct.unpack_from("<H", r, 2)[0] // 4,
+            self.kinds.append(dict(flags=r[0], type=r[1], pic=r[2], pic2=r[3],
                                    width=struct.unpack_from("<i", r, 4)[0] / 65536,
+                                   width2=struct.unpack_from("<i", r, 8)[0] / 65536,
                                    height=struct.unpack_from("<i", r, 12)[0] / 65536))
         p = d + self.kinds_n * 16
         self.objects = []
