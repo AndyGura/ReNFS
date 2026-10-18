@@ -84,6 +84,13 @@ Ghidra project and `build/decomp`, one command). The git history was started aga
   decoder; ROCK1 matches ffmpeg's EA decoder sample for sample. The music loops are
   understood (a marker block points back at the block the loop starts with).
 
+- **EA's packers are read and the car physics files opened** (`tools/unpack.py`,
+  `tools/carspec.py`, NOTES §3.9, §3.10): all 527 packed files on the CD unpack exactly as
+  the game's own routine does (run in an emulator to check), which also opens 23 menu
+  pictures the picture tool couldn't (German records screens, rally maps, police screens).
+  The car files give the torque curves, the gears' top speeds (the real cars' figures),
+  the rev limits and which cars have ABS and traction control (`build/cars/torque.png`).
+
 ## Waiting for Danik
 
 Nothing. Decided 2026-10-18: menus 640x480 on the MiSTer (interlaced at 15 kHz),
@@ -96,7 +103,7 @@ races 320x200 / 320x240; commit locally as the work goes.
    widgets `0x71208`.., the Watcom runtime. Small enough now to leave for when the port
    reaches them; the formats are the better next step.
 2. **Formats**, each from the code that reads it (TRI, `wwww`, `ORIP`, the road's textures and
-   roadside pictures, FFN fonts, EA sound done): INFO, PBS/PDN (`30FB`), INV, BAMF, TGV, RPL, CONFIG.DAT. A Python reader and a picture for each
+   roadside pictures, FFN fonts, EA sound, the packers, PBS/PDN first reading done): INFO, INV, BAMF, TGV, RPL, CONFIG.DAT. A Python reader and a picture for each
    (`tools/`).
 3. **The port's skeleton** (`port/`, CMake, SDL2, C): an 8-bit framebuffer at 640x480 and
    320x200, palette, the file layer (case-insensitive names in the CD folder; the data

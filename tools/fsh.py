@@ -13,6 +13,8 @@ x and y positions, then the pixels; after them may come a palette (type 0x22,
 """
 import os, struct, sys, zlib
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 
 def refpack(d):
     """RefPack (EA's LZ77): 0x10FB / 0x11FB header, big-endian 24-bit size."""
@@ -62,7 +64,8 @@ def refpack(d):
 def load(path):
     d = open(path, "rb").read()
     if d[:4] != b"SHPI" and d[1] == 0xFB:
-        d = refpack(d)
+        import unpack                   # RefPack, Huffman (30FB..) or pairs (46FB)
+        d = unpack.unpack(d)
     assert d[:4] == b"SHPI", path
     return d
 
@@ -124,7 +127,7 @@ def main():
             for name, off in shapes(d):
                 parts = []
                 for t, o in blocks(d, off):
-                    w, h, cx, cy, x, y = struct.unpack_from("<6H", d, o + 4)
+                    w, h, cx, cy, x, y = struct.unpack_from("<6H", d + bytes(16), o + 4)
                     parts.append("%02x %dx%d c(%d,%d) at(%d,%d)" % (t, w, h, cx, cy, x, y))
                 print("  %-4s @%06x  %s" % (name, off, " | ".join(parts)))
         return

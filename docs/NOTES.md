@@ -267,10 +267,61 @@ stream plays on (0..15, records of 0x28 at `0x160fa4`; -1 in EAS / BNK), +0xc u3
 - Not sound: `0x8cd60` (signed n-bit fields), `0x8cdf0` (2-bit codes through a 4-entry
   table), `0x8cf00` (10-bit fields into a table) build pictures from blocks: the TGV video?
 
+### 3.9 EA's packers: 10FB, 30FB/32FB/34FB, 46FB — read (`tools/unpack.py`, 2026-10-19)
+
+`unpack` `0xa7020` (src, dst, complain; returns the size; `unpack_size` `0xa711c`) picks by
+the first two bytes, `& 0xfe` on the first (an odd first byte = a header 3 bytes longer):
+`10FB` RefPack (`0xaf2c8`; 473 `.QFS`), `30FB`/`32FB`/`34FB` Huffman (`0xaf440`; the `.PBS`,
+`.PDN`, 15 `.QFS`), `46FB` byte pairs (`0xb0674`; 8 `.QFS`), `4AFB` (`0xb0890`; no file uses
+it). **All 527 packed files on the CD unpack to the byte as the game's own routine does**:
+`tools/unpack_emu.py` runs `0xa7020` itself in Unicorn (`build/venv`) and the two are
+compared file by file. Before this, `fsh.py` could not open 23 menu pictures (the German
+track records, the rally maps, the police screens); it now uses `unpack.py`.
+- **Huffman** (`0xaf440`, bits read from the top of each byte): 16 bits the kind (bit 8:
+  24 more bits to skip), 24 bits the size, 8 bits the escape byte. A "number": `1xx` = 4..7,
+  or z zeros, a one, z + 2 bits b = 2^(z+2) + b. Per code length 1, 2, ..: a number − 4 =
+  the codes of that length (canonical), until the code space is full. The symbols in code
+  order: each a number − 3 = how many unused byte values to step on from the last (from
+  255, wrapping). Then codes: a symbol that is not the escape is a byte; the escape is
+  followed by a number − 4 = n: n > 0 repeats the last byte n times, n = 0 then 1 bit: 1 the
+  end, 0 then 8 bits a byte as it is. `32FB` then sums the bytes (deltas), `34FB` twice.
+  (The routine decodes codes up to 8 bits through two 256-byte tables, longer ones through
+  left-aligned 16-bit limits.)
+- **Pairs** (`0xb0674`, `47FB` has 3 bytes more): 24-bit size, the escape byte, the number
+  of pairs, then (code, first, second) each; a code stands for its two bytes, each maybe a
+  code again (`0xb0630`, recursive). A byte that is no code is itself; escape + 0 ends,
+  escape + b is b.
+
+### 3.10 Car physics: PBS and PDN — first reading (`tools/carspec.py`, 2026-10-19)
+
+Both Huffman-packed, all i32, mostly 16.16; the fields' meaning settles when the physics
+is written (`car_physics_player`, `0x3fb90`, `0x3ed68` ..). `build/cars/torque.png`.
+- **`.PBS`** (CARSPECS: the 8 player cars and TRAFFC; 1912 bytes), `load_car_pbs` `0x50c24`:
+  used in place (the car's `+0x479`). **A checksum**: the sum of bytes 0..0x757 = u32
+  `+0x774`, otherwise `+0x3c` is set to 0 (an edited file gives a car without power).
+  `+0x3c` a power factor (0.5..0.84; ×248/256 with the automatic gearbox, `0x18990`;
+  TRAFFC 2.0), `+0x88` the torque points, from `+0xb4` (rpm, torque) pairs every 200 rpm
+  from 1000 (in N·m it seems: the NSX peaks at 286 at 5600; `0x18990` makes them 16.16).
+  `+0x334` ABS, `+0x338` traction control (1.0 = the car has it: the NSX, ZR-1, Supra both,
+  512TR, RX-7, 911 ABS only, Viper and Diablo neither; on only with the player's own
+  setting, `0x12da5f` / `0x12da5b` in the player's 0x4b-byte record → car `+0x492` /
+  `+0x48e`). `+0x2e4`, `+0x2e8` → car `+0x78`, `+0x7c`. When `0x12dd2c` is set the loader
+  halves `+0x320`, `+0x328` (and stores 1/x at `+0x324`, `+0x32c`), `+0x2dc`, `+0x2e0`,
+  `+0x28`, `+0x2c`, multiplies `+0x24` by 1.5, copies `+0x374..` 0x200 bytes to `+0x574..`,
+  and scales `+0x3c` by 0x14c/256 (`0x12da12` = 3) or 0x133/256: a game mode still to name.
+  (`By_R&T`, a 4-byte file beside them, is opened for writing in a debug case: not needed.)
+- **`.PDN`** (CARFAMS: all 22 cars; 460 bytes), loaded in `load_car_cfm` `0x65874` into
+  `0x1493a4[car]`, applied by `0x1e9cc`: `+0xc`, `+0x10` → `0x2c920` with the car's body
+  (`+0xc0`); `+0x14` → car `+0x168` and 1/x `+0x16c` (10, 15, 16; 255 for traffic);
+  `+0x18` → `+0x170`; 93 values from `+0x1c` → car `+0x178..` (a falling curve, a value a
+  speed step?); six from `+0x1ac` → `+0x308..` with 1/x at `+0x320..`: the gears' top
+  speeds in m/s (NSX 20, 35.6, 50.2, 63.5, 74.7 = 269 km/h; Diablo 323, 512TR 307: the real
+  cars'); `+0x1c4` the rev limit (NSX 8000) → `+0x338`; `+0x1c8` → `+0x469` (5 for the
+  player cars: the gears?). Traffic cars have 0 in the head, gears and rev limit.
+
 ### 3.4 Still to read
 
-`BAMF`, `30FB`-headed
-`.PBS` / `.PDN` (RefPack with flag bits `0x20`?), `kVGT` (TGV video, 320x192?), `.INV` (32 KB), `BAMF` (`MASKHI.B00` ..), `.RPL`, `CONFIG.DAT` (player name, replay
+`kVGT` (TGV video, 320x192?), `.INV` (32 KB), `BAMF` (`MASKHI.B00` ..), `.RPL`, `CONFIG.DAT` (player name, replay
 names).
 
 ## 4. Map of the program (2026-10-19)

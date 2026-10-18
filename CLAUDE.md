@@ -130,12 +130,13 @@ The original in DOSBox: `nfs-dos`, `tools/nfsdos.py` (unseen, keys, memory; NOTE
 | Ext | What | Status |
 |---|---|---|
 | `.FSH` | EA shapes, "SHPI": directory of 4-char names, 8-bit pictures + palettes (`!pal`) | read (`tools/fsh.py`) |
-| `.QFS` | RefPack-compressed (`10FB`) FSH | read (`tools/fsh.py`) |
+| `.QFS` | packed FSH (RefPack `10FB`, 23 Huffman or pairs) | read (`tools/fsh.py`) |
 | `.CFM` `.FAM` | `wwww` containers of `ORIP` 3D models (1/128 units) + `SHPI` textures: cars, track families | read (`tools/orip.py`) |
 | `.FMM` `.MMB` | `wwww` of `BAMF` (dashboards) | to do |
 | `.TRI` | track: road nodes (x y z, heading, lanes), speeds a section, objects, the road's 3D points | read (`tools/tri.py`) |
 | `xxxINFO` | a track's text settings (sky, colours) | to do |
-| `.PBS` `.PDN` | car physics / performance, `30FB` (compressed or obfuscated) | to do |
+| `.PBS` `.PDN` | car physics (torque, gears, ABS/TCS), Huffman-packed `30FB` | first reading (`tools/carspec.py`) |
+| `xxFB` | EA's packers: RefPack `10FB`, Huffman `30FB`/`32FB`/`34FB`, pairs `46FB` | read (`tools/unpack.py`, equal to the game's own on all 527) |
 | `.EAS` `.ASF` `.AS4` | EA sound/music (`EACS`, `1SNh` streams): PCM or IMA ADPCM | read (`tools/eacs.py`) |
 | `.BNK` | EA sound bank (engines, collisions): 128 offsets, `EACS` records | read (`tools/eacs.py`) |
 | `.TGV` | EA video (`kVGT`): intro, attract, car showcase | to do |

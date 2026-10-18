@@ -255,3 +255,12 @@
 0xa06a5 snd_volume_tables
 0xadfdc ima_decode_mono
 0xae084 ima_decode_stereo
+0xa7020 unpack
+0xa711c unpack_size
+0xaf2c8 unpack_refpack
+0xaf440 unpack_huffman
+0xb0674 unpack_pairs
+0xb0630 unpack_pairs_put
+0xb0890 unpack_4afb
+0x1e9cc car_apply_pdn
+0x18990 car_torque_load
