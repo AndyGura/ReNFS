@@ -101,6 +101,11 @@ Ghidra project and `build/decomp`, one command). The git history was started aga
   Transtropolis, coast) drawn on their tracks (`build/rpl/*.png`). For the port this
   means the race must run exactly as the original's for a replay to play right.
 
+- **CONFIG.DAT is read** (`tools/config.py`, NOTES §3.16): the player's name, the menus'
+  last choices, the keys and the records of all nine tracks (best segment times or laps,
+  top speeds, three tables of race times). The CD's records are not the ones built into
+  the program (a revised set), so the port should start from the CD's file.
+
 ## Waiting for Danik
 
 Nothing. Decided 2026-10-18: menus 640x480 on the MiSTer (interlaced at 15 kHz),
@@ -112,9 +117,9 @@ races 320x200 / 320x240; commit locally as the work goes.
    `drive_opponent`, `0x5efb0` (the replay?), the second drawing pass `0x5a4f0`, the
    widgets `0x71208`.., the Watcom runtime. Small enough now to leave for when the port
    reaches them; the formats are the better next step.
-2. **Formats**, each from the code that reads it (TRI, `wwww`, `ORIP`, the road's textures and
-   roadside pictures, FFN fonts, EA sound, the packers, PBS/PDN first reading, INFO, INV, BAMF, TGV, RPL done): CONFIG.DAT. A Python reader and a picture for each
-   (`tools/`).
+2. **Formats: done.** Every file type on the CD has a reader in `tools/` (TRI, `wwww`,
+   `ORIP`, textures, FFN, EA sound, the packers, PBS/PDN first reading, INFO, INV, BAMF,
+   TGV, RPL, CONFIG.DAT). What is still open inside them is listed in NOTES §3.4.
 3. **The port's skeleton** (`port/`, CMake, SDL2, C): an 8-bit framebuffer at 640x480 and
    320x200, palette, the file layer (case-insensitive names in the CD folder; the data
    directory from `-data`, `$RENFS_DATA`, `./NFSSE`), the title picture on the screen.

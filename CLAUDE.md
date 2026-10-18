@@ -143,6 +143,7 @@ The original in DOSBox: `nfs-dos`, `tools/nfsdos.py` (unseen, keys, memory; NOTE
 | `.INV` | the menus' inverse palettes (15-bit colour → entry), 32 KB | read (`tools/inv.py`) |
 | `.B00`.. `.MMB` `.FMM` | `BAMF` blit lists: which spans of the 3D view reach the screen (HUD, dashboards) | read (`tools/bamf.py`) |
 | `.RPL` | replays: the race record, every driver's controls (a word every 2nd step), car snapshots every 27 s | read (`tools/rpl.py`) |
+| `CONFIG.DAT` | the front end's state and the records (9 tracks, times in 1/60 s, speeds 16.16 m/s), copied whole to `0x156c14` | read (`tools/config.py`) |
 
 Language: English art is `ART`, `SHOW`, `SLIDES`, `DASH`, `SPEECH`, `NTRACKFM`/`ETRACKFM`;
 German has a `G` in front (`GART`, `GSHOW`, ...).

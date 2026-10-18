@@ -454,9 +454,44 @@ three settings in its entry). The attract mode (`fe_attract_mode` `0x34284`) put
   a race of 8, 2:03; REPLAY3 coast (cl1) Viper against a Supra with traffic, 1:44. All
   one driver at the keyboard (`build/rpl/*.png`).
 
+### 3.16 CONFIG.DAT (the front end's state, the records) — read (`tools/config.py`, 2026-10-19)
+
+`GAMEDATA/CONFIG/CONFIG.DAT`, exactly 24,402 bytes (0x5f52), is copied as it is to
+`0x156c14` by `cfg_load_config_dat` `0x39c40` (another size or no file: `cfg_defaults`
+`0x38ea8` builds it) and written back by `cfg_save_config_dat` `0x3a134`. Offsets from
+`0x156c14`:
+- `+0` the player's name ("Player" / "Spieler"); `+0x3b` (`0x156c4f`) the replay's name;
+  from `+0x6b` the menus' choices as words, read by `race_setup_record` `0x36c5c`: `+0x93`
+  the segment (→ `0x12da0e`), `+0x95` the track (→ `0x12da12`), `+0xb3` the race length
+  (which table of race times), the car, the opponents, the detail settings (`0x156c93`..
+  set from a speed test `0x74ca0` in the defaults), ..; `+0x5f36` (`0x15cb4a`..) the keys.
+- From `+0xb5`, **the records**: 9 tracks (`0x41b68`'s order) × 0xa6b bytes, 0x27 bytes a
+  record: `+0` the name (15), `+0xf` the car (the menu's order, `0xf7464`: RX-7 NSX SUPRA
+  911 ZR-1 VIPER 512TR DIABLO), `+0x13` 0/1 (?), `+0x17` 1 = filled, `+0x1b` the time in
+  **1/60 s** (`fmt_time` `0x74914`: m:ss.t; 99,999 / 999,999 = "N/A"), `+0x1f` a speed
+  (16.16 m/s; `fmt_speed` `0x74854`: × 2.24 "mph", German × 3.6 + 1 km/h; below
+  0x9fff6 "N/A"), `+0x23` the kind of race (0 time trial "t.t." / German "z", 1 head to
+  head "h.h." / "d", 2 a race: the track select screen `0x75288`).
+  - records 0–2: city, coast, alpine: the best time of segments 1–3 (`records_segment`
+    `0x69608`, from the result's `0x15cbc1`, its top speed `0x15cbc9`); a circuit: the best
+    lap in record 0 (`records_best_lap` `0x69438`, from the 20 lap times at `0x15cb71`);
+    records 3–5: the best top speed of segments 1–3.
+  - records 6–35: three tables of ten race times (`+0xb3` picks one; on a circuit each
+    length twice the one before: Rusty Springs 2:43, 5:23, 10:34).
+  - record 36 (`+0x57c`): the track's top speed.
+  The players' results they come from: 0x95 bytes a player from `0x15cb68` (`+0` the name,
+  `+9` 20 lap times, `+0x59` the time, `+0x61` the top speed, `+0x6d` ..).
+- **The CD's copy is not the built-in defaults**: `cfg_defaults` takes its records from
+  text tables (`0xeab80` .., six strings a record: name, time, car, speed, `+0x13`, kind);
+  the first five race times on City agree, the slower five are faster on the CD (Slayer
+  7:54.5 against 8:09.5 built in, ..). The CD's city segment times add up to its best
+  race time (7,332 + 7,596 + 11,706 = 26,634). The port should seed its records from the
+  CD's file.
+
 ### 3.4 Still to read
 
-`CONFIG.DAT` (player name, replay names).
+Every file type on the CD has a reader now. Open within them: the PBS/PDN fields the
+physics will name, the 0x9a4-byte block of a replay, the menus' choices word by word.
 
 ## 4. Map of the program (2026-10-19)
 

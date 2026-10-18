@@ -294,3 +294,6 @@
 0x48600 car_throttle
 0x48658 car_brake
 0x48714 car_shift
+# the records (NOTES 3.16)
+0x69438 records_best_lap
+0x69608 records_segment
