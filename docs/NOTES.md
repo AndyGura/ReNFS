@@ -222,9 +222,112 @@ race_from_menu 0x3770c (from fe_main_menu)
   and their `m` / `r` variants = mirrored? / reversed?), `0x68dcc` (four-letter: city coas
   alpi rust autu burt mont trop neod). `0x5636e`: the music loops `loop1` .. `loopx`.
 
-### 4.4 Still to name
+### 4.4 The libraries the game leans on (read from their code)
 
-`0x83908` (221 bytes, called before nearly everything: polls the keyboard or the system
-tasks?), the widget block `0x71208`.., the 3D renderer under `race_draw_frame`, the car
-physics under `0x519d8` / `0x136b0`, the opponents and traffic, the Watcom runtime
-(memcpy, sprintf, ... at `0x89897`, `0x8198b`, `0x92484` = the error exit?).
+- Memory: `allocmem` `0x828a8` (`reservemem` under a lock), `freemem` `0x82ebc`
+  (`findmemblock` + `purgememblock`), `free` `0xa5ff4` (Watcom's), `memmove` `0x8ecc4`
+  (stack arguments). `fatalerror` `0x92484`: prints, restores the system, exits through
+  `0xf8a84`. `sprintf` `0x8198b` (stack, `__prtf`-like core `0xa23f3`).
+- Time: the system clock `0xf7980` (TIMERHZ ticks). `ticksince` `0x81350`, `settimeout`
+  `0x8136b`, `timedout` `0x81389`. `runsystemtasks` `0x83908`: runs every task given to
+  `addsystemtask` whose time has come (`0x15db6c` routine, `+4` period, `+8` next time) and
+  returns their results OR-ed. It is called before nearly everything; the keyboard, the
+  sound and the music streams are such tasks (to confirm).
+- Pictures: `findshape` `0x80e1d` (a shape in a SHPI by its 4-letter name, `fatalerror`
+  if asked to and missing), `blitshape` `0x9d8d0` (shape, x, y, window), `drawshape`
+  `0x81280`, `drawshapeatpos` `0x8129c` (at the shape's own x / y, `+0xa` / `+0xc` >> 16),
+  `drawshapemove` `0x84248`. Windows: the current window is 13 dwords at `0xf889c`;
+  `setwindow` `0x8118c` copies one in, `setscreenwindow` `0xba93c` puts the screen's
+  (`0xf88d4`) back; `newwindow` `0x80c4c`. `waitretrace` `0xba95f` (port `0x3da` bit 8).
+  The video driver's routines are pointers set by `initgraphics` (`0xf795c` show the page,
+  `0xf7960`, `0xf7964`).
+- Palette: `setpalette` `0x84080` (first, count, colours; out `0x3c8`, 6-bit DAC),
+  `nearestcolour` `0x80c80`, `pal_clear` `0x7188c` (768 bytes), `pal_from_shape` `0x718a4`
+  (palette shape type `0x24` = 8 bits a channel, else 6), `pal_fade_down` `0x7198c` /
+  `pal_fade_up` `0x71918` (steps of `0x98abc` / `0x98aec`; which is in and which is out: to
+  read).
+- The front end's helpers: the mouse at `0xf78e0` / `0xf78e4` (`mouse_set` `0x71ad4`,
+  `mouse_in_rect` `0x71a1c`, `mouse_moved` `0x71b24`), `fe_show_if_changed` `0x71afc`
+  (shows the page when something changed), `fe_service_music` `0x71c20` (keeps the menu's
+  music stream fed, called in every wait loop), `fe_play_sound` `0x72510`.
+
+### 4.5 Numbers: fixed point, no floating point
+
+- **The game computes in whole numbers.** The game code (`0x10000`..`0x80000`) holds 18
+  x87 instructions in all; the physics is 16.16 fixed point, inline: `imul` then `shrd`
+  by 16. **The multiply rounds**: `(p >> 16) + bit 15 of p` (`rotate2d` `0x3e918`,
+  `car_road_offset` `0x51598`). So the port can match the original to the bit with plain
+  integer C (64-bit products, the same rounding).
+- Angles: **65,536 = a full turn**. `fixsin` `0x80b00` / `fixcos` `0x80b70`: a quarter-wave
+  table of 256 entries at `0xf8448` (index = angle >> 6, the two bits above it the
+  quadrant), plus a straight-line step between entries: `(cos(i) >> 2) * (((a & 0x3f) *
+  0x6487e) >> 9) >> 21` (`0x6487e` = 2π × 65,536). The result is 16.16.
+- `rotate2d` `0x3e918` (x, y, angle, &x', &y'): x' = x·cos − y·sin, y' = x·sin + y·cos.
+- A random number generator: `0xeab70 = (0xeab70 × 0xeab78) & 0xffff`, the bits 8.. of the
+  product used (in `drive_opponent_wait` `0x7e0c8`).
+
+### 4.6 The cars
+
+- The cars' objects: pointers at `0x13c24c` (`0x12da38` of them; the racers first,
+  `0x12da30`; then traffic and police?). A second table, `0x12da30` records of `0x1d2`
+  bytes from `0x14ec3c` (the racers' standings?), and the controls / players `0x18c` bytes
+  from `0x12cccc`.
+- A car's fields seen so far: `+0x0` `+0x4` `+0x8` a position (16.16; `+0x4` the height?),
+  `+0xc` `+0x10` `+0x14` angles (`+0x10` the heading, kept in 24 bits), `+0x48` the road
+  node it is on (`& 0x13bb88`, the track's node mask), `+0x60` / `+0x68` the speeds
+  sideways / forwards?, `+0x70` / `+0x74` (speed; `0x960000` = 150 the cap), `+0x88` a
+  pointer to the record that holds the kind, `+0x341`.. the last step's values, `+0x47d`
+  the player number, `+0x50e` the sound kind, `+0x512` **the driving kind**, `+0x51a` flags
+  (4 = active).
+- **The driving kind** `+0x512` picks the routine called every step through the table
+  `0x13c1b8` (filled by `race_init_car_kinds` `0x504c4`); `+0x50e` picks one called every
+  fourth step through `0x13c1e0` (1 = `car_sound_player` `0x10400`, 2 = nothing):
+
+  | kind | routine | what | set by |
+  |---|---|---|---|
+  | 1 | `drive_player_wait` `0x7ea20` | counts down, then kind 2 | `0x79728`, `0x7e64c` |
+  | 2 | `drive_player` `0x382d0` → `car_physics_player` `0x408e0` (4.4 KB) | the player | `load_car_pbs` |
+  | 3 | `drive_opponent` `0x7b34c` (3 KB) | a computer's car | `load_car_pbs`, `0x51200`, kinds 5, 6 |
+  | 4 | `drive_crashed` `0x1cfe0` | after a crash? | `0x1ca9c`, `0x1cb14`, `0x1e314` (collisions) |
+  | 5 | `drive_kind5` `0x7d9e4` | slows by `0x13333` a step (`0x23333` with flag 4), runs the opponent's routine | `0x1cd40` |
+  | 6 | `drive_opponent_wait` `0x7e0c8` | held at (8, 200 + 10n, 8), counts down, then kind 3 | `0x7ccc0` |
+
+  After its routine, every car goes through `car_road_offset` `0x51598` (its place
+  across the road: the road node's position `0x137430 + node × 0x24`, turned by the node's
+  angle).
+- `car_physics_player` `0x408e0`: `0x3ea98` / `0x3e9c4` every fourth step (the gearbox?),
+  `0x3ed68` (the engine: reads `Carspecs` through `0x18a04`), `0x3f260` twice (front 0 and
+  rear 1, from `+0x60` / `+0x68`), `0x3f7b8` twice (the axles' forces?), `0x4071c`,
+  `0x40230`, `0x4008c`, `replay_mark_highlight` `0x5c6d4` (events 0x28, 0x57, 0x78),
+  `race_stats_max` `0x2d71c` (the race's greatest values, capped at 1200).
+- `replay_mark_highlight` `0x5c6d4`: for each slot of 60 half-steps (`0x145c94` counts 2
+  a step) keeps the greatest event and its time (`0x144da8`): the replay's highlights
+  ("Load highlight ?"). 60 half-steps = 1 s at 30 steps a second: a hint that the game was
+  made for 30 (race clock setting 0) while `race_setup_record` sets 1 (33.3). To measure.
+- `car_check_lap` `0x5056c` (called by the opponents too; speaks `besttime` / `bestlast` /
+  `finallap` for the player).
+
+### 4.7 Drawing a frame
+
+- `camera_update` `0x136b0` (also in the step), `camera_set_car` `0x13530`
+  (`0x129ecc` = the camera, a car, a mode: 3 seen).
+- `draw_road_sections` `0x5aa84`: the track **from far to near** (a painter's order), a
+  section = 4 road nodes (`0x13bb90` the sections' mask); per section 11 points, 3D at
+  `0x13b728` (12 bytes each, `0x84` a section) and on the screen at `0x13b9bc` (8 bytes,
+  `0x58` a section); its faces (11 bytes each: four point numbers, a texture number,
+  flags) drawn by `draw_quad` `0x35b04` with the texture from `0x140cd8`; then the objects
+  and cars at that slice: `draw_slice_objects` `0x68430` (→ `0x66d08`). The section's kind
+  is `0x136621 + section × 6` → a record of `0x4c` bytes at `0xf61c0`.
+- `0x5a4f0` (1.1 KB, reaches 18 KB) is a second pass of the same shape with `0x35348`
+  (another polygon routine), `0x59d3c`, `0x5a0a8`, `0x679ec`: the walls and roadside, or
+  the near part. To read.
+- `draw_horizon` `0x5adbc` (`horz`), the HUD and dashboard `0x314e4` / `0x31684` /
+  `0x3081c` (`b00t`.., the cockpit) / `0x31cb4` (`mpbd`, the map), `0x59a74`, `0x5868c`.
+
+### 4.8 Still to name
+
+The opponents' and traffic routines under `drive_opponent` (`0x7cf98` 2.6 KB, `0x7b178`,
+`0x7dbd8`, `0x77c..`), the collisions (`0x1e314`, `0x2afb8`, `0x2a918`), the police
+(`0x30424` shows the tickets; the chase itself?), `0x47c88` (the race's rules), `0x1fa1c`
+/ `0x63304` in `race_step`, the second drawing pass `0x5a4f0`, the widget block
+`0x71208`..`0x74dcc`, Watcom's runtime.
