@@ -61,15 +61,22 @@ then the LZ77 commands (2/3/4-byte copies, literal runs, `FC..FF` end). The game
 unpacker is `unpack` (`0xa7020`).
 Menu pictures are all 640x480 (TITLE.QFS `bgnd`, the slides `SCRN`).
 
-### 3.2 `wwww` containers — layout seen in the data, the reader not yet found
+### 3.2 `wwww` containers — read (`tools/orip.py list`)
 
-"wwww", u32 count, `count` u32 offsets from the container's start (padded: the first
-offset of a 4-entry container is 0x18). Entries nest.
-- `.CFM` (a car): 4 entries, `ORIP` (3D model, high detail) + its `SHPI` textures, then a
-  second `ORIP` + `SHPI` (low detail).
-- `.FAM` (a track family, `<track>_M01` ..): [0] a `wwww` of 17 `SHPI` texture banks,
-  [1] a `wwww` of 32 `SHPI` (object sprites?), [2] one `SHPI` (sky / horizon?),
-  [3] a `wwww` of `wwww`s of (`ORIP`, `SHPI`) = 3D objects.
+"wwww", u32 count, `count` u32 offsets from the container's start (0 = an empty slot).
+Entries nest. The reader is `wwww_resolve` `0x60134`: it turns every offset into a pointer
+in place, nested containers too, and returns the address of the table (`+8`);
+`wwww_count` `0x602a4` reads the count before it, `wwww_entry` `0x60028` one slot.
+- `.CFM` (a car, `SIMDATA/CARFAMS`): [0] `ORIP` + [1] its `SHPI` textures (high detail),
+  [2] `ORIP` + [3] `SHPI` (low detail: ANSX 16 points and 6 polygons against 103 / 56).
+- `.FAM` (a track family, `<track>_M01` / `_R01` / `_T01`, read by `load_track_fam`
+  `0x60078`, names `%s/%s_T%.2d.fam` / `_M` / `_R` / `%s_%.3d.fam`): [0] 17 `SHPI` texture
+  banks (names `A000`, `A004`, `B000`, `C004` ..: the road's?), [1] 32 `SHPI` of one picture
+  `0000` each (the flat roadside objects?), [2] one `SHPI` `horz` (the horizon), [3] a
+  `wwww` of `wwww` (`ORIP`, `SHPI`) pairs = the track's 3D models (`load_track_models`
+  `0x66118` → `load_track_model` `0x65224` each): 1-2 on the open roads, 4-8 on the
+  circuits (TR1: a water tower, a pylon, grandstands, rock arches, a bridge). What T / M / R
+  choose: to find.
 - `.FMM` (a dashboard, `<car>DH` / `DL` = 640 / 320): 4 `BAMF`. `.MMB`: 12 `BAMF`.
 
 ### 3.3 TRI (track) — read (`tools/tri.py`, 2026-10-19)
@@ -138,9 +145,48 @@ would be 60 / 74 mph in metres a second. **Probably metres**, not yet proved (th
 two inner ones a side, then green, then brown), the centre line, the start, and the
 objects (red: pictures, blue: points).
 
+### 3.5 ORIP (3D models) — read (`tools/orip.py`, 2026-10-19)
+
+EA's 3D library (`0x94000`..`0x9a000`, every routine opening with `push n; call __chk`)
+takes a model in place: `orip_fix` `0x978a8` turns its offsets into pointers,
+`orip_instance` `0x95522` makes a drawable copy (room for the turned points, their screen
+places, the sort list), `draw_model` `0x666b0` → `orip_transform` `0x98137`, `orip_sort`
+`0x982e1` (by the z of each polygon's first two corners), `orip_draw` `0x98735` →
+`orip_draw_list` `0x9868a` → `orip_draw_poly` `0x98482`. Offsets from the "ORIP":
+
+| at | what | proof |
+|---|---|---|
+| `+4` | u32 size; `+8` 0x2bc; `+0xc` 0 (a use count at run time) | `orip_instance` adds 1 to `+0xc` |
+| `+0x10` / `+0x18` | points / their offset: 3 × i32 x, y (up), z (forward), **1/128 units** | NSX 234 × 151 × 562 = the real car's 1.81 × 1.17 × 4.43 m at 7.8 mm a unit |
+| `+0x14` | points of the body (ANSX 87 of 103; the rest the wheels?) | |
+| `+0x1c` / `+0x20` | texture positions: u32 u, v in pixels (0 on most track models) | `0xab105` reads them through `0x1616cc`, u << 16 |
+| `+0x24` / `+0x28` | polygons, 12 bytes: u32 flags, u32 corners, u32 texture positions (both counted in u32s into the index table) | `orip_fix`, `orip_sort`, `orip_draw_poly` |
+| `+0x2c` | 12 bytes: the model's name (`_NSX`, `_TR1`..) | |
+| `+0x38` / `+0x3c` | textures, 20 bytes: 8 bytes a part's name or 0, the `SHPI` picture's name (4), 8 bytes | names match the `SHPI` beside the model |
+| `+0x40` / `+0x44` | named point groups, 20 bytes (`left_tur`, `right_tu`: count 8, first, ..) | |
+| `+0x48` / `+0x4c` | named polygon groups, 28 bytes (`NON-SORT`, `inside`, `surface`, `outside`) | |
+| `+0x50` | the index table (u32 each) | `orip_fix` |
+| `+0x54` / `+0x58`, `+0x5c` / `+0x60` | named points, 12 bytes: 8-char name, u32 point (`smok`, the wheels `FL0`.. `RR1`, the lights `bklr` `bkll` `lt_frnt` ..) | |
+| `+0x64` / `+0x68` | a count and a table (0 on the cars) | `orip_fix` |
+
+**The polygon flags** (`orip_draw_poly`): bits 0-2 the corners (3 or 4); `0x80`
+textured (else one colour, `0xaa990`); bits 3-6 pick the drawing routine from tables at
+`0x1265d8` (triangles) and `0x1265e4` / `0x1265f0` / `0x1265fc` / `0x126608` (quads, by
+`0x1000` / `0x2000` and the model's flag); `0x100` or `0x400` drawn from both sides, `0x200`
+the other side faces out (`0xaa95b` decides); `0x800` the next polygon is drawn with it;
+**`0x1000` the polygon has its own texture positions** (`0xab105` reads `+8`); without it
+the whole picture is put on corners 0-3 = top left, top right, bottom right, bottom left
+(`map_quad_whole` `0x91b90` gives them (0,0), (w,0), (w,h), (0,h)); bits 16-23 the
+texture. Colour 255 is see-through in every palette seen (magenta, 206 28 198), and covers
+the open parts of the grandstands. A texture with a part's name and no picture
+(`frntires`, `rertires`) is the wheels: the game fills it in (`tyr1`..`tyr4`, turning).
+Car tail lights are drawn in colours the second palette (`!xxx`) changes (to check).
+`tools/orip.py png` draws a model from eight sides (`build/orip/`): the NSX and TR1's
+models look right from all of them.
+
 ### 3.4 Still to read
 
-`ORIP` models, `BAMF`, `30FB`-headed
+`BAMF`, `30FB`-headed
 `.PBS` / `.PDN` (RefPack with flag bits `0x20`?), `.BNK` (EA sound bank), `EACS` / `1SNh`
 (EA ADPCM: `.EAS` speech, `.ASF` / `.AS4` music), `kVGT` (TGV video, 320x192?), `FNTF`
 fonts, `.INV` (32 KB), `BAMF` (`MASKHI.B00` ..), `.RPL`, `CONFIG.DAT` (player name, replay
@@ -318,7 +364,7 @@ race_from_menu 0x3770c (from fe_main_menu)
 ### 4.4 The libraries the game leans on (read from their code)
 
 - Memory: `allocmem` `0x828a8` (`reservemem` under a lock), `freemem` `0x82ebc`
-  (`findmemblock` + `purgememblock`), `free` `0xa5ff4` (Watcom's), `memmove` `0x8ecc4`
+  (`findmemblock` + `purgememblock`), `__chk` `0xa5ff4` (Watcom's stack check: `push <bytes>; call` opens every library routine; named `free` until 2026-10-19, wrongly), `memmove` `0x8ecc4`
   (stack arguments). `fatalerror` `0x92484`: prints, restores the system, exits through
   `0xf8a84`. `sprintf` `0x8198b` (stack, `__prtf`-like core `0xa23f3`).
 - Time: the system clock `0xf7980` (TIMERHZ ticks). `ticksince` `0x81350`, `settimeout`

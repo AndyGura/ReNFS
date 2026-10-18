@@ -131,7 +131,8 @@ The original in DOSBox: `nfs-dos`, `tools/nfsdos.py` (unseen, keys, memory; NOTE
 |---|---|---|
 | `.FSH` | EA shapes, "SHPI": directory of 4-char names, 8-bit pictures + palettes (`!pal`) | read (`tools/fsh.py`) |
 | `.QFS` | RefPack-compressed (`10FB`) FSH | read (`tools/fsh.py`) |
-| `.CFM` `.FAM` `.FMM` `.MMB` | `wwww` containers (cars, track families, dashboards) | to do |
+| `.CFM` `.FAM` | `wwww` containers of `ORIP` 3D models (1/128 units) + `SHPI` textures: cars, track families | read (`tools/orip.py`) |
+| `.FMM` `.MMB` | `wwww` of `BAMF` (dashboards) | to do |
 | `.TRI` | track: road nodes (x y z, heading, lanes), speeds a section, objects, the road's 3D points | read (`tools/tri.py`) |
 | `xxxINFO` | a track's text settings (sky, colours) | to do |
 | `.PBS` `.PDN` | car physics / performance, `30FB` (compressed or obfuscated) | to do |

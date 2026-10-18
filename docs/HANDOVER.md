@@ -68,6 +68,11 @@ Ghidra project and `build/decomp`, one command). The git history was started aga
   from above (`build/tri/`). Left and right checked against the original running in DOSBox
   (the game's pointers now read through DOS/4GW's paging: NOTES §5).
 
+- **The 3D models are read** (`tools/orip.py`, NOTES §3.2, §3.5): the `wwww` containers,
+  the `ORIP` models (points, polygons, textures, the named parts: wheels, lights,
+  steering), drawn textured from eight sides: the cars and the circuits' grandstands, water
+  tower, arches look right. Units are 1/128 m (the NSX model is the real car's size).
+
 ## Waiting for Danik
 
 Nothing. Decided 2026-10-18: menus 640x480 on the MiSTer (interlaced at 15 kHz),
@@ -79,7 +84,7 @@ races 320x200 / 320x240; commit locally as the work goes.
    `drive_opponent`, `0x5efb0` (the replay?), the second drawing pass `0x5a4f0`, the
    widgets `0x71208`.., the Watcom runtime. Small enough now to leave for when the port
    reaches them; the formats are the better next step.
-2. **Formats**, each from the code that reads it (TRI done): `wwww` + `ORIP` (the 3D models), INFO, CFM (car models),
+2. **Formats**, each from the code that reads it (TRI, `wwww`, `ORIP` done): INFO, the 32 roadside pictures and the road's textures (which picture a kind / a strip uses), CFM (car models),
    FAM (track textures and objects), PBS/PDN (`30FB`), FFN fonts, INV, BAMF, EA ADPCM
    (`EACS`/`1SNh`), BNK, TGV, RPL, CONFIG.DAT. A Python reader and a picture for each
    (`tools/`).
