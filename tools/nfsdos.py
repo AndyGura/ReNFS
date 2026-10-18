@@ -10,6 +10,8 @@ The plan is a comma-separated list of steps:
     hold:<name>:<s>     hold a key down for <s> seconds
     shot:<name>         a picture of the screen: <prefix>_<name>.png
     watch:<s>           print the game's clocks every 0.25 s for <s> seconds
+    peek:<s>:<a>[+<a>..] sample these 32-bit words (flat image addresses, hex) every 5 ms
+                        for <s> seconds: a row every 0.5 s, then each word's values seen
     find                find the game's data object in DOSBox's memory (needed before watch;
                         done by the first watch if not done before)
 
@@ -104,6 +106,28 @@ def watch(secs):
         print("race clock ticks per 100 system ticks: %.2f" % (100.0 * (row[2] - first[2]) / (row[1] - first[1])))
 
 
+def peek(secs, addrs):
+    if base is None:
+        find()
+    addrs = [int(a, 16) for a in addrs.split("+")]
+    print("   t  " + " ".join("%10x" % a for a in addrs))
+    seen = [dict() for a in addrs]
+    t0 = last = time.time()
+    while time.time() - t0 < secs:
+        row = [i32(a) for a in addrs]
+        for s_, v in zip(seen, row):
+            s_[v] = s_.get(v, 0) + 1
+        if time.time() - last >= 0.5:
+            last = time.time()
+            print("%6.2f" % (last - t0) + " ".join("%10d" % v for v in row))
+        time.sleep(0.005)
+    for a, s_ in zip(addrs, seen):
+        vals = sorted(s_)
+        odd = sum(1 for v in vals if v & 1)
+        print("0x%x: %d values, %d odd, from %d to %d%s" % (a, len(vals), odd, vals[0], vals[-1],
+              (": " + " ".join("%d(x%d)" % (v, s_[v]) for v in vals)) if len(vals) <= 12 else ""))
+
+
 try:
     for step in plan.split(","):
         p = step.split(":")
@@ -118,6 +142,8 @@ try:
             shot(p[1])
         elif p[0] == "watch":
             watch(float(p[1]))
+        elif p[0] == "peek":
+            peek(float(p[1]), p[2])
         elif p[0] == "find":
             find()
         sys.stdout.flush()

@@ -195,3 +195,26 @@
 0x5aa84 draw_road_sections
 0x35b04 draw_quad
 0x68430 draw_slice_objects
+# the race's rules, collisions, traffic and police (NOTES 4.3, 4.6, 4.8)
+0x47c88 race_keys
+0x63304 race_check_pause
+0x1fa1c race_timed_calls
+0x519d8 race_update_cars
+0x51760 car_check_finish
+0x5162c car_race_progress
+0x51724 car_past_finish_by
+0x1c878 cars_meet_world
+0x1c6a4 car_car_collide
+0x1e314 car_car_impact
+0x1ebf4 car_wall_collide
+0x1cd40 car_set_drive_kind
+0x1eb54 car_node_in_list
+0x7a040 traffic_police_tick
+0x79728 police_pull_over
+0x79e28 ai_car_engine
+0x2d290 hud_ticket_on
+0x2d2c8 hud_warning_on
+0x2d2ac hud_ticket_or_warning
+0x30424 load_ticket_picture
+0x53214 snd_play_event29
+0x685e0 nothing3

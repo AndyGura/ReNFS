@@ -120,6 +120,9 @@ $G build/ghidra renfs -process nfs_flat.bin -noanalysis -scriptPath tools \
 runs at 100 Hz; the race clock divides it in a 3-cycle (`race_timer_tick` `0x4c454`):
 33.3 Hz by default (measured in DOSBox), 30–60 Hz by `0x12dd0c`. Names: `tools/names.txt`.
 Arithmetic: 16.16 fixed point, the multiply rounds, 65,536 = a full turn (NOTES §4.5).
+A step: the cars' driving every step, their sounds and the gearbox every 2nd, traffic and
+police every 4th (flags `0x12f1bc`, measured). A race ends through `0x13c178`: 1 finished,
+4 arrested (the second police ticket), 0x10 everyone turned back (NOTES §4.3, §4.8).
 The original in DOSBox: `nfs-dos`, `tools/nfsdos.py` (unseen, keys, memory; NOTES §5).
 
 ## File formats (details in `docs/NOTES.md`, "Formats")

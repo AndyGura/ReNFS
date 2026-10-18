@@ -55,6 +55,12 @@ Ghidra project and `build/decomp`, one command). The git history was started aga
   the frame's drawing (NOTES §4.4-4.8).
 - **The original runs here, unseen** (`nfs-dos`, `tools/nfsdos.py`, NOTES §5): into a race
   with keys, its memory read. **The race's 33.3 steps a second is measured**, not only read.
+- (third part) The race's rules mapped: what runs on which step (every step / 2nd / 4th,
+  measured in the original with the new `peek` step; an earlier note had it one place off),
+  how a race ends (finished, arrested, everyone turned back, quit), each racer's results
+  record, cars against walls and each other, the traffic's driving, and the police: stop
+  quickly when caught and it is a warning, after a long chase a ticket, the second ticket an
+  arrest (NOTES §4.3, §4.8). 22 more routines named (215 names in all).
 
 ## Waiting for Danik
 
@@ -63,9 +69,10 @@ races 320x200 / 320x240; commit locally as the work goes.
 
 ## Next, in order
 
-1. **Finish the map** (NOTES §4.8): the opponents and traffic under `drive_opponent`, the
-   collisions, the police, `0x47c88` (the race's rules), the second drawing pass `0x5a4f0`,
-   the widgets `0x71208`.., the Watcom runtime.
+1. **Finish the map** (NOTES §4.8, "Still to name"): the opponents' routines under
+   `drive_opponent`, `0x5efb0` (the replay?), the second drawing pass `0x5a4f0`, the
+   widgets `0x71208`.., the Watcom runtime. Small enough now to leave for when the port
+   reaches them; the formats are the better next step.
 2. **Formats**, each from the code that reads it: `wwww`, TRI + INFO, CFM (car models),
    FAM (track textures and objects), PBS/PDN (`30FB`), FFN fonts, INV, BAMF, EA ADPCM
    (`EACS`/`1SNh`), BNK, TGV, RPL, CONFIG.DAT. A Python reader and a picture for each

@@ -200,10 +200,48 @@ race_from_menu 0x3770c (from fe_main_menu)
   equal to the steps due all along, and the race time on the screen = clock / 33.33
   (1,449 ticks, "00:43.4"). The system clock runs at 100 a second. In the modes `0x15d134` = 1..3 (network, replay?)
   the steps due come from elsewhere (`0x12dd18`, `0xf6d68`).
-- `race_step` `0x6348c`: the controls (`0x71cec` or `0x83908`), `0x1fa1c`, `0x63304`,
-  `0x47c88` (1.5 KB: the race's rules? reads the clock against 100 / 400), then
-  `0x519d8` (1.6 KB: every car? calls `0x136b0` and the sub-steps) with the flags
-  `0x12f1bc` = 1 / 4 / 0x10 on every 2nd / 4th / 8th step (`0x145c94` counts in twos).
+- `race_step` `0x6348c`, in this order: the controls (`0x71cec` or `runsystemtasks`
+  `0x83908`); `race_timed_calls` `0x1fa1c` (two timers at `0x129fb0` that call
+  `race_pause_menu` `0x56474` / `0x63110` once their time comes); `race_check_pause`
+  `0x63304`; `race_keys` `0x47c88`; then, unless the race is held (state 4, or 2 before the
+  start), `race_update_cars` `0x519d8` with the step flags `0x12f1bc`, and the step counter
+  `0x145c94` goes on by 2.
+  - **The step counter and the flags.** `0x145c94` counts in twos (2 a step: it is
+    always even and twice the race clock). The flags are 1 if `(n & 1) == 0`, | 4 if
+    `(n & 3) == 0`, | 0x10 if `(n & 7) == 0`: **1 on every step, 4 on every second step,
+    0x10 on every fourth**. Measured (§5, 2026-10-19, `peek`): over 10 s of a race the
+    counter was never odd and ran at 2 × the clock; of 1,914 samples the flags were 1
+    (910), 5 (508), 21 (496). (An earlier note here said every 2nd / 4th / 8th: wrong.)
+  - The keyboard is a table of keys down by scan code at `0xf7ac8` (`0xf7ac8 + code`).
+    `race_keys`: keys 1..8 (codes 2..9) put the camera on car 0..7 (`camera_set_car(0x129ecc,
+    car, 4)`, `0x12dd54` = the car watched). `race_check_pause`: Esc (code 1) or P (`0x19`)
+    after the first 60 steps opens the pause menu (`0x1f988`); in a network race
+    (`0x15d134`) with a Shift (`0x2a` / `0x36`) held it ends the race instead (`0x15d138` = 1,
+    `0x13c17c` = 2).
+- **`race_update_cars` `0x519d8`** (the step's work on the cars): on flag 4 each car's
+  sound routine (`+0x50e` → `0x13c1e0`); on flag 1 (every step), in state 1,
+  `car_check_finish` `0x51760` for every racer, then the end-of-race test (below), then
+  **every car's driving routine** (`+0x512` → `0x13c1b8`, in road order: the list
+  `0x13c298`) and `car_road_offset`; then `cars_meet_world` `0x1c878`; then the camera
+  (`camera_update`), and the HUD's sums.
+- **Where a car is in its race:** `car_race_progress` `0x5162c` returns 1 before the start
+  and 2 past the finish, 0 between. A point-to-point track (`0x13bb80` = 0) ends at road node
+  `0x13c164` (`+0x48` is the car's node; below node 12 it is before the start); a circuit
+  (`0x13bb80` ≠ 0) at lap `0x13c160` (`+0x50` is the car's lap). `car_past_finish_by`
+  `0x51724`: how many nodes past.
+- **The racers' results**, one record of `0x1d2` bytes a racer (car `+0x516` is its index)
+  from `0x14ea7c`: lap times at `+0` / `+8` + lap × 4, the tickets `+0x1b4` (`0x14ec30`),
+  the warnings `+0x1b8` (`0x14ec34`), **the finish time** `+0x1c0` (`0x14ec3c`: 0 = still
+  racing, the step counter − 300 when past the finish, −999 = turned back past the start),
+  `+0x1ce` (`0x14ec4a`) the place (counted from the times already in).
+- **The end of a race: `0x13c178`** (a copy in `0x13c17c`), 0 while it runs, cleared by
+  `race_init_car_kinds` and `0x506dc`. `race_update_cars` sets **1** once every racer has a
+  finish time and is down to half a unit of speed (`+0x70` ≤ `0x8000`), **0x10** if none of
+  those times is positive (all turned back); `police_pull_over` sets **4** (arrested,
+  below). `race_run` copies it to `0x15d122` (and makes it 2 when `0x15d136` = 0, `0x12da24`
+  = 1 and `0x156cc3` = 0: when that is, not yet known), and `race_from_menu` reads it: 4 →
+  `fe_cop_ticket_movie` (`ticket.qfs`, `cop%d.tgv`), 1 → the winner's film and the
+  standings. `0x68dcc` (the track records?) also tests it for 1 and 0x10.
 - The cars' records: `0x12da30` cars, `0x18c` bytes each from `0x12cccc`.
 - `race_draw_frame` `0x5bc40` ("sub:%4d cam:%c", a debug line): calls the 3D and HUD
   routines `0x59a74` `0x5a4f0` `0x5aa84` `0x5adbc` (`horz`), `0x31cb4` (`mpbd`: the map?),
@@ -284,21 +322,21 @@ race_from_menu 0x3770c (from fe_main_menu)
   (4 = active).
 - **The driving kind** `+0x512` picks the routine called every step through the table
   `0x13c1b8` (filled by `race_init_car_kinds` `0x504c4`); `+0x50e` picks one called every
-  fourth step through `0x13c1e0` (1 = `car_sound_player` `0x10400`, 2 = nothing):
+  second step (flag 4) through `0x13c1e0` (1 = `car_sound_player` `0x10400`, 2 = nothing):
 
   | kind | routine | what | set by |
   |---|---|---|---|
-  | 1 | `drive_player_wait` `0x7ea20` | counts down, then kind 2 | `0x79728`, `0x7e64c` |
+  | 1 | `drive_player_wait` `0x7ea20` | counts down, then kind 2 | `police_pull_over` `0x79728`, `0x7e64c` |
   | 2 | `drive_player` `0x382d0` → `car_physics_player` `0x408e0` (4.4 KB) | the player | `load_car_pbs` |
   | 3 | `drive_opponent` `0x7b34c` (3 KB) | a computer's car | `load_car_pbs`, `0x51200`, kinds 5, 6 |
-  | 4 | `drive_crashed` `0x1cfe0` | after a crash? | `0x1ca9c`, `0x1cb14`, `0x1e314` (collisions) |
-  | 5 | `drive_kind5` `0x7d9e4` | slows by `0x13333` a step (`0x23333` with flag 4), runs the opponent's routine | `0x1cd40` |
+  | 4 | `drive_crashed` `0x1cfe0` | after a crash? | `0x1ca9c`, `0x1cb14`, `car_car_impact` `0x1e314` |
+  | 5 | `drive_kind5` `0x7d9e4` | slows by `0x13333` a step (`0x23333` with flag 4), runs the opponent's routine | `car_set_drive_kind` `0x1cd40` |
   | 6 | `drive_opponent_wait` `0x7e0c8` | held at (8, 200 + 10n, 8), counts down, then kind 3 | `0x7ccc0` |
 
   After its routine, every car goes through `car_road_offset` `0x51598` (its place
   across the road: the road node's position `0x137430 + node × 0x24`, turned by the node's
   angle).
-- `car_physics_player` `0x408e0`: `0x3ea98` / `0x3e9c4` every fourth step (the gearbox?),
+- `car_physics_player` `0x408e0`: `0x3ea98` / `0x3e9c4` every second step (flag 4; the gearbox?),
   `0x3ed68` (the engine: reads `Carspecs` through `0x18a04`), `0x3f260` twice (front 0 and
   rear 1, from `+0x60` / `+0x68`), `0x3f7b8` twice (the axles' forces?), `0x4071c`,
   `0x40230`, `0x4008c`, `replay_mark_highlight` `0x5c6d4` (events 0x28, 0x57, 0x78),
@@ -327,12 +365,46 @@ race_from_menu 0x3770c (from fe_main_menu)
 - `draw_horizon` `0x5adbc` (`horz`), the HUD and dashboard `0x314e4` / `0x31684` /
   `0x3081c` (`b00t`.., the cockpit) / `0x31cb4` (`mpbd`, the map), `0x59a74`, `0x5868c`.
 
-### 4.8 Still to name
+### 4.8 Cars meeting cars, walls, traffic and the police
 
-The opponents' and traffic routines under `drive_opponent` (`0x7cf98` 2.6 KB, `0x7b178`,
-`0x7dbd8`, `0x77c..`), the collisions (`0x1e314`, `0x2afb8`, `0x2a918`), the police
-(`0x30424` shows the tickets; the chase itself?), `0x47c88` (the race's rules), `0x1fa1c`
-/ `0x63304` in `race_step`, the second drawing pass `0x5a4f0`, the widget block
+- **`cars_meet_world` `0x1c878`**, every step after the driving: every 4th call
+  (`0x129fac` counts down from 4) `traffic_police_tick` `0x7a040`. Then for every racer
+  `0x1c800`, and `car_wall_collide` `0x1ebf4` when the car is further across the road than
+  the node's lanes reach (node byte 4: lanes on each side, a nibble each; lane widths from
+  `0x15d15a`). Then each car (not kind 6, flags `+0x51a` & 6 = 6) against the next ones in
+  road order, as long as they are within two nodes: if both are within the sum of their
+  sizes (`+0xc0` → `+0x70`) in x and in z, `car_car_collide` `0x1c6a4` →
+  `car_car_impact` `0x1e314` (951 bytes: the push, `0x2afb8`, `0x2b864` (6 KB: the bodies'
+  dents?), the replay's highlight `0x5c6d4`, and kind 4 through `car_set_drive_kind`).
+- `car_set_drive_kind` `0x1cd40` (car, kind): sets `+0x512` and puts the car's position,
+  angles and speeds back from its body record (`+0xc0`). Kind 4 = crashed; if the car is
+  the one watched, `snd_play_event29` `0x53214` (sound 0x29 through `0x95a7a`, the sound
+  library's play).
+- **`traffic_police_tick` `0x7a040`** (3.7 KB, every 4th step = 8.3 times a second): every
+  car that is not a racer (`+0x516` < 0 or ≥ `0x12da30`) and not crashed drives in its lane:
+  `0x786d4` (939 b), the lane choices on the node's lanes (byte 4), `0x78c88` (2.2 KB, the
+  steering), `0x78a80`, `0x7850c` (a lane change), `0x78370` (slow down to 25 near the
+  player). Cars with `+0x174` & 8 are **police**: `police_pull_over` `0x79728`. Cars with
+  `+0x174` & 4: `ai_car_engine` `0x79e28` (past the finish they pull to the side; the gear
+  from the speed against the table at `+0x308`, the engine's revs `+0x3c1` eased by 1/8).
+- **`police_pull_over` `0x79728`**: (for a police car chasing, `+0x175` & 4) once it has
+  caught the player (the player's `+0x176` & 1, set when the police car is more than two
+  nodes ahead, or level and both slower than 3) and both are stopped (speeds `+0x15c` /
+  `+0x70` under 1), the player gets **a warning** (`0x14ec34` + 1, `hud_warning_on` `0x2d2c8`) if the chase's
+  counter `0x15d4b8` (`traffic_police_tick` adds to it) is still under the limit
+  `0x15d2d8`, else **a ticket** (`0x14ec30` + 1, `hud_ticket_on` `0x2d290`). Either way
+  the player's car goes to kind 1 (wait, then drive again), the chase ends (`0x15d4b8` =
+  `0xf74a8` = 0) and the police car is put back (`0x7c030`, `0x7aeb8`). **On the second
+  ticket the race ends: `0x13c178` = 4, arrested**, and the player's finish time is 0.
+  The limits `0x15d2d8` / `0x15d2e0` / `0x15d2e4` are set by `drive_opponent_wait`.
+- The message: `hud_ticket_on` sets `0xea81c`, `hud_warning_on` `0xea820`, both with a
+  time of −1000 (`0xea824`); `hud_ticket_or_warning` `0x2d2ac` tells if one is up (the
+  pause waits for it); `load_ticket_picture` `0x30424` loads `ticketDH` / `warnDH` ..
+  (`tickeg..` / `gwarn..` German, `..DL` the low-detail screen) from a `.qfs`.
+
+Still to name: the opponents' routines under `drive_opponent` (`0x7cf98` 2.6 KB,
+`0x7b178`, `0x7dbd8`, `0x77c..`), `0x5efb0` (first in `race_update_cars` when the state is
+not 0: the replay?), `0x2a918`, the second drawing pass `0x5a4f0`, the widget block
 `0x71208`..`0x74dcc`, Watcom's runtime.
 
 ## 5. The original in DOSBox (2026-10-19)
@@ -346,6 +418,8 @@ The opponents' and traffic routines under `drive_opponent` (`0x7cf98` 2.6 KB, `0
 - **`tools/nfsdos.py <prefix> "<plan>"`** runs it unseen on `Xvfb :77` as its own child,
   presses keys (XTEST), takes pictures, finds the data object in DOSBox's memory by the
   car sound banks' names (`0xe2d14`) and reads the clocks (the header lists what).
+  `peek:<s>:<a>+<a>..` samples any words (flat addresses) every 5 ms and prints the
+  values each took: the way to check a rate or a set of flags in the running original.
 - The way into a single race with the defaults (Ferrari 512TR against the Diablo,
   head to head, City), in seconds from the start: `wait:20` (the EA logo, Pioneer, the
   intro, the title), `key:Return:5` ×3 (title, game mode SINGLE PLAYER, the name
