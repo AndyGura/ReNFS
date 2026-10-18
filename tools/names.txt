@@ -266,3 +266,12 @@
 0x18990 car_torque_load
 0x8b8f0 bamf_blit
 0x30b64 draw_view_through_mask
+0x34ba0 movie_play
+0x346dc movie_loop
+0x8d4ac tgv_frame
+0x8d190 tgv_key
+0x8cf00 tgv_delta
+0x8cd60 bits_signed
+0x8cdf0 tgv_packed_blocks
+0xa6ec8 bits_unsigned
+0xa6f6c tgv_build_frame

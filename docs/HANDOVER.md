@@ -91,6 +91,10 @@ Ghidra project and `build/decomp`, one command). The git history was started aga
   The car files give the torque curves, the gears' top speeds (the real cars' figures),
   the rev limits and which cars have ABS and traction control (`build/cars/torque.png`).
 
+- **The movies play** (`tools/tgv.py`, NOTES §3.14): all 26 (EA logo, title, attract
+  loops, car showcases, police and winners' clips) decode frame for frame the same as
+  ffmpeg's own decoder, sound included (`build/tgv/title.png`).
+
 ## Waiting for Danik
 
 Nothing. Decided 2026-10-18: menus 640x480 on the MiSTer (interlaced at 15 kHz),
@@ -103,7 +107,7 @@ races 320x200 / 320x240; commit locally as the work goes.
    widgets `0x71208`.., the Watcom runtime. Small enough now to leave for when the port
    reaches them; the formats are the better next step.
 2. **Formats**, each from the code that reads it (TRI, `wwww`, `ORIP`, the road's textures and
-   roadside pictures, FFN fonts, EA sound, the packers, PBS/PDN first reading, INFO, INV, BAMF done): TGV, RPL, CONFIG.DAT. A Python reader and a picture for each
+   roadside pictures, FFN fonts, EA sound, the packers, PBS/PDN first reading, INFO, INV, BAMF, TGV done): RPL, CONFIG.DAT. A Python reader and a picture for each
    (`tools/`).
 3. **The port's skeleton** (`port/`, CMake, SDL2, C): an 8-bit framebuffer at 640x480 and
    320x200, palette, the file layer (case-insensitive names in the CD folder; the data

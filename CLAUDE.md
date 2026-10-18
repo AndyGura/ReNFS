@@ -138,7 +138,7 @@ The original in DOSBox: `nfs-dos`, `tools/nfsdos.py` (unseen, keys, memory; NOTE
 | `xxFB` | EA's packers: RefPack `10FB`, Huffman `30FB`/`32FB`/`34FB`, pairs `46FB` | read (`tools/unpack.py`, equal to the game's own on all 527) |
 | `.EAS` `.ASF` `.AS4` | EA sound/music (`EACS`, `1SNh` streams): PCM or IMA ADPCM | read (`tools/eacs.py`) |
 | `.BNK` | EA sound bank (engines, collisions): 128 offsets, `EACS` records | read (`tools/eacs.py`) |
-| `.TGV` | EA video (`kVGT`): intro, attract, car showcase | to do |
+| `.TGV` | EA video: `kVGT` key frames (RefPack), `fVGT` 4x4 blocks + motion vectors, 320x240 at 15 a second | read (`tools/tgv.py`, equal to ffmpeg) |
 | `.FFN` | fonts (`FNTF`): 4-bit smoothed bitmap + character table | read (`tools/ffn.py`) |
 | `.INV` | the menus' inverse palettes (15-bit colour → entry), 32 KB | read (`tools/inv.py`) |
 | `.B00`.. `.MMB` `.FMM` | `BAMF` blit lists: which spans of the 3D view reach the screen (HUD, dashboards) | read (`tools/bamf.py`) |

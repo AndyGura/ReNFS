@@ -264,8 +264,7 @@ stream plays on (0..15, records of 0x28 at `0x160fa4`; -1 in EAS / BNK), +0xc u3
   `.EAS` starts from 0, 0. **Checked against ffmpeg's EA decoder** (`adpcm_ima_ea_eacs`):
   with its rounding ((2n+1)·step/8) every sample of ROCK1.AS4 is equal; the tool keeps the
   game's bit-by-bit rounding (differences up to 72 of 32768).
-- Not sound: `0x8cd60` (signed n-bit fields), `0x8cdf0` (2-bit codes through a 4-entry
-  table), `0x8cf00` (10-bit fields into a table) build pictures from blocks: the TGV video?
+- Not sound: `0x8cd60`, `0x8cdf0`, `0x8cf00` are the TGV video's (§3.14).
 
 ### 3.9 EA's packers: 10FB, 30FB/32FB/34FB, 46FB — read (`tools/unpack.py`, 2026-10-19)
 
@@ -368,10 +367,36 @@ u16 offset in the bank, u16 length. Every file's spans end exactly at its size.
   ways of copying): the windscreen and side window, A-pillar and mirror cut out
   (`build/bamf/ansxdh.png`); the dashboard picture is `<car>DH.FSH`.
 
+### 3.14 TGV (the movies) — read (`tools/tgv.py`, 2026-10-19)
+
+The 26 `FRONTEND/MOVIE/*.TGV`: the EA logo, the title, three attract loops, a showcase a
+car, three police clips (and German `GCOP`), seven winners' clips. Played by `movie_play`
+`0x34ba0` → `movie_loop` `0x346dc` (from `fe_attract_mode` `0x34284`, `fe_winner_movie`,
+`fe_cop_ticket_movie`); a frame decoded by `tgv_frame` `0x8d4ac`. All 320x240, 15 frames a
+second, the sound an EA stream (16 kHz 8-bit stereo PCM in all checked).
+- Blocks of u32 tag + u32 size (the 8 included): `1SNh`/`1SNd` the sound (§3.8), `kVGT` a
+  key frame, `fVGT` a delta frame.
+- **`kVGT`** (`tgv_key` `0x8d190`): `+8` u16 width, `+0xa` height, `+0xc` u16 (0 in all),
+  `+0xe` u16 colours (256), `+0x10` u32 flags (bit 0 = the picture unpacked; 0 in all
+  1,236), `+0x14` the palette, 3 bytes a colour, **8-bit** (values to 255), copied as it is
+  to the decoder's `+0x44`; then the picture, RefPack (`10FB`, §3.9). A new size frees and
+  allocates the two picture buffers (`+0x28` current, `+0x2c` previous).
+- **`fVGT`** (`tgv_delta` `0x8cf00`): swaps the two buffers, then `+8` u16 vectors, `+0xa`
+  raw blocks, `+0xc` packed blocks, `+0xe` bits an index. From `+0x14`: the vectors (x, y:
+  pairs of 10-bit signed fields, least significant bit first, `bits_signed` `0x8cd60`; the
+  run rounded up to 32 bits); the raw 4x4 blocks (16 bytes, row by row); the packed blocks
+  (8 bytes: 4 colours, then a u32 LE of sixteen 2-bit codes, the top two bits first,
+  `tgv_packed_blocks` `0x8cdf0`); then one index a 4x4 block of the picture
+  (`bits_unsigned` `0xa6ec8`, least significant bit first). `tgv_build_frame` `0xa6f6c`,
+  left to right, top to bottom: an index below the vectors' number copies the 4x4 at
+  (this place + that vector) from the previous picture (a row table makes dy·width);
+  any other is block (index − vectors) of the raw blocks followed by the packed ones.
+- **Checked against ffmpeg's `tgv` decoder**: all 26 movies, 11,833 frames, equal pixel for
+  pixel; TITLE's sound equal sample for sample.
+
 ### 3.4 Still to read
 
-`kVGT` (TGV video, 320x192?), `.RPL`, `CONFIG.DAT` (player name, replay
-names).
+`.RPL`, `CONFIG.DAT` (player name, replay names).
 
 ## 4. Map of the program (2026-10-19)
 
