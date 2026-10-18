@@ -112,6 +112,14 @@ $G build/ghidra renfs -process nfs_flat.bin -noanalysis -scriptPath tools \
 
 ---
 
+## The program (details: NOTES §4)
+
+`main` `0x4716c` → `startup` `0x42054` → `fe_outer_loop` `0x47000` → `fe_main_menu`
+`0x42c30` → `race_from_menu` `0x3770c` → `race_run` `0x37228` → `race_main` `0x6356c`:
+`race_step` `0x6348c` once per race-clock tick, then `race_draw_frame` `0x5bc40`. The timer
+runs at 100 Hz; the race clock divides it in a 3-cycle (`race_timer_tick` `0x4c454`):
+33.3 Hz by default, 30–60 Hz by `0x12dd0c`. Names: `tools/names.txt`.
+
 ## File formats (details in `docs/NOTES.md`, "Formats")
 
 | Ext | What | Status |

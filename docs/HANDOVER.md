@@ -36,6 +36,20 @@ Ghidra project and `build/decomp`, one command). The git history was started aga
 - The launcher's catalogue needs no change: it is made from `package/games.txt` by
   `distribution.py` (the skill's step 3 predates that).
 
+## Done (2026-10-19, second session)
+
+- The project rebuilt after it was lost (see the top). `tools/rebuild.sh` is now general:
+  `--decomp` re-applies `tools/names.txt` and decompiles again in minutes, and it takes the
+  entry, the code range and the BSS from the EXE's layout.
+- **The skill `reverse-engineer-dos-game`** (`~/.claude/skills/`): the method of
+  OpenScreamer and ReNFS, the toolkit, the decompiler's traps, checking against DOSBox.
+  What ReNFS learns that holds for any game goes there too.
+- **The program mapped, first pass** (NOTES §4): 85 of the game's routines named (start-up,
+  the front end's screens, the race and its loading, HUD, speech, replays, saves). The race
+  loop is `race_main` `0x6348c` steps + `race_draw_frame` `0x5bc40`. The race clock (the
+  physics' rate) is 100 Hz divided in a 3-cycle: 33.3 steps a second by default, 30 to 60
+  by a setting (NOTES §4.3). `tools/strmap.py` lists the strings each routine uses.
+
 ## Waiting for Danik
 
 Nothing. Decided 2026-10-18: menus 640x480 on the MiSTer (interlaced at 15 kHz),
@@ -43,10 +57,11 @@ races 320x200 / 320x240; commit locally as the work goes.
 
 ## Next, in order
 
-1. **Map the program.** Name the top-level routines: the front end's loop (`0x47000`?),
-   the race (`0x3770c` → `0x1a5d8` / `0x1b6a0`?), the frame loop, the renderer, the car
-   physics, opponents / traffic / police, sound, network (skip), replay. Put each name into
-   `tools/names.txt` and the findings into `docs/NOTES.md`.
+1. **Finish the map** (NOTES §4.4): `0x83908`, the widgets `0x71208`.., the renderer under
+   `race_draw_frame`, the car physics under `0x519d8` / `0x136b0`, opponents / traffic /
+   police, the Watcom runtime. Then set up the original in DOSBox (the skill's
+   `reference/verification.md`; the download's `TNFSSE/` has a `dosbox.conf`) and confirm
+   the race clock's 33.3 steps a second.
 2. **Formats**, each from the code that reads it: `wwww`, TRI + INFO, CFM (car models),
    FAM (track textures and objects), PBS/PDN (`30FB`), FFN fonts, INV, BAMF, EA ADPCM
    (`EACS`/`1SNh`), BNK, TGV, RPL, CONFIG.DAT. A Python reader and a picture for each
