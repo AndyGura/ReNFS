@@ -232,11 +232,45 @@ first, rows of (4 × width + 7) / 8 bytes); a pixel is a level 0..15 (the edges'
 mixed with the text's colour when drawn. Checked by drawing a line of text with each font
 (`build/ffn/`).
 
+### 3.8 EA sound: EAS, ASF / AS4, BNK — read (`tools/eacs.py`, 2026-10-19)
+
+One header, **`EACS`**, everywhere (read by `snd_stream_header` `0x8c8f3`, `snd_play_eacs`
+`0xa1f11`, `0x95b4e`, `0xad887`): +4 u32 samples a second (16000, 16247, 22050), +8 u8 bytes
+a sample, +9 u8 channels, +0xa u8 compression (0 PCM, 2 IMA ADPCM), +0xb i8 the voice a
+stream plays on (0..15, records of 0x28 at `0x160fa4`; -1 in EAS / BNK), +0xc u32 samples,
++0x10 i32 loop start (-1 none), +0x14 u32 loop length, +0x18 u32 where the data starts.
+- **`.EAS`** (193: speech, `SPEECH/`, `GSPEECH/`): the header at 0, the data at 0x20. 170 PCM
+  (8-bit signed: the mixer's volume table `0xa06a5` maps byte 0x80 to -128), 23 IMA.
+- **`.BNK`** (38: engines, collisions, sirens): 128 u32 offsets (0 = none) of 0x48-byte
+  records; a record's +0x28 is the header, its +4 the header's file position, its data
+  offset a file position too; +0, +0xc, +0x14..+0x27 (volumes, pitch?) still to read.
+  All PCM.
+- **`.ASF` / `.AS4`** (3 PCM 16 kHz, 12 IMA 22 kHz music): blocks of u32 tag + u32 size
+  (the 8 included), handled by `snd_stream_block` `0x8cbf5` and queued for the mixer
+  (`0x8c9fe`, the list at `0x15ece4`/`0x15ece8`): `1SNh` (the header at +8, data from +0x28),
+  `1SNd` data, `1SNl` at the loop's end (u32: the file position of the block the loop starts
+  with: checked on all 14, every loop starts on a block), `1SNe` the end (CREDITS.ASF has
+  1.7 MB after it that is not part of the sound). The headers' sample counts equal the
+  blocks' sums.
+- **The IMA ADPCM** (`snd_voice_start` `0x9ff4c` sets the voice's mode 2 and its decoder
+  `[voice+0x58]`: `ima_decode_mono` `0xadfdc` or `ima_decode_stereo` `0xae084`): standard
+  IMA, the tables pre-multiplied in the data (`0x12669c`: 89 steps × 16 codes of ready
+  differences, computed bit by bit: step/8 + step·b2 + step/2·b1 + step/4·b0; `0x127cdc`:
+  the 8 index changes ×64; the index is kept ×64, clamped to 0..0x1600). That is why a search
+  for the step table found nothing. High nibble first; stereo is one byte a sample, high
+  nibble the first channel. A stream's data block (and the 1SNh's data) starts with 0x14
+  bytes: u32 samples, u32 step index channel 0, 1, u32 value channel 0, 1 (the voice packs
+  them as `+0x30` = index0·64 | index1·64 << 16, `+0x34` = value0 | value1 << 16). An IMA
+  `.EAS` starts from 0, 0. **Checked against ffmpeg's EA decoder** (`adpcm_ima_ea_eacs`):
+  with its rounding ((2n+1)·step/8) every sample of ROCK1.AS4 is equal; the tool keeps the
+  game's bit-by-bit rounding (differences up to 72 of 32768).
+- Not sound: `0x8cd60` (signed n-bit fields), `0x8cdf0` (2-bit codes through a 4-entry
+  table), `0x8cf00` (10-bit fields into a table) build pictures from blocks: the TGV video?
+
 ### 3.4 Still to read
 
 `BAMF`, `30FB`-headed
-`.PBS` / `.PDN` (RefPack with flag bits `0x20`?), `.BNK` (EA sound bank), `EACS` / `1SNh`
-(EA ADPCM: `.EAS` speech, `.ASF` / `.AS4` music), `kVGT` (TGV video, 320x192?), `.INV` (32 KB), `BAMF` (`MASKHI.B00` ..), `.RPL`, `CONFIG.DAT` (player name, replay
+`.PBS` / `.PDN` (RefPack with flag bits `0x20`?), `kVGT` (TGV video, 320x192?), `.INV` (32 KB), `BAMF` (`MASKHI.B00` ..), `.RPL`, `CONFIG.DAT` (player name, replay
 names).
 
 ## 4. Map of the program (2026-10-19)

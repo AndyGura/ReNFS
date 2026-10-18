@@ -245,3 +245,13 @@
 0x5b34c load_track_textures
 0x59490 draw_object
 0x59430 object_on_screen
+0x8c8f3 snd_stream_header
+0x8c9fe snd_stream_queue
+0x8cbf5 snd_stream_block
+0x8ca7b snd_stream_next
+0xa1f11 snd_play_eacs
+0x9ff4c snd_voice_start
+0xa062c snd_voice_rate
+0xa06a5 snd_volume_tables
+0xadfdc ima_decode_mono
+0xae084 ima_decode_stereo

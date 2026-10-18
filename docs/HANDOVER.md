@@ -78,6 +78,12 @@ Ghidra project and `build/decomp`, one command). The git history was started aga
   buildings, next to the DOSBox screenshot of the same spot (`build/tri/compare_cy1.png`).
   The track, model and texture formats are proved together.
 
+- **Fonts and sound are read** (`tools/ffn.py`, `tools/eacs.py`, NOTES §3.7, §3.8): every
+  font draws text; every speech, music and sound-bank file converts to WAV
+  (`build/snd/`). The music's compression is standard IMA ADPCM, found in the mixer's own
+  decoder; ROCK1 matches ffmpeg's EA decoder sample for sample. The music loops are
+  understood (a marker block points back at the block the loop starts with).
+
 ## Waiting for Danik
 
 Nothing. Decided 2026-10-18: menus 640x480 on the MiSTer (interlaced at 15 kHz),
@@ -90,7 +96,7 @@ races 320x200 / 320x240; commit locally as the work goes.
    widgets `0x71208`.., the Watcom runtime. Small enough now to leave for when the port
    reaches them; the formats are the better next step.
 2. **Formats**, each from the code that reads it (TRI, `wwww`, `ORIP`, the road's textures and
-   roadside pictures, FFN fonts done): EA sound (`EACS`/`1SNh`, BNK), INFO, PBS/PDN (`30FB`), INV, BAMF, TGV, RPL, CONFIG.DAT. A Python reader and a picture for each
+   roadside pictures, FFN fonts, EA sound done): INFO, PBS/PDN (`30FB`), INV, BAMF, TGV, RPL, CONFIG.DAT. A Python reader and a picture for each
    (`tools/`).
 3. **The port's skeleton** (`port/`, CMake, SDL2, C): an 8-bit framebuffer at 640x480 and
    320x200, palette, the file layer (case-insensitive names in the CD folder; the data

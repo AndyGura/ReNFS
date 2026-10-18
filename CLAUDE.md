@@ -136,8 +136,8 @@ The original in DOSBox: `nfs-dos`, `tools/nfsdos.py` (unseen, keys, memory; NOTE
 | `.TRI` | track: road nodes (x y z, heading, lanes), speeds a section, objects, the road's 3D points | read (`tools/tri.py`) |
 | `xxxINFO` | a track's text settings (sky, colours) | to do |
 | `.PBS` `.PDN` | car physics / performance, `30FB` (compressed or obfuscated) | to do |
-| `.EAS` `.ASF` `.AS4` | EA ADPCM sound/music (`EACS`, `1SNh`) | to do |
-| `.BNK` | EA sound bank (engines, collisions) | to do |
+| `.EAS` `.ASF` `.AS4` | EA sound/music (`EACS`, `1SNh` streams): PCM or IMA ADPCM | read (`tools/eacs.py`) |
+| `.BNK` | EA sound bank (engines, collisions): 128 offsets, `EACS` records | read (`tools/eacs.py`) |
 | `.TGV` | EA video (`kVGT`): intro, attract, car showcase | to do |
 | `.FFN` | fonts (`FNTF`): 4-bit smoothed bitmap + character table | read (`tools/ffn.py`) |
 | `.INV` | 32 KB tables beside menu art (hit masks?) | to do |
