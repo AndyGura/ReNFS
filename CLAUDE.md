@@ -134,7 +134,7 @@ The original in DOSBox: `nfs-dos`, `tools/nfsdos.py` (unseen, keys, memory; NOTE
 | `.CFM` `.FAM` | `wwww` containers of `ORIP` 3D models (1/128 units) + `SHPI` textures: cars, track families | read (`tools/orip.py`) |
 | `.FMM` `.MMB` | `wwww` of `BAMF` (dashboards) | to do |
 | `.TRI` | track: road nodes (x y z, heading, lanes), speeds a section, objects, the road's 3D points | read (`tools/tri.py`) |
-| `xxxINFO` | a track's text settings (sky, colours) | to do |
+| `xxxINFO` | a track's sky and horizon settings, text | read (`tools/trackinfo.py`) |
 | `.PBS` `.PDN` | car physics (torque, gears, ABS/TCS), Huffman-packed `30FB` | first reading (`tools/carspec.py`) |
 | `xxFB` | EA's packers: RefPack `10FB`, Huffman `30FB`/`32FB`/`34FB`, pairs `46FB` | read (`tools/unpack.py`, equal to the game's own on all 527) |
 | `.EAS` `.ASF` `.AS4` | EA sound/music (`EACS`, `1SNh` streams): PCM or IMA ADPCM | read (`tools/eacs.py`) |

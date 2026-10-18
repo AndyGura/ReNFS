@@ -319,6 +319,23 @@ is written (`car_physics_player`, `0x3fb90`, `0x3ed68` ..). `build/cars/torque.p
   cars'); `+0x1c4` the rev limit (NSX 8000) → `+0x338`; `+0x1c8` → `+0x469` (5 for the
   player cars: the gears?). Traffic cars have 0 in the head, gears and rev limit.
 
+### 3.11 Track INFO (sky and horizon) — read (`tools/trackinfo.py`, 2026-10-19)
+
+`SIMDATA/MISC/<track>INFO`, text with its own labels, read by `load_track_info` `0x49dc0`:
+a line at a time (`0x38c50`: lines starting `#` or empty skipped), one value a line. Eight
+decimals into 16.16 (`0x41b68`): vert offset near/far → `0x12ef44`/`48`, zoffset near/far →
+`4c`/`50`, height near/far → `58`/`60`, radius near/far → `54`/`5c`; colour top and bottom,
+three numbers on a line packed a<<10 | b<<5 | c → `0x12ef64`/`68` (all tracks: 0 1 2 and
+3 4 5); then `atoi`: ring type (1 on CL3, AL3) → `6c`, ring y offset ("bigger places the
+horizon further down", -60 / -15 / -63) → `70`, ring height (112) → `74`; "RGB TIME OF DAY
+VALUES": three groups of five → `0x12ef78 + 4g + 12k` (the fifth ×256; CY1: 400 202 80 2572
+216 / 255 255 255 0 255 / 296 52 52 0 255: colours above 255 and an angle?, no direct reader
+found), and one last value → `0x12efb4` (1 on CL3, AL3). Users: `load_horizon`, `0x4a9d0`,
+`0x4ace8`, `race_menu_options`. CY3INFO has a stray "o" line that `atoi` reads as 0.
+**The files win**: the flag `0xec5d8` is 1; only when a file is missing (or `0x12c340` = 1)
+does the game take the built-in table (33 values a track from `0xec5dc`, 0x84 apart, picked
+by the names cl1 .. tr1), which holds older values than the files.
+
 ### 3.4 Still to read
 
 `kVGT` (TGV video, 320x192?), `.INV` (32 KB), `BAMF` (`MASKHI.B00` ..), `.RPL`, `CONFIG.DAT` (player name, replay
