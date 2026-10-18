@@ -72,19 +72,71 @@ offset of a 4-entry container is 0x18). Entries nest.
   [3] a `wwww` of `wwww`s of (`ORIP`, `SHPI`) = 3D objects.
 - `.FMM` (a dashboard, `<car>DH` / `DL` = 640 / 320): 4 `BAMF`. `.MMB`: 12 `BAMF`.
 
-### 3.3 TRI (track) — loader `0x4f010`, called from `0x5ba1c`
+### 3.3 TRI (track) — read (`tools/tri.py`, 2026-10-19)
 
-The loader builds `<path><name>.tri` (`"%s%s.tri"` at `0xe2b90`) and reads it in several
-pieces (`0x4e880`) into buffers from `0x828a8` (`getmemblock`-like). Header: u32 `0x11`;
-the u16 at `+4` is 0 for the point-to-point tracks (AL, CL, CY: an open road) and the
-loop length / 4 for the circuits (TR1 0x80, TR2 0x100); `+6` u16 (AL1 0x208, CL1 0x1E0).
-Read in the loader: `+0x18` and `+0x20` (u16 into a race record), `+0x15b0c` (3 bytes a
-road node: scaled by a factor from a table at `0xed12c` / `0xed1d4` picked by two
-settings: colours or lighting per node?), `+0x16214` (a count × 16 bytes, then a list of
-16-byte records ending in -1). AL22.TRI is the same as AL2 with 12 bytes more (the
-other direction? to check).
-Per track a text file `<track>INFO`: horizon / sky ring settings (`#ring y offset`,
-`#colour top` / `bottom`, `#RGB TIME OF DAY VALUES`).
+`SIMDATA/MISC/<track><n>.TRI`: AL1-3 (alpine), CL1-3 (coast), CY1-3 (city) are the open
+roads, in three segments each; TR1-7 the circuits; AL22 = AL2 + 12 bytes. Read by
+`load_tri` `0x4f010` (from `race_load_track` `0x5ba1c`) in three parts, each in memory
+under the name the loader gives it, and **the file stays open**: the road's 3D points are
+read from it section by section as the car goes (`0x4ee30` → `0x4ed74` → `0x4eb00`).
+
+1. **"RoadSection"**, 0x1621c bytes, at `0x136608`:
+
+   | at | what | proof |
+   |---|---|---|
+   | `+0` | u32 0x11 | every file |
+   | `+4` | u16 sections in the loop, 0 = an open road | `load_tri`: loop → node mask `0x13bb88` = 4 × n − 1, `0x13bb80` = 1 |
+   | `+6` | u16 sections (4 road nodes each) | the speed loop runs to `+6` × 4 nodes |
+   | `+8` | i32 node spacing, 6.0 (16.16) on every track | the nodes are 6.00 apart |
+   | `+0xc` | 3 × i32 (?), small, different per track | |
+   | `+0x18`, `+0x20` | copied into node 0's `+0x14` / `+0x18` | `load_tri` |
+   | `+0x24` | u32 the size of part 3 | `allocmem("TrackSlices", +0x24)` |
+   | `+0x28` | u32 33..63 (?) | |
+   | `+0x2c` | 600 × u32: each section's offset in part 3 | `0x4ed74`, `0x4eb00` |
+   | `+0x98c` | **2,400 road nodes** × 0x24 → `0x137430` | |
+   | `+0x15b0c` | 600 × 3 bytes, one a section → `0xf74a0` | below |
+   | `+0x16214` | u32 object kinds (64) | |
+   | `+0x16218` | u32 the most placements (1000; `0x1c630` keeps 2 bytes of state each) | |
+
+   **A road node** (0x24 bytes): `+0..3` four bytes (widths? `+1` / 8 picks a lane width in
+   `cars_meet_world`), `+4` the lanes, a nibble a side (high = the left / negative side, low
+   = the right), `+5..7` bytes (`+7` picks a row of `0xed284` in `0x4f7d4`),
+   `+8` **x, y (up), z** as i32 16.16, `+0x14` u16 (the slope?), **`+0x18` u16 the heading**
+   (0x4000 = a full turn; the code takes it × 4 for its 65,536: `car_road_offset`
+   `0x51598` reads the dword at `+0x16` >> 16 << 10 >> 8), `+0x1a..0x23` (?).
+   Proof of the heading: on all 17 tracks it is atan2(dx, dz) towards the next node within
+   1-6 parts in 16,384 (one node of AL1 off by 43).
+   **Left and right**: in the original (DOSBox, `nfsdos.py car:`), at the start of a race on
+   CY1 the player (right-hand lane on the screen) is at x = +2.5 and the opponent at −2.5,
+   both heading +z: +x is the driver's right when the heading is 0, so a picture with x to
+   the right and z up is not mirrored.
+   **The section bytes**: `[0]` scaled at load by a factor from `0xed12c` / `0xed1d4`
+   (picked by two settings, `0x47b58` / `0x47b50`: the difficulty?), read by the
+   opponents (`0x7cf98`): their speed; `[1]` **the speed limit** (`police_pull_over`: the
+   chase starts when the player is faster than it × 65,536): 27 on the coast and the
+   mountains, 33 in the city, 9 / 16 / 18 on the circuits, 2 or 9 or 10 in a few places;
+   `[2]` read by the traffic (`0x786d4`, `0x7e64c`), about 0.6 × `[0]`, 5 on most circuits.
+2. **"RoadObjects"** (`0x13bb84`): "SJBO", u32 size (with this 12-byte head), u32 0. Then
+   64 **kinds** × 16 bytes: `+1` type (1 = a point only, else a flat picture), `+2` u16 the
+   picture × 4, `+4` i32 width, `+0xc` i32 height (16.16). Then the **placements**
+   (`0x13bb94`) × 16 bytes up to an i32 −1, in node order: `+0` i32 node, `+4` u8 kind,
+   `+5` u8 angle (256 a turn, added to the node's heading), `+0xa` 3 × i16 x, y, z from the
+   node's position (8.8, the world's axes). Read by `0x4f7d4` (the corners of a flat
+   object: ± width / 2 along its angle, height up) and `car_node_in_list` (walks them by
+   node). 584..998 placements on the open roads, 138..595 on the circuits.
+3. **"TrackSlices"** (`0x136604`), one record a section: "TRKD", u32, u32, 12 bytes
+   (copied as they are: the strips' textures?), then **4 rows (one a node) of 11 points ×
+   3 × i16** in 1/128 units: point 0 from the node's position, points 1 and 6 from point 0,
+   every other point from the one before it (1..5 one side, 6..10 the other). 288 bytes a
+   section. `0x4eb00` turns one into 12 + 528 bytes (i32 points) in a ring of 64 at
+   `0x1365e8` (0x8700 bytes); `0x4ee30` keeps the 30 sections round the car there.
+
+Units: a node is 6 units from the next; TR1 is 3,066 units round; the speed limits 27 / 33
+would be 60 / 74 mph in metres a second. **Probably metres**, not yet proved (the HUD shows
+"5.2 MILES" at the start of CY1, 11,514 units long: the race may not run the whole file).
+`tools/tri.py info|nodes|png`: the picture (`build/tri/`) shows the road strips (grey the
+two inner ones a side, then green, then brown), the centre line, the start, and the
+objects (red: pictures, blue: points).
 
 ### 3.4 Still to read
 
@@ -415,6 +467,12 @@ not 0: the replay?), `0x2a918`, the second drawing pass `0x5a4f0`, the widget bl
   starts it in DOSBox Staging (flatpak) with `~/dosgames/nfs.conf` (Screamer's settings:
   S3, 60000 cycles, Pentium, SB16): `mount C ~/dosgames/nfs`, `imgmount D <iso> -t iso`,
   `C:\NFSSE\NFS`. UNIVBE is not needed (DOSBox's VESA is enough).
+- **The game's pointers are its own addresses, not DOSBox's.** DOS/4GW runs with paging:
+  the data object is at its own address 0x2a4000 but physically at 0xea7000. Its own
+  address comes from any relocated pointer in it (`0xea828` holds image `0xe0afc`), and the
+  game's memory is one run, so host = where the data object was found + (pointer − its own
+  address). Checked: the road nodes' pointer `0x137430` read that way gives CY1's node 0
+  byte for byte. `nfsdos.py` does this (`dos()`, the `car:` step).
 - **`tools/nfsdos.py <prefix> "<plan>"`** runs it unseen on `Xvfb :77` as its own child,
   presses keys (XTEST), takes pictures, finds the data object in DOSBox's memory by the
   car sound banks' names (`0xe2d14`) and reads the clocks (the header lists what).

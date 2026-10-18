@@ -12,6 +12,8 @@ The plan is a comma-separated list of steps:
     watch:<s>           print the game's clocks every 0.25 s for <s> seconds
     peek:<s>:<a>[+<a>..] sample these 32-bit words (flat image addresses, hex) every 5 ms
                         for <s> seconds: a row every 0.5 s, then each word's values seen
+    car:<n>             car n's record (through the pointers at 0x13c24c): position +0 +4 +8
+                        (16.16), road node +0x48, across the road +0x80, speed +0x70
     find                find the game's data object in DOSBox's memory (needed before watch;
                         done by the first watch if not done before)
 
@@ -53,12 +55,12 @@ def shot(name):
     subprocess.run(["import", "-display", ":77", "-window", "root", "%s_%s.png" % (out, name)])
 
 
-mem, base = None, None
+mem, base, prog = None, None, None
 
 
 def find():
     """the host address of the data object: DOSBox's emulated memory holds it unmoved"""
-    global mem, base
+    global mem, base, prog
     pid = None
     for l in subprocess.run(["pgrep", "-a", "dosbox"], capture_output=True, text=True).stdout.splitlines():
         if l.split()[1].endswith("dosbox"):
@@ -80,13 +82,33 @@ def find():
         i = buf.find(SIG)
         if i >= 0:
             base = a + i - (SIG_AT - DATA)
-            print("data object at host 0x%x (dosbox pid %d)" % (base, pid))
+            # The game's pointers are its own (paged) addresses, not DOSBox's physical ones.
+            # A relocated pointer in the data object (0xea828 -> image 0xe0afc) gives the
+            # object's own address; the game's memory is one run, so one offset holds.
+            prog = (struct.unpack("<I", os.pread(mem.fileno(), 4, base + 0xEA828 - DATA))[0]
+                    - (0xE0AFC - DATA))
+            print("data object at host 0x%x, its own address 0x%x (dosbox pid %d)" % (base, prog, pid))
             return
     sys.exit("the data object was not found (the game not loaded yet?)")
 
 
+def dos(p, n):
+    """n bytes at the game's own address p (a pointer read from its memory)"""
+    return os.pread(mem.fileno(), n, base + p - prog)
+
+
 def i32(a):
     return struct.unpack("<i", os.pread(mem.fileno(), 4, base + a - DATA))[0]
+
+
+def car(n):
+    if base is None:
+        find()
+    p = i32(0x13C24C + 4 * n)
+    rd = lambda o: struct.unpack("<i", dos(p + o, 4))[0]
+    print("car %d at 0x%x: x %.3f y %.3f z %.3f  node %d  across %.3f  speed %.3f" % (
+        n, p, rd(0) / 65536, rd(4) / 65536, rd(8) / 65536, rd(0x48), rd(0x80) / 65536,
+        rd(0x70) / 65536))
 
 
 def watch(secs):
@@ -144,6 +166,8 @@ try:
             watch(float(p[1]))
         elif p[0] == "peek":
             peek(float(p[1]), p[2])
+        elif p[0] == "car":
+            car(int(p[1]))
         elif p[0] == "find":
             find()
         sys.stdout.flush()
