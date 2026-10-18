@@ -95,6 +95,12 @@ Ghidra project and `build/decomp`, one command). The git history was started aga
   loops, car showcases, police and winners' clips) decode frame for frame the same as
   ffmpeg's own decoder, sound included (`build/tgv/title.png`).
 
+- **The replays are read** (`tools/rpl.py`, NOTES §3.15): a replay is the race's settings
+  plus the driver's keys every second step and a snapshot of every car every 27 s; the
+  game drives the race again from them. The CD's four (alpine, Burnt Sienna,
+  Transtropolis, coast) drawn on their tracks (`build/rpl/*.png`). For the port this
+  means the race must run exactly as the original's for a replay to play right.
+
 ## Waiting for Danik
 
 Nothing. Decided 2026-10-18: menus 640x480 on the MiSTer (interlaced at 15 kHz),
@@ -107,7 +113,7 @@ races 320x200 / 320x240; commit locally as the work goes.
    widgets `0x71208`.., the Watcom runtime. Small enough now to leave for when the port
    reaches them; the formats are the better next step.
 2. **Formats**, each from the code that reads it (TRI, `wwww`, `ORIP`, the road's textures and
-   roadside pictures, FFN fonts, EA sound, the packers, PBS/PDN first reading, INFO, INV, BAMF, TGV done): RPL, CONFIG.DAT. A Python reader and a picture for each
+   roadside pictures, FFN fonts, EA sound, the packers, PBS/PDN first reading, INFO, INV, BAMF, TGV, RPL done): CONFIG.DAT. A Python reader and a picture for each
    (`tools/`).
 3. **The port's skeleton** (`port/`, CMake, SDL2, C): an 8-bit framebuffer at 640x480 and
    320x200, palette, the file layer (case-insensitive names in the CD folder; the data

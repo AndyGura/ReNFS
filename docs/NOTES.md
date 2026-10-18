@@ -394,9 +394,69 @@ second, the sound an EA stream (16 kHz 8-bit stereo PCM in all checked).
 - **Checked against ffmpeg's `tgv` decoder**: all 26 movies, 11,833 frames, equal pixel for
   pixel; TITLE's sound equal sample for sample.
 
+### 3.15 RPL (replays) — read (`tools/rpl.py`, 2026-10-19)
+
+A replay is not a film: it is the race's settings, every driver's controls and snapshots of
+every car, from which the race is driven again. 100,374 bytes, five blocks of memory
+written by `replay_file` `0x5c3b0` (`fwrite`, `<path>Replay.rpl`, when `0x12dd5c` is set and
+the mode `0x15d136` is not 1) and read back in the same order: `replay_settings` `0x5c340`
+(from `race_run`: the first block only, from the name at `0x145558`; no file → `0x14554c`
+= 6, `0x13c17c` = 0x20) and `replay_load` `0x5c4a4` (all of it, keeping the player's own
+three settings in its entry). The attract mode (`fe_attract_mode` `0x34284`) puts
+`REPLAY%d.RPL` in `0x156c4f`, sets `0x156cc3` = 3 and runs a race.
+- `0x00000` 0x348 bytes: **the race record `0x12da0c`** (filled by `race_setup_record`
+  `0x36c5c`): `+2` (0 in all), `+6` the track (`0x41b68`'s order: city coast alpine
+  springs avalley bsienna vridge tpolis lvegas moon), `+0xa` its files' stem (`al1`,
+  `tr6`, ..), `+0x14` 1 / 2 (head to head / a race of 8?), `+0x18` network, `+0x1c` flags
+  (`0x15d12a`), `+0x20` racers, `+0x24` drivers (people), `+0x28` (1 with traffic), `+0x2c`
+  cars in all, `+0x30` traffic cars, `+0x38` **the time** (seconds from 1970: the CD's were
+  made 15–16 June 1996), from `+0x3c` two 0x4b-byte entries (the player, the head-to-head
+  rival: `+2` the name, `+0xb` the car in `0xf6e40`'s order: TSupra LDiabl P911 CZR1
+  F512TR DVIPER ANSX MRX7 .. Traffc, the police and traffic cars; `+0x13` / `+0x17` the
+  two driving aids), .. `+0x300` the clock setting `0x12dd0c`, `+0x310` the player
+  `0x12dd1c`.
+- `0x00348` 0x9a4 bytes from `0x144ba8` (the highlights `0x144da8`, §4.8, among them).
+- `0x00cec` 0x15e00 bytes, **the recording** (`UsrCtrlBuff`, allocated by `replay_start`
+  `0x5dd68` and **never cleared**: what the race did not reach is whatever the memory held,
+  so a reader must stop at the end below). `replay_record_step` `0x5d888` runs on every
+  second step (flag 4, §4.3); `0x144ba4` = step counter `0x145c94` mod 28,800:
+  - `+0`: the drivers' control words, one slot a call (`replay_record_controls` `0x5cac4`,
+    played back by `replay_play_controls` `0x5cb58`): driver k's low bytes at k·7200 + t,
+    its high bytes at 14,400 + k·7200 + t, t = `0x144ba4` / 4. Two drivers at most; a
+    ring of 7,200 slots = 14,400 steps = 7.2 minutes. During the first 120 counts every
+    word is `0x7a0` (no steering, no pedals).
+  - `+0x7080`: every 450 calls (900 steps, 27 s; `0x143ee8` counts down) a snapshot
+    s = `0x144ba4` / 1800 of 16: each driver's car, 0x1a4 bytes at `+0x7080 + s·0x1a4 +
+    k·0x1a40` (`replay_pack_car` `0x5cbd0` + `replay_record_car` `0x5d0e4`; back by
+    `replay_restore_car` `0x5ceb0`);
+  - `+0xa500`: the other cars at the same moment, 0x172 bytes at `+0xa500 + s·0xb90 +
+    j·0x172` (8 at most; the count at `0x143f3c + s·0xa2`).
+  - A car's snapshot: `+0` / `+4` car `+0x50e` / `+0x512`, `+8` its index (`+0x516`) << 24
+    | `+0x51a` << 8, `+0xc..` car `+0..+0x20` (the position, the angles), `+0x54` car
+    `+0x48` (the road node), .. The positions lie on their road nodes (checked on all four).
+- `0x16aec` 0xcc8 bytes from `0x143ed8`: `+4` (`0x143edc`) **the step counter at the last
+  step recorded** (2 a step: REPLAY.RPL 11,632 = 5,816 steps = 2:54.5), from `+0x14` 16 ×
+  0xa2 bytes, what each snapshot needs besides the cars (the cars' order `0x13c298` /
+  `0x13c274`, the random seed `0xeab70`, ..).
+- `0x177b4` 9 × 0x1d2 bytes from **`0x14ea80`**: the racers' results (§4.3), whose records
+  start at `0x14ea7c`: the game's copy is 4 bytes late (each record's first 4 bytes are
+  missing, the next one's follow). REPLAY.RPL: the Diablo finishes at 11,198 (+300 =
+  2:52.5).
+- **The control word** (`controls_read` `0x49248` builds it from the keys or joystick;
+  `car_steer` `0x483e4` / `car_steer_2` `0x4853c` and `car_pedals` `0x48990` /
+  `car_pedals_2` `0x48a80` use it, chosen by the entry's `0x12d974` / `0x12d978`): bits
+  0–5 the steering (32 = straight; 1 to 15 either way a slope, beyond it full lock),
+  6–11 the pedals (30 = neither; below 15 `car_throttle` `0x48600` ramps `+0x3b1` to 255,
+  45 and above `car_brake` `0x48658` the brake `+0x3b9`), 12 a gear down, 13 a gear up
+  (`car_shift` `0x48714`), 14 car `+0x4ba`, 15 car `+0x3f5`.
+- The CD's four: REPLAY alpine (al1) Diablo against a 911 with traffic, 2:54; REPLAY1
+  Burnt Sienna (tr6) a 512TR in a race of 8, 1:53; REPLAY2 Transtropolis (tr7) a Diablo in
+  a race of 8, 2:03; REPLAY3 coast (cl1) Viper against a Supra with traffic, 1:44. All
+  one driver at the keyboard (`build/rpl/*.png`).
+
 ### 3.4 Still to read
 
-`.RPL`, `CONFIG.DAT` (player name, replay names).
+`CONFIG.DAT` (player name, replay names).
 
 ## 4. Map of the program (2026-10-19)
 
@@ -561,8 +621,10 @@ race_from_menu 0x3770c (from fe_main_menu)
 - Physics file: `load_car_pbs` `0x50c24` (`.PBS`, "By_R&T"); `.PDN` at `0x660bc` in
   `load_car_cfm`'s neighbour `0x65874`; the car's parts by name (`frntires`, `rertires`,
   `left_turn`, `right_turn`, `inside`, `outside`, `surface`, `convex`).
-- Replays: `save_replay` `0x3a628`, `load_replay` `0x3a218`, `replay_file` `0x5c3b0`
-  (`Replay.rpl`), `0x5dd68` (`UsrCtrlBuff`: a replay records the controls?).
+- Replays (§3.15): `save_replay` `0x3a628` ("Save replay as") copies the last race's
+  `replay.rpl` under a new name through `replay_copy_as` `0x3a218` (named `load_replay`
+  until 2026-10-19: it reads, checks the disk's free space, writes); `replay_file`
+  `0x5c3b0` writes it at the race's end, `replay_start` `0x5dd68` allocates `UsrCtrlBuff`.
 - Track names: `0x41b68` (`city coast alpine springs avalley bsienna vridge tpolis lvegas`
   and their `m` / `r` variants = mirrored? / reversed?), `0x68dcc` (four-letter: city coas
   alpi rust autu burt mont trop neod). `0x5636e`: the music loops `loop1` .. `loopx`.

@@ -122,7 +122,7 @@
 0x5056c car_check_lap
 0x3a2b0 save_game
 0x3a628 save_replay
-0x3a218 load_replay
+0x3a218 replay_copy_as
 0x3a9c4 is_system_replay
 0x5c3b0 replay_file
 0x4d4a0 cfg_load_joystick
@@ -275,3 +275,22 @@
 0x8cdf0 tgv_packed_blocks
 0xa6ec8 bits_unsigned
 0xa6f6c tgv_build_frame
+# the replay (NOTES 3.15)
+0x5c340 replay_settings
+0x5c4a4 replay_load
+0x5dd68 replay_start
+0x5de88 replay_end
+0x5d888 replay_record_step
+0x5cac4 replay_record_controls
+0x5cb58 replay_play_controls
+0x5cbd0 replay_pack_car
+0x5d0e4 replay_record_car
+0x5ceb0 replay_restore_car
+0x49248 controls_read
+0x483e4 car_steer
+0x4853c car_steer_2
+0x48990 car_pedals
+0x48a80 car_pedals_2
+0x48600 car_throttle
+0x48658 car_brake
+0x48714 car_shift

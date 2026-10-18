@@ -142,7 +142,7 @@ The original in DOSBox: `nfs-dos`, `tools/nfsdos.py` (unseen, keys, memory; NOTE
 | `.FFN` | fonts (`FNTF`): 4-bit smoothed bitmap + character table | read (`tools/ffn.py`) |
 | `.INV` | the menus' inverse palettes (15-bit colour → entry), 32 KB | read (`tools/inv.py`) |
 | `.B00`.. `.MMB` `.FMM` | `BAMF` blit lists: which spans of the 3D view reach the screen (HUD, dashboards) | read (`tools/bamf.py`) |
-| `.RPL` | replays (the CD has four) | to do |
+| `.RPL` | replays: the race record, every driver's controls (a word every 2nd step), car snapshots every 27 s | read (`tools/rpl.py`) |
 
 Language: English art is `ART`, `SHOW`, `SLIDES`, `DASH`, `SPEECH`, `NTRACKFM`/`ETRACKFM`;
 German has a `G` in front (`GART`, `GSHOW`, ...).
