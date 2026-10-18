@@ -132,7 +132,6 @@ The original in DOSBox: `nfs-dos`, `tools/nfsdos.py` (unseen, keys, memory; NOTE
 | `.FSH` | EA shapes, "SHPI": directory of 4-char names, 8-bit pictures + palettes (`!pal`) | read (`tools/fsh.py`) |
 | `.QFS` | packed FSH (RefPack `10FB`, 23 Huffman or pairs) | read (`tools/fsh.py`) |
 | `.CFM` `.FAM` | `wwww` containers of `ORIP` 3D models (1/128 units) + `SHPI` textures: cars, track families | read (`tools/orip.py`) |
-| `.FMM` `.MMB` | `wwww` of `BAMF` (dashboards) | to do |
 | `.TRI` | track: road nodes (x y z, heading, lanes), speeds a section, objects, the road's 3D points | read (`tools/tri.py`) |
 | `xxxINFO` | a track's sky and horizon settings, text | read (`tools/trackinfo.py`) |
 | `.PBS` `.PDN` | car physics (torque, gears, ABS/TCS), Huffman-packed `30FB` | first reading (`tools/carspec.py`) |
@@ -142,7 +141,7 @@ The original in DOSBox: `nfs-dos`, `tools/nfsdos.py` (unseen, keys, memory; NOTE
 | `.TGV` | EA video (`kVGT`): intro, attract, car showcase | to do |
 | `.FFN` | fonts (`FNTF`): 4-bit smoothed bitmap + character table | read (`tools/ffn.py`) |
 | `.INV` | the menus' inverse palettes (15-bit colour → entry), 32 KB | read (`tools/inv.py`) |
-| `.B00`.. `.FSB` | `BAMF` (cockpit masks) | to do |
+| `.B00`.. `.MMB` `.FMM` | `BAMF` blit lists: which spans of the 3D view reach the screen (HUD, dashboards) | read (`tools/bamf.py`) |
 | `.RPL` | replays (the CD has four) | to do |
 
 Language: English art is `ART`, `SHOW`, `SLIDES`, `DASH`, `SPEECH`, `NTRACKFM`/`ETRACKFM`;

@@ -264,3 +264,5 @@
 0xb0890 unpack_4afb
 0x1e9cc car_apply_pdn
 0x18990 car_torque_load
+0x8b8f0 bamf_blit
+0x30b64 draw_view_through_mask

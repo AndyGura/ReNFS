@@ -350,9 +350,27 @@ the rest ties); **15 fit no palette on the CD** (all the installer's `IART` scre
 City's tables): made for older art, so the original picks odd colours through them. The port
 reads the files as they are, and that stays faithful.
 
+### 3.13 BAMF (what of the 3D view reaches the screen) — read (`tools/bamf.py`, 2026-10-19)
+
+EA's blit lists, copied by `0x8b8f0` (the off-screen view `0xf4578`, the list) by VESA
+64 KB bank (`0x9d7f8` sets the bank): "BAMF", u32 size, u16 banks, u16 the longest span,
+u32 `+0xc` and `+0x10` (0x10000, or 0x8000 = the source read at half the rate across /
+down: pixels doubled), then per bank a u16 count of spans, each u32 offset in the source,
+u16 offset in the bank, u16 length. Every file's spans end exactly at its size.
+- **The HUD** (`load_cockpit_mask` `0x5f7c8`, drawn by `0x30b64`): `MASKHI.B<s><n>` /
+  `MASKLO..` into `0x145a58`, and `MASKHI.MMB` (a `wwww` of 12) into `0x145a24`; s = the
+  view's size (full screen, medium, small window), n = how it is copied (1:1; doubled
+  across; doubled both ways; doubled with every other line: the detail settings). The
+  spans leave out the status bar on top, the tachometer bottom left and (the `.B` set
+  only) the map's box bottom right; `0x12b988` picks the set. `MASKHI.FSH` / `MASKLO.FSH`
+  (`MASKHIG` German) hold the HUD's pieces (digits, bars, the tachometer, labels).
+- **The dashboards** (`SIMDATA/DASH/<car>DH.FMM`, `DL.FMM`: a `wwww` of 4, the same four
+  ways of copying): the windscreen and side window, A-pillar and mirror cut out
+  (`build/bamf/ansxdh.png`); the dashboard picture is `<car>DH.FSH`.
+
 ### 3.4 Still to read
 
-`kVGT` (TGV video, 320x192?), `BAMF` (`MASKHI.B00` ..), `.RPL`, `CONFIG.DAT` (player name, replay
+`kVGT` (TGV video, 320x192?), `.RPL`, `CONFIG.DAT` (player name, replay
 names).
 
 ## 4. Map of the program (2026-10-19)
