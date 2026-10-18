@@ -1,0 +1,13 @@
+# the game itself and everything made from it: never in the repository
+/NFSSE/
+/NFSSE-Install/
+/build/
+# builds
+/port/build/
+__pycache__/
+*.pyc
+# what the program writes when it is run from here: settings, saves, pictures
+*.ppm
+*.wav
+# release packages
+/dist/
