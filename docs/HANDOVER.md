@@ -141,6 +141,18 @@ Ghidra project and `build/decomp`, one command). The git history was started aga
   Cancel, Esc; six screens compared). Audio, graphics, controls, load / save and credits
   behind it are not written yet.
 
+- **The race, under way (2026-10-19, third session)**. Ported and equal to the original
+  run on snapshots of a City 1 race (Unicorn, the original's own code against the port's):
+  the track file and its ring of sections, the sky settings and tint, the family's
+  textures and their re-colouring (`trackinfo.c`, `trackfam.c`, `racepal.c`), the fixed
+  tables read from the CD's `NFS_DOS.EXE` (`exe.c`), the frame's road points and their
+  move into the view (`road.c`), the quad and triangle painters and the cutting of near
+  pieces (`raster.c`, `poly.c`), and **the road painted far to near with its roadside
+  signs (`roaddraw.c`): the same picture pixel for pixel on all 6 snapshots**
+  (`tools/roadpic_emu.py`; `build/shots/road_d2_port.png`). Not yet: the sky, the
+  roadside walls (`0x59294`, other tracks than the cities), 3D roadside models, the cars,
+  the camera, the race palette's composition.
+
 **Progress page for Danik**: https://claude.ai/artifact/VZdxTpYC3oLXYeBVJpoDoM (every step,
 its percent done and weight). Update its steps file after each finished step.
 
@@ -166,7 +178,10 @@ races 320x200 / 320x240; commit locally as the work goes.
 3. **The port's skeleton: done** (movies, title, game mode screen, exit dialog). Name entry
    the main menu, the settings kept and the options screen done too. Next: the screens
    behind the options (credits, audio, graphics, controls, load / save), Danik chose
-   (2026-10-19): **the race next**, the remaining menus later.
+   (2026-10-19): **the race next**, the remaining menus later. In the race, next: the sky
+   (`0x4a9d0`), the walls `0x59294` (check on CY1 memory with made-up flags, or snapshots
+   of another track), then the camera (`0x136b0`, `0x1486c`) and the race palette, so the
+   port makes a first frame of its own from the starting grid.
 4. Front end (menus, car and track choice), then the race (track, cars, physics, HUD,
    sound), then the rest (replays, championship/tournament, cops, the showcase).
 5. MiSTer (`~/MiSTer-ReNFS`): the skill's steps 5–8 — `MISTER_HYBRID`, `mister_port.[ch]`,
