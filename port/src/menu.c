@@ -42,10 +42,10 @@ int fe_read_keys(void)
     return 0;
 }
 
-void fe_wait_keys_up(void)
+void fe_flush_keys(void)
 {
-    while (fe_read_keys() && !g_quit)
-        video_retrace();
+    while (key_get())
+        ;
 }
 
 /* the mouse */
@@ -240,7 +240,7 @@ int fe_yes_no_dialog(const char *question)
         fe_mouse_read();
         video_retrace();
     }
-    fe_wait_keys_up();
+    fe_flush_keys();
     while (!done && !g_quit) {
         int mx, my, k;
         mouse_read(&mx, &my);
@@ -308,4 +308,140 @@ int fe_ask_exit(void)
     else
         snprintf(q, sizeof q, "Exit to system ?");
     return fe_yes_no_dialog(q);
+}
+
+/* 0x701cc: a line typed in, centred on cx at y, in a window of maxlen / 2 * 30 + 5 each
+   side by 35 lines that holds what was there. For a name (names = 1) space . * + [ ] :
+   ; " < > , ? are let in; for a file name none of them, and letters become capitals;
+   % \ / | never. In German also ü ä ö ß µ Ä Ü Ö ° §. Backspace, Del (all of it); Enter
+   (not when only spaces) keeps it, Esc not. The cursor "_" blinks every 15 hundredths. */
+int fe_text_field(char *text, int maxlen, int cx, int y, int names)
+{
+    enum { H = 35 };
+    static unsigned char saved[640 * H];
+    char buf[42];
+    int half = maxlen / 2 * 30, left = cx - half - 5, w = 2 * half + 10;
+    int len = (int)strlen(text), tw, blink = 0, result = -1;
+    unsigned waited = 0;
+
+    if (w > 640)
+        w = 640;
+    if (len > 41)
+        len = 41;
+    memset(buf, 0, sizeof buf);
+    memcpy(buf, text, (size_t)len);
+    fe_flush_keys();
+    if (g_mouse_active)
+        fe_mouse_read();
+    while ((fe_read_keys() || g_mouse_buttons) && !g_quit) {
+        if (g_mouse_active)
+            fe_mouse_read();
+        video_retrace();
+    }
+    for (int r = 0; r < H; r++)
+        memcpy(saved + r * w, g_fb + (y + r) * g_fb_w + left, (size_t)w);
+    fe_style(1);
+    tw = text_width(&g_fe_font, buf);
+#define FIELD_DRAW(s)                                                       \
+    do {                                                                    \
+        for (int r = 0; r < H; r++)                                         \
+            memcpy(g_fb + (y + r) * g_fb_w + left, saved + r * w, (size_t)w); \
+        text_clip(left, y, left + w, y + H);                                \
+        fe_text(s, left + w / 2 - tw / 2, y);                               \
+        text_clip_off();                                                    \
+    } while (0)
+    FIELD_DRAW(buf);
+    while ((fe_read_keys() || g_mouse_buttons) && !g_quit) {
+        if (g_mouse_active)
+            fe_mouse_read();
+        video_retrace();
+    }
+    fe_flush_keys();
+    ticksince();
+    /* the mouse buttons are read once before the loop, after they were let go: a click
+       in it does nothing (the original's code would take left as Enter, right as Esc) */
+    while (result < 0 && !g_quit) {
+        int k = key_get();
+        if (k == 0x0d) {
+            int i = 0;
+            while (i < len && buf[i] == ' ')
+                i++;
+            if (i == len)
+                k = 0;                     /* nothing but spaces */
+        }
+        if (k == 0x0d) {
+            memset(text, 0, (size_t)maxlen + 1);
+            memcpy(text, buf, (size_t)(len < maxlen ? len : maxlen));
+            result = 1;
+        } else if (k == 0x1b) {
+            result = 0;
+        } else if (k) {
+            static const char banned[] = " .\\/%*+[]|:;\"<>,?";
+            if (k < 0x80 && strchr(banned, k) &&
+                (!names || k == '%' || k == '\\' || k == '/' || k == '|'))
+                ;
+            else if (k == 8 && len > 0)
+                buf[--len] = 0;
+            else if (k == 0x5300 && len > 0) {
+                len = 0;
+                memset(buf, 0, sizeof buf);
+            } else if (len < maxlen && text_width(&g_fe_font, buf) < 440) {
+                static const unsigned char german[] = { 0x81, 0x84, 0x94, 0xe1, 0xe6, 0x8e, 0x9a, 0x99, 0xf8, 0x15 };
+                if (k > 0x1f && k < 0x7f) {
+                    if (!names && k > 0x60 && k < 0x7b)
+                        k -= 0x20;
+                    buf[len++] = (char)k;
+                } else if (g_german && k < 0x100 && memchr(german, k, sizeof german))
+                    buf[len++] = (char)k;
+            }
+            /* any key draws it again, without the cursor */
+            tw = text_width(&g_fe_font, buf);
+            FIELD_DRAW(buf);
+            ticksince();
+        } else if ((waited += ticksince()) >= 15) {
+            char shown[44];
+            blink ^= 1;
+            snprintf(shown, sizeof shown, "%s_", buf);
+            FIELD_DRAW(blink ? shown : buf);
+            waited = 0;
+        }
+        video_retrace();
+    }
+#undef FIELD_DRAW
+    for (int r = 0; r < H; r++)
+        memcpy(g_fb + (y + r) * g_fb_w + left, saved + r * w, (size_t)w);
+    return result > 0;
+}
+
+unsigned long g_name_marks[2];
+
+int fe_enter_name(char *name)
+{
+    enum { BX = 80, BY = 190, BW = 480, BH = 100 };
+    static unsigned char saved[BW * BH];
+    unsigned char remap[256];
+    int r;
+
+    mouse_show(0);                         /* hidden, and left so (0xf795c) */
+    for (int y = 0; y < BH; y++)
+        memcpy(saved + y * BW, g_fb + (BY + y) * g_fb_w + BX, BW);
+    darken_table(remap, video_palette8(), 0x6000);
+    for (int y = 0; y < BH; y++)
+        for (int x = 0; x < BW; x++) {
+            unsigned char *p = &g_fb[(BY + y) * g_fb_w + BX + x];
+            *p = remap[*p];
+        }
+    frame(BX + 2, BY + 2, BX + 477, BY + 97, nearest_colour(0xff0000));
+    frame(BX + 3, BY + 3, BX + 476, BY + 96, nearest_colour(0xff0000));
+    fe_styles_init();
+    fe_style(2);
+    fe_text_centre(g_german ? "Bitte Namen Eingeben" : "Please Enter Name", BX + 240, BY + 10);
+    fe_style(1);
+    r = fe_text_field(name, 8, 320, 230, 1);
+    fe_play_sound(0x48);
+    if (r)
+        g_name_marks[0] = g_name_marks[1] = 0;
+    for (int y = 0; y < BH; y++)
+        memcpy(g_fb + (BY + y) * g_fb_w + BX, saved + y * BW, BW);
+    return r;
 }

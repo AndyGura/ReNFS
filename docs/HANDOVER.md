@@ -120,6 +120,15 @@ Ghidra project and `build/decomp`, one command). The git history was started aga
   79 s, the movies' own length. Still to come in the attract mode: the replay race from
   the second round on (needs the race).
 
+- **The port's game mode screen and exit dialog equal the original's** (screenshots
+  compared by palette entry: 9 pixels, and 1 near-black pixel). Single player / Modem /
+  Exit with the mouse and the keys, the move and choice sounds, the music chosen as the
+  original does it, 45 s idle goes back to the movies, Esc asks "Exit to system ?".
+  Single player asks for the name as the original does (typed, Backspace, Del, Esc;
+  equal to the original's pictures), then ends the port for now (the main menu is next). Modem is left out (no
+  network). Under the hood: the menus' font and letter blending, the mouse pointer, the
+  inverse colour table, CONFIG.DAT read from the CD.
+
 ## Waiting for Danik
 
 Nothing. Decided 2026-10-18: menus 640x480 on the MiSTer (interlaced at 15 kHz),
@@ -134,11 +143,9 @@ races 320x200 / 320x240; commit locally as the work goes.
 2. **Formats: done.** Every file type on the CD has a reader in `tools/` (TRI, `wwww`,
    `ORIP`, textures, FFN, EA sound, the packers, PBS/PDN first reading, INFO, INV, BAMF,
    TGV, RPL, CONFIG.DAT). What is still open inside them is listed in NOTES §3.4.
-3. **The port's skeleton: done** (movies, title). Next in it: the game mode screen
-   (`fe_game_mode_screen` `0x47274`: single, modem, exit; a timeout goes back to the
-   movies), then the main menu
-   (`fe_main_menu` `0x42c30`: its pictures, the font, the mouse and keys, the music), the
-   widget routines `0x71208`.. on the way.
+3. **The port's skeleton: done** (movies, title, game mode screen, exit dialog). Name entry
+   done too. Next in it: the main menu (`fe_main_menu` `0x42c30`: `control/central.qfs`,
+   `control/ani.qfs`, its state machine), the widget routines `0x71208`.. on the way.
 4. Front end (menus, car and track choice), then the race (track, cars, physics, HUD,
    sound), then the rest (replays, championship/tournament, cops, the showcase).
 5. MiSTer (`~/MiSTer-ReNFS`): the skill's steps 5–8 — `MISTER_HYBRID`, `mister_port.[ch]`,

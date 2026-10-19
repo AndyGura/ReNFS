@@ -28,7 +28,13 @@ static unsigned long g_retraces;        /* counted, for the headless clock */
 static unsigned long g_virtual_ms;      /* the headless clock, in ms x 70 x 60 */
 static unsigned g_start_ms;
 
-static int g_keys[16], g_nkeys;
+static int g_keys[16], g_nkeys;  /* the keys typed, as the BIOS gives them (0x84304) */
+
+static void key_put(int c)
+{
+    if (c && g_nkeys < 16)
+        g_keys[g_nkeys++] = c;
+}
 
 /* the mouse, in the 640x480 picture's pixels, and its pointer drawn over the picture */
 static int g_mouse_x = 320, g_mouse_y = 240, g_mouse_buttons;
@@ -39,10 +45,12 @@ void (*g_retrace_hook)(void);
 
 /* RENFS_INPUT: keys and the mouse played in at given retraces, for pictures without a
    window: "<retrace>:<what>" separated by spaces; <what> is a key (up down left right
-   enter esc space y n j tab f1..f4), "click", "rclick" (held 6 retraces) or "m<x>,<y>" */
+   enter esc space y n j tab f1..f4 bksp del), "click", "rclick" (held 6 retraces),
+   "m<x>,<y>", or "t<text>": those letters typed */
 typedef struct {
     unsigned long at;
     int scan, buttons, x, y;
+    char text[16];
 } scripted;
 static scripted g_script[64];
 static int g_nscript;
@@ -52,6 +60,7 @@ static const struct { const char *name; int scan; } g_script_keys[] = {
     { "esc", 0x01 }, { "enter", 0x1c }, { "space", 0x39 }, { "up", 0x48 }, { "down", 0x50 },
     { "left", 0x4b }, { "right", 0x4d }, { "tab", 0x0f }, { "y", 0x15 }, { "n", 0x31 },
     { "j", 0x24 }, { "f1", 0x3b }, { "f2", 0x3c }, { "f3", 0x3d }, { "f4", 0x3e },
+    { "bksp", 0x0e }, { "del", 0x53 },
 };
 
 static void script_parse(const char *s)
@@ -73,6 +82,8 @@ static void script_parse(const char *s)
             e->buttons = 2;
         else if (what[0] == 'm' && sscanf(what + 1, "%d,%d", &e->x, &e->y) == 2)
             ;
+        else if (what[0] == 't' && what[1])
+            snprintf(e->text, sizeof e->text, "%s", what + 1);
         else {
             for (size_t k = 0; k < sizeof g_script_keys / sizeof g_script_keys[0]; k++)
                 if (!strcmp(what, g_script_keys[k].name))
@@ -95,10 +106,11 @@ static void script_step(unsigned long retrace)
             g_mouse_x = e->x;
             g_mouse_y = e->y;
         }
-        if (retrace == e->at && g_nkeys < 16) {   /* a press, for the key queue too */
-            int c = e->scan == 0x01 ? 0x1b : e->scan == 0x1c ? 0x0d : e->scan == 0x39 ? 0x20 : 0;
-            if (c)
-                g_keys[g_nkeys++] = c;
+        if (retrace == e->at) {            /* a press, for the key queue too */
+            key_put(e->scan == 0x01 ? 0x1b : e->scan == 0x1c ? 0x0d : e->scan == 0x39 ? 0x20 :
+                    e->scan == 0x0e ? 8 : e->scan == 0x53 ? 0x5300 : 0);
+            for (const char *t = e->text; *t; t++)
+                key_put((unsigned char)*t);
         }
         if (retrace >= e->at && retrace < e->at + 6) {
             if (e->scan)
@@ -124,6 +136,7 @@ int video_init(const char *shot, int shot_frames)
         fprintf(stderr, "SDL: %s\n", SDL_GetError());
         return 0;
     }
+    SDL_StartTextInput();                  /* the characters typed, for the names */
     g_ren = SDL_CreateRenderer(g_win, -1, shot ? SDL_RENDERER_SOFTWARE : SDL_RENDERER_PRESENTVSYNC);
     if (!g_ren)
         g_ren = SDL_CreateRenderer(g_win, -1, 0);
@@ -235,17 +248,39 @@ static void poll(void)
                 g_mouse_buttons |= bit;
             else
                 g_mouse_buttons &= ~bit;
-        } else if (e.type == SDL_KEYDOWN && !e.key.repeat && g_nkeys < 16) {
-            SDL_Keycode k = e.key.keysym.sym;
-            int c = 0;
-            if (k == SDLK_ESCAPE)
-                c = 0x1b;
-            else if (k == SDLK_RETURN || k == SDLK_KP_ENTER)
-                c = 0x0d;
-            else if (k >= 0x20 && k < 0x7f)
-                c = (int)k;
-            if (c)
-                g_keys[g_nkeys++] = c;
+        } else if (e.type == SDL_KEYDOWN) {
+            /* the keys that type no character; held, they repeat as the BIOS's do */
+            static const struct { SDL_Keycode k; int c; } typed[] = {
+                { SDLK_ESCAPE, 0x1b }, { SDLK_RETURN, 0x0d }, { SDLK_KP_ENTER, 0x0d },
+                { SDLK_BACKSPACE, 8 }, { SDLK_TAB, 9 }, { SDLK_DELETE, 0x5300 },
+                { SDLK_UP, 0x4800 }, { SDLK_DOWN, 0x5000 }, { SDLK_LEFT, 0x4b00 },
+                { SDLK_RIGHT, 0x4d00 }, { SDLK_INSERT, 0x5200 },
+            };
+            for (size_t i = 0; i < sizeof typed / sizeof typed[0]; i++)
+                if (e.key.keysym.sym == typed[i].k)
+                    key_put(typed[i].c);
+        } else if (e.type == SDL_TEXTINPUT) {
+            /* the characters, in the DOS code page (437): ASCII, and the German letters
+               the game takes (ü ä ö ß µ Ä Ü Ö ° §) */
+            static const struct { unsigned u; int c; } cp437[] = {
+                { 0xfc, 0x81 }, { 0xe4, 0x84 }, { 0xf6, 0x94 }, { 0xdf, 0xe1 }, { 0xb5, 0xe6 },
+                { 0xc4, 0x8e }, { 0xdc, 0x9a }, { 0xd6, 0x99 }, { 0xb0, 0xf8 }, { 0xa7, 0x15 },
+            };
+            for (const unsigned char *t = (const unsigned char *)e.text.text; *t;) {
+                unsigned u = *t++;
+                if (u >= 0xc0 && u < 0xe0 && (*t & 0xc0) == 0x80)
+                    u = (u & 0x1f) << 6 | (*t++ & 0x3f);
+                else if (u >= 0x80) {          /* longer: none the game knows */
+                    while ((*t & 0xc0) == 0x80)
+                        t++;
+                    continue;
+                }
+                if (u >= 0x20 && u < 0x7f)
+                    key_put((int)u);
+                for (size_t i = 0; i < sizeof cp437 / sizeof cp437[0]; i++)
+                    if (u == cp437[i].u)
+                        key_put(cp437[i].c);
+            }
         }
     }
 }

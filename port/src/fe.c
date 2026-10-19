@@ -209,7 +209,7 @@ int fe_game_mode_screen(void)
                 if (ready) {
                     fe_play_sound(0x48);
                     if (sel == 0) {
-                        if (fe_enter_name()) {
+                        if (fe_enter_name((char *)g_config)) {
                             done = 1;
                             result = 0;
                         }
@@ -231,7 +231,7 @@ int fe_game_mode_screen(void)
                         done = 1;
                         result = 1;
                     }
-                    fe_wait_keys_up();
+                    fe_flush_keys();
                 } else if (k == 0x4800 || k == 0x5000) {
                     prev = sel;
                     sel = k == 0x4800 ? (sel + 2) % 3 : (sel + 1) % 3;
@@ -259,7 +259,7 @@ int fe_game_mode_screen(void)
                     done = 1;
                     result = 1;
                 }
-                fe_wait_keys_up();
+                fe_flush_keys();
                 do {                       /* until the button is let go */
                     if (g_mouse_active)
                         fe_mouse_read();
@@ -307,10 +307,4 @@ void fe_outer_loop(void)
     } while (state != 1 && !g_quit);
     music_fade_out();
     music_wait_end();
-}
-
-/* fe_enter_name 0x743b4: to be written; for now the name stays as it is */
-int fe_enter_name(void)
-{
-    return 1;
 }

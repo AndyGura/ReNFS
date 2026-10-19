@@ -124,6 +124,8 @@ A step: the cars' driving every step, their sounds and the gearbox every 2nd, tr
 police every 4th (flags `0x12f1bc`, measured). A race ends through `0x13c178`: 1 finished,
 4 arrested (the second police ticket), 0x10 everyone turned back (NOTES §4.3, §4.8).
 The original in DOSBox: `nfs-dos`, `tools/nfsdos.py` (unseen, keys, memory; NOTES §5).
+Menus: held keys, letters blended per pixel, an inverse colour table after every fade up
+(NOTES §4.2).
 
 ## File formats (details in `docs/NOTES.md`, "Formats")
 
@@ -154,7 +156,7 @@ German has a `G` in front (`GART`, `GSHOW`, ...).
 
 ```bash
 cmake -S port -B port/build && cmake --build port/build
-port/build/renfs                                   # the game (the movies and the title, for now)
+port/build/renfs                                   # the game (movies, title, game mode screen, for now)
 port/build/renfs --shot build/shots/title.ppm 120  # no window: the picture of retrace 120
 port/build/renfs --help
 ```
@@ -168,13 +170,20 @@ under `--shot`. The game's blocking loops stay loops that wait for a retrace.
 Data folder: `-data`, else `$RENFS_DATA`, else `./NFSSE`, else `NFSSE` beside the program
 (a folder asked for is used or refused). Home: `-home`, `$RENFS_HOME`, `~/.config/renfs`
 (the port's own formats, never the game's files). `RENFS_LANG=de`: the German art;
-`RENFS_NOSOUND=1`: no sound; `RENFS_SNDWAV=f`: what is heard written to a WAV (checking).
+`RENFS_NOSOUND=1`: no sound; `RENFS_SNDWAV=f`: what is heard written to a WAV (checking);
+`RENFS_INPUT="<retrace>:<key> .."`: keys and mouse given at those retraces (esc enter
+space up down left right tab y n j f1-f4 click rclick m<x>,<y>; for `--shot` tests);
+`RENFS_SHOTRAW=f`: `--shot` also writes the palette numbers (comparing by entry).
 Sound: SDL's device at 44.1 kHz 16-bit stereo, each stream converted by an
 `SDL_AudioStream` and added in the callback. Movies: the sound read ahead (half a second
 queued), the pictures timed by the sound heard, as the original with sound on.
 `src/files.c` (case-insensitive paths), `unpack.c` (all of EA's packers on the CD),
 `fsh.c`, `video.c` (screen, clock, keys), `audio.c`, `eacs.c` (EA sound blocks), `tgv.c`
-and `movie.c` (the movies), `fe.c` (front end), `main.c`.
+and `movie.c` (the movies), `fe.c` (front end screens), `menu.c` (what the menus share:
+keys, mouse, text styles, the yes/no dialog), `font.c` (FFN, letters blended pixel by
+pixel, `nearest_colour`, the inverse table), `sound.c` (the front end's sound bank and
+music), `config.c` (CONFIG.DAT), `main.c`. The menus' look is checked against the
+original's screenshots by palette entry (DOSBox Staging changes colours slightly).
 **Headless tests set `RENFS_HOME` to a scratch folder** (once the port writes settings).
 
 ---

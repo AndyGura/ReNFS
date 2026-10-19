@@ -556,6 +556,90 @@ libraries `0x80000`..`0x94000` and `0x95000`..`0xb0000`, Watcom's runtime `0x940
   `screenshot_tga` `0x72ac4` (`nfs%02d.tga`). The opponents' names "Drifter Burnout Psycho
   Phreak Hacker Razor Mr. Ice" are at `0x74748`.
 
+- **The menus' common routines, as the port has them (2026-10-19; checked against the
+  original: the game mode screen to 9 pixels, the exit dialog to 1 near-black pixel of
+  DOSBox's colour adjustment)**:
+  - Keys `fe_read_keys` `0x727a0`: the key *held*, first of Ctrl+F10 / F5 (both 0), Esc
+    0x1b, Space 0x20, Enter 0x0d, 0x4800 up, 0x5000 down, 0x4b00 left, 0x4d00 right,
+    0x5200 Ins, 0x5300 Del, F1-F4 (only when `0x12bd3c`), then the raw scan codes 0x2a,
+    0x36, 0x1d, 0x38, 0x15 (Y), 0x31 (N), 0x24 (J); Tab 0; the joystick after.
+    `key_down` `0x84742` (by scan code), `key_scancode` `0x91d60`. **The menus read held
+    keys**: a DOSBox test must hold a key (`hold:Return:0.2`), a tap is missed.
+    A screen acts on a key once, then again only when it is let go or held over 25
+    hundredths (not Esc, Space, Enter). `key_flush` `0x84358` (empties the typed-key queue; `key_get` `0x84304`).
+  - Mouse: the driver `0x8498e` sets the poll `[0xf7964]` = `0x848af` (relative mickeys,
+    x at half speed; buttons 1 left, 2 right), hide `[0xf795c]`, show `[0xf7960]`; place
+    `0xf78e0` / `0xf78e4`. `0x156604` the mouse has been used, `0x156606` its buttons.
+    `mouse_load` `0x52020` (`MOUSE.FSH`: ptr0, ptr1 pressed, ptr2; 15x15, 255
+    see-through), `mouse_draw` `0x52288` (also sets 0x156604), `mouse_buttons` `0x522e8`,
+    `mouse_press` `0x52304` (ptr1 for 0.2 s), `mouse_save` `0x52348`, `0x71ad4` place +
+    save, `0x71b24` moved.
+  - Sound: `fe_sound_bank_load` `0x724c4` (`SIMDATA/SOUNDBNK/FRONT_MW.BNK`),
+    `fe_play_sound` `0x72510` (sound n, pan 0x40, volume CONFIG.DAT word +0x79),
+    `fe_sound_bank_free` `0x725ac`. 0x47 a move, 0x48 a choice.
+  - Music: `music_choose` `0x63ed0`: mode CONFIG.DAT +0x73 (0 none, 1 any of 12 in turn,
+    3 and 10-15 techno, else rock), counter `0xed0fc`; pick 5 of a set means none, so
+    ROCK6 never plays (kept). `music_start` `0x72010` (looping AS4), the feeding
+    `fe_service_stream` `0x71b6c` / `fe_service_music` `0x71c20`, `music_fade_out`
+    `0x720d8`, `music_wait_end` `0x72150`.
+  - Text: `setfont` `0x91ed0` (FFN +0xa count, +0x10/+0x11 origin, +0x12/+0x13 line,
+    +0x14 characters, +0x1c the 4-bit bitmap), `printstring` `0x94234` (characters
+    <= 0x20 move by the space's advance, newline: x 0, y + line), `text_width` `0x84794`
+    (through `0xa3e30`, at most 256 characters). `textcolour` `0x95e10` with `0xa87ec`
+    makes a ramp of 16 ARGB: a = k*255/15, the colour * k / 15. `0xa857c` also makes a
+    16x256 table of nearest entries, but the letter routine `0xa8080` uses it only when
+    the window has **7** bits a pixel (`0xf88b4` = window +0x18); 8-bit menus always take
+    the slow path: `0xb1430` for each pixel of level 1..15 (level 0 is left alone):
+    channel = round(under * (65536 - 256a) / 65536) + the ramp's, at most 255, then
+    `nearestcolour`; level 15 is the colour's nearest entry. (The table path would also
+    skip letters one byte wide.) Styles `fe_styles_init` `0x71208` (white ffffff, beige
+    e8d3b7, yellow ffce06, red ff0606, the chosen one, black for the shadow, saved at
+    0x152f04 0x153f44 0x154fd4 0x150b84 0x14fb44 0x151bc4), `fe_style` `0x7135c` (3 white,
+    2 red, 1 yellow, else beige), `fe_text` `0x71774` (shadow black at +2,+2, then the
+    text), `fe_text_centre` `0x716fc`, `fe_button_text` `0x713d0` (the same into a window
+    of width + 10 by 45 holding the screen there, pasted back: text drawn over text).
+  - Colours: `nearestcolour` `0x80c80`: the inverse table `0xf77c4` when there is one, else
+    the closest of entries 0..253 in the palette copy `0x1607a4` (dg^2+dr^2+db^2, strict <
+    from 99999). `make_inverse_table` `0x8227c` reads the DAC back (`read_dac` `0xa3184`,
+    6 bits x 4) and builds the exact 32x32x32 inverse map (`inverse_colormap` `0x819c0`:
+    cell centres x*8+4, entries 0..253, the lowest wins a tie). **`pal_fade_up` `0x71918`
+    calls it at its end**; checked: the original's table on the game mode screen equals
+    this computation in all 32768 cells.
+  - `fe_yes_no_dialog` `0x73b04`: two windows of 340x100 holding the screen at (150,190);
+    the box darkened through `remap_table` `0x89f3c` (0x9000 a channel, 6-bit cap, weights
+    2R 3G 1B) by `polygon` `0x8a0cf`, two red frames `frame` `0x8a0f0`, the question red
+    centred at (170,20), "Yes" at (60,60), "No" at (250,60). **"changed" starts at 1**: on
+    its first pass it plays sound 0x47 and draws both buttons again with `0x713d0` (so
+    they come out brighter than drawn once). Mouse placed at x 225 / 420, y 260 only if
+    the mouse has not been used. Hit boxes yes x 0xbe..0x104, no 0x17c..0x1cc, y
+    0xf5..0x118. Esc / N no, Y (J in German) yes, left / right swap, Enter / Space /
+    a click the one chosen (the right button: no).
+  - `fe_text_field` `0x701cc` (text, max length, centre x, y, names flag on the stack):
+    a window of max/2*30 + 5 each side by 35 holding the screen; typed keys from the
+    queue (`key_get` `0x84304`); names (flag 1) let in space . * + [ ] : ; " < > , ?,
+    file names (0) none of them and letters become capitals; % \ / | never; German adds
+    0x81 0x84 0x94 0xe1 0xe6 0x8e 0x9a 0x99 0xf8 0x15 (and installs its own keyboard
+    handler `0x8447c` / `0x843bc`). Appends while length < max and the width < 440.
+    Backspace, Del clears all, Enter (refused when only spaces, `0x98aac` isspace)
+    copies back, Esc not. Any key redraws without the cursor; "_" blinks every 15
+    hundredths. The mouse buttons are read once before the loop (after they are let go),
+    so a click in it does nothing. `0x4dfe0` reads the joystick (`0x12f25c`: 0x20/0x0d).
+  - `fe_enter_name` `0x743b4` (the name, CONFIG.DAT +0 = 0x156c14): the screen at
+    (80,190) 480x100 darkened by `remap_table` 0x6000 (darker than the dialog's), red
+    frames, "Please Enter Name" / "Bitte Namen Eingeben" red centred at (240,10), the
+    field (8, 320, 230, names); sound 0x48 either way; a new name clears 0x15d12a and
+    0x15d12e (bits the main menu keeps). The pointer is hidden and stays hidden. Port
+    against the original: equal (only DOSBox's near-black noise), typing too.
+  - `fe_game_mode_screen` `0x47274`: `CONTROL/GAMEMOD2.QFS` (bgnd, sinl/modl/exil lit,
+    sind/modd/exid dark), the mouse picks by y (<= 0xcd single, <= 0x118 modem, else
+    exit), button centres (320, 167/242/315); 45 s without a choice: back to the movies
+    (result 2); single → `fe_enter_name` → 0, exit → 1, Esc and the right button ask
+    "Exit to system ?".
+  - `fe_outer_loop` `0x47000`: state 2; when going round again: music fade and wait, the
+    attract mode, the first time CONFIG.DAT (state 3 if it fails), `music_choose`; the
+    title when state is 2 or 3; state = the game mode screen; 0: `0x7469c`, the main menu,
+    the settings saved; until 1.
+
 ### 4.3 The race
 
 ```

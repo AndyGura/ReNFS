@@ -11,8 +11,8 @@
    0 if none */
 int fe_read_keys(void);
 extern int g_fkeys;
-/* 0x84358: until no key is held */
-void fe_wait_keys_up(void);
+/* 0x84358: the keys typed and not yet read thrown away */
+void fe_flush_keys(void);
 /* ticksince 0x81350: the hundredths since it was last asked */
 unsigned ticksince(void);
 
@@ -44,5 +44,15 @@ void fe_text_centre(const char *s, int x, int y);
 int fe_yes_no_dialog(const char *question);
 /* "Exit to system ?" (German "Zurück zum system ?") */
 int fe_ask_exit(void);
+
+/* 0x701cc: a line typed in (names 1: a player's name; 0: a file name), centred on cx
+   at y; 1 Enter (text changed), 0 Esc */
+int fe_text_field(char *text, int maxlen, int cx, int y, int names);
+/* fe_enter_name 0x743b4: "Please Enter Name" in a box, the name (8 letters at most,
+   CONFIG.DAT +0) typed; 1 Enter, 0 Esc */
+int fe_enter_name(char *name);
+/* 0x15d12a, 0x15d12e: cleared by a new name; the main menu reads them (to be named when
+   it is written) */
+extern unsigned long g_name_marks[2];
 
 #endif
