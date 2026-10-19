@@ -8,6 +8,8 @@ The plan is a comma-separated list of steps:
     key:<name>[:<s>]    press and release a key (X keysym name: Return, Escape, Up, Down,
                         Left, Right, space, a ...), then wait <s> seconds (default 1)
     hold:<name>:<s>     hold a key down for <s> seconds
+    down:<name> / up:<name>   press a key and keep it down / let it go (steps between run
+                        with it held)
     shot:<name>         a picture of the screen: <prefix>_<name>.png
     watch:<s>           print the game's clocks every 0.25 s for <s> seconds
     peek:<s>:<a>[+<a>..] sample these 32-bit words (flat image addresses, hex) every 5 ms
@@ -167,6 +169,8 @@ try:
             time.sleep(float(p[2]) if len(p) > 2 else 1.0)
         elif p[0] == "hold":
             key(p[1], 1); time.sleep(float(p[2])); key(p[1], 0)
+        elif p[0] in ("down", "up"):
+            key(p[1], p[0] == "down")
         elif p[0] == "shot":
             shot(p[1])
         elif p[0] == "watch":

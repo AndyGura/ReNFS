@@ -1004,6 +1004,26 @@ that packs the four pointers and screen points of a child.
   multiplies), z = near. The children (ushift + 1, level + 1): (m01, P1, m12, c) at
   (2u + 1, 2v + 1), (c, m12, P2, m23) at (2u + 1, 2v); then, **unless m23.z < near and
   m01.z < near**, m30 and (P0, m01, c, m30) at (2u, 2v + 1), (m30, c, m23, P3) at (2u, 2v).
+- **The view's own cutter `0x35348`** (same arguments; `0x352dc` its helper) is the one
+  for the road ahead (`0x5a4f0`); `draw_quad` draws only the mirror (`draw_road_sections`
+  `0x5aa84`). Differences: nothing when near > P3.z and near > P0.z; cut when `0xeaadc[level]`
+  >> `0xf6aa4` > P1.z **or** > P2.z (and level < `0xeaad8`); the midpoints m01, m23, m03,
+  c; the children (P0, m01, c, m03) at (2u + 1, 2v + 1), (m03, c, m23, P3) at (2u + 1, 2v),
+  then unless m23.z < near and m01.z < near, m12 and (m01, P1, m12, c) at (2u, 2v + 1),
+  (c, m12, P2, m23) at (2u, 2v). A whole piece is painted only if `0x91cee(4, S)` & 7 = 0:
+  the outcode of all corners together (1 left of x0, 2 at or right of x1, 4 above y0,
+  8 at or below y1; **compared unsigned**, so x < 0 counts as right, and a piece below the
+  window is still painted). `0xeaad8` = 2, `0xf6aa4` = 11, both tables 6.4, 4.8, 3.8.
+- Each view has a record (camera `+0x88` the road ahead, `+0x8c` the mirror; `0x1486c(cam,
+  mirror)` makes one current: `0x143dfc`): `+0` the window's width, `+0x14` its own
+  reciprocal table (made current by `0x83ae0`, which changes only `0xf7a14`, not the focal
+  `0xf7a30`), `+0x1c` → the window (x, y, w, h at +8.. +0x1c) whose centre `0x83c18`
+  makes `0xf7a28` / `0xf7a2c`; the road ahead adds `0x129ec0` / `0x129ec4`; both << `0xf456c`.
+- `port/src/poly.c` (projection, both cutters, the corners, the outcode in `raster.c`) is
+  **checked by `tools/poly_emu.py`**: the original's cutters caught inside a real frame on
+  a snapshot (every top-level call, the globals at that moment) and every piece they
+  paint (picture, uv, xy) against the port's given the same quads: **equal on 663 pieces
+  in 5 snapshots** (standing, and driving: 2026-10-19).
 - Projection `0x83b5c(p, out)`: z ≤ `0xf7938` → (0x80000000, 0x80000000) and `0xf7a40`
   |= 1. Else z normalised below 0x400 with a shift (16; ≥ 0x10000: 24 and z >> 8; again
   ≥ 0x10000: +8, >> 8; ≥ 0x1000: +4, >> 4; ≥ 0x800: +2, >> 2; ≥ 0x400: +1, >> 1), r =
@@ -1077,6 +1097,11 @@ not 0: the replay?), `0x2a918`, the second drawing pass `0x5a4f0`, the widget bl
   interrupts, no ports) and leaves the whole 320x200 frame (cockpit, mirror, map) at the
   game's `0xa0000`; the 3D view is drawn first into a 320x127 window at `[0xf88c8]`.
   The palette is the card's, not in memory.
+- **Driving the original under XTEST**: the gearbox starts in neutral even when automatic:
+  `a` (gear up) first, then the keypad's arrows (`KP_8` throttle, `KP_4` / `KP_6` steer);
+  `down:<key>` / `up:<key>` keep a key held across other steps. A snapshot is taken
+  whenever DOSBox is paused: it may be mid-frame (in `d1` the mirror's globals were
+  current), so tests catch the globals at each call.
 - **`tools/nfsdos.py <prefix> "<plan>"`** runs it unseen on `Xvfb :77` as its own child,
   presses keys (XTEST), takes pictures, finds the data object in DOSBox's memory by the
   car sound banks' names (`0xe2d14`) and reads the clocks (the header lists what).

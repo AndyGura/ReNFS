@@ -127,8 +127,9 @@ static void span(const raster_tex *t, unsigned char *dst, int u, int du, int v, 
     }
 }
 
-void raster_quad(const raster_tex *t, const int uv[8], const int xy[8], int see_through)
+void raster_quad(const raster_tex *t, const int uv[8], const int xy[8])
 {
+    int see_through = t->see_through;
     int top = 0, bottom = 2, ymin = xy[1], ymax = xy[5], i, y, dir, s_next, s_prev;
     int retried = 0;
 
@@ -185,4 +186,22 @@ void raster_quad(const raster_tex *t, const int uv[8], const int xy[8], int see_
             n -= r - g_x1 + 1;
         span(t, g_base + y * g_pitch + l, u, du, v, dv, n, see_through);
     }
+}
+
+int raster_outcode(int n, const int *xy)
+{
+    int all = 15;
+    for (; n > 0 && all; n--, xy += 2) {
+        unsigned x = (unsigned)xy[0], y = (unsigned)xy[1], code = 0;
+        if (x < (unsigned)g_x0)
+            code |= 1;
+        if ((unsigned)g_x1 < x + 1)
+            code |= 2;
+        if (y < (unsigned)g_y0)
+            code |= 4;
+        if ((unsigned)g_y1 < y + 1)
+            code |= 8;
+        all &= code;
+    }
+    return all;
 }

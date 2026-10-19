@@ -62,7 +62,8 @@ def port_lib():
 
 class Tex(ctypes.Structure):
     _fields_ = [("pixels", ctypes.c_void_p), ("lo", ctypes.c_void_p), ("hi", ctypes.c_void_p),
-                ("rowbytes", ctypes.c_int)]
+                ("rowbytes", ctypes.c_int), ("w", ctypes.c_int), ("h", ctypes.c_int),
+                ("see_through", ctypes.c_int)]
 
 
 def main():
@@ -77,7 +78,7 @@ def main():
     lib = port_lib()
     cmem = (ctypes.c_ubyte * MEMSIZE).from_buffer(mem)
     base = ctypes.addressof(cmem)
-    tex = Tex(base + TEX - MEM + 16, base, base + MEMSIZE, tw)
+    tex = Tex(base + TEX - MEM + 16, base, base + MEMSIZE, tw, tw, th, 0)
     cfb = (ctypes.c_ubyte * (W * H))()
     bad = fatal = painted = 0
     for n in range(count):
@@ -102,7 +103,8 @@ def main():
             continue
         ctypes.memmove(cfb, fb, W * H)
         lib.raster_window(cfb, W, *win)
-        lib.raster_quad(ctypes.byref(tex), (ctypes.c_int * 8)(*uv), (ctypes.c_int * 8)(*xy), see)
+        tex.see_through = see
+        lib.raster_quad(ctypes.byref(tex), (ctypes.c_int * 8)(*uv), (ctypes.c_int * 8)(*xy))
         got = bytes(cfb)
         if want != fb:
             painted += 1
