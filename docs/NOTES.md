@@ -951,6 +951,66 @@ race_from_menu 0x3770c (from fe_main_menu)
 - `draw_horizon` `0x5adbc` (`horz`), the HUD and dashboard `0x314e4` / `0x31684` /
   `0x3081c` (`b00t`.., the cockpit) / `0x31cb4` (`mpbd`, the map), `0x59a74`, `0x5868c`.
 
+#### Painting a textured quad (2026-10-19; ported, `port/src/raster.c`)
+
+- The filler pointer `0x12c0dc` = `0x34ed8` (set by `load_vis` `0x58bc4`; the other
+  setters of `0x12c0d8..e4` are a debug `.vis` recorder). It calls `0x91360(shape, uv[4],
+  xy[4])` (stack arguments): uv in 16.16 picture pixels, xy whole screen pixels, corners in
+  order round the quad. A shape of type `0x45` goes to `0x90b30` instead (with its type
+  set to `0x7b` for the call): the same routine with the row painter `0xa7610`, which
+  leaves colour 255 out. **Type `0x45` is made at load** by `0x5b270`: every shape of a
+  track's SHPI that holds a 255 and whose name does not start with `!` (all are `0x7b` on
+  the CD).
+- `0x91360`: the top corner = the first with the least y, the bottom = corner 2 unless
+  another has a greater y (strictly). Which way round from the two edges' slopes at the top
+  (`(dx << 16) / (dy + 1)`, the next edge's ≥ the previous one's → +1). The left and right
+  sides walked from the top to the bottom corner into tables by absolute row (x, u, v each
+  side; 0x300 rows at most, `fatalerror` over): `0xa7790` (left x), `0xa7844` (right x),
+  `0xa78e4` / `0xa79a4` (u, v): slope `(x1 − x0 << 16) / n` (n = dy + 1, the end row
+  included), a half step in on the first row (left: when the slope < 0, right: > 0; u/v
+  by the x slope's sign), cut to the window `0xf88a4..0xf88b0` (x0, y0, x1, y1: ends
+  outside). An edge going up (n ≤ 0) is skipped: the table keeps what was there (the
+  original's stack).
+- Each row: n = right − left + 1; **n ≤ 0 → once, the way round flipped and the sides
+  built again, the same row again; a second time ends the quad** (`0x91917`). Rows outside
+  the window's x are skipped; du = (u_r − u_l) / n, dv likewise (before the clipping), the
+  left cut moves u, v by du, dv per pixel cut. The row painter `0xa7a4c` (`0xa7610`):
+  source = picture + (v >> 16) × row bytes + (u >> 16); the fractions in 16 bits each and
+  their carries step the source by a row and a pixel (`add bx,dx` / `adc esi,[step +
+  row?]`): exactly u + k·du, v + k·dv, no wrapping. Row bytes `shaperowbytes` `0xa61f0`
+  (bits a pixel from `0xf9888[type & 0x7f]`, 15 → 16, × width, rounded up to bytes);
+  the screen's bits a pixel `0xf88b4`, its rows `0xf88c4` (a table of row addresses) +
+  `0xf88c8`.
+- `tools/raster_emu.py` runs `0x91360` / `0x90b30` in Unicorn against the port's
+  `raster.c`: **equal on 22,246 random quads** (convex, crossed, clipped, see-through;
+  2026-10-19).
+
+#### Cutting a quad: `draw_quad` `0x35b04` (read, 2026-10-19)
+
+`draw_quad(shape, ushift, level, uindex, vindex, P[4] (3D point pointers), S (4 screen
+points, 8 bytes each), near)`, Watcom registers then the stack; `0x35a98` is its helper
+that packs the four pointers and screen points of a child.
+- Nothing when near > P2.z and near > P1.z.
+- **Cut into four when P3.z < `0xeaae8[level]` >> `0xf6aa4` and level < `0xeaad8`**,
+  else painted whole: `0x3521c(shape, ushift, level, uindex, vindex, S)` gives the corners'
+  picture positions: w = width >> ushift, h = height >> level, u0 = ((1 << ushift) − 1 −
+  uindex) · w (mirrored), v0 = ((1 << level) − 1 − vindex) · h, u1 = u0 + w − 1, v1 = v0 +
+  h − 1, corners (u0,v0) (u1,v0) (u1,v1) (u0,v1) in 16.16; painted only if w > 1 and
+  h > 1, through `[0x12c0dc]`.
+- The cut: midpoints m01, m23, the centre c = mid(m01, m23), m12 (each coordinate
+  `(a + b) / 2` toward zero), from the unclipped points. A midpoint nearer than `near` is
+  moved for its projection only: t = (near − z) / `0x143e5c` in 16.16 (two divisions:
+  whole, then the remainder << 16), x += t · `0x143e54`, y += t · `0x143e58` (rounded
+  multiplies), z = near. The children (ushift + 1, level + 1): (m01, P1, m12, c) at
+  (2u + 1, 2v + 1), (c, m12, P2, m23) at (2u + 1, 2v); then, **unless m23.z < near and
+  m01.z < near**, m30 and (P0, m01, c, m30) at (2u, 2v + 1), (m30, c, m23, P3) at (2u, 2v).
+- Projection `0x83b5c(p, out)`: z ≤ `0xf7938` → (0x80000000, 0x80000000) and `0xf7a40`
+  |= 1. Else z normalised below 0x400 with a shift (16; ≥ 0x10000: 24 and z >> 8; again
+  ≥ 0x10000: +8, >> 8; ≥ 0x1000: +4, >> 4; ≥ 0x800: +2, >> 2; ≥ 0x400: +1, >> 1), r =
+  `[0xf7a14]`[z]; x' = `0xf7a28` + (x · r >> shift, rounded by the last bit out), y' =
+  `0xf7a2c` − (y · r >> shift). The shift is taken mod 32 by the CPU (z ≥ 2^24: no shift).
+  The table (`0x83af4`): r[i] = (`0xf7a30` << 16) / i, i < 10 as 10; 0x400 entries.
+
 ### 4.8 Cars meeting cars, walls, traffic and the police
 
 - **`cars_meet_world` `0x1c878`**, every step after the driving: every 4th call
@@ -1007,6 +1067,16 @@ not 0: the replay?), `0x2a918`, the second drawing pass `0x5a4f0`, the widget bl
   game's memory is one run, so host = where the data object was found + (pointer − its own
   address). Checked: the road nodes' pointer `0x137430` read that way gives CY1's node 0
   byte for byte. `nfsdos.py` does this (`dos()`, the `car:` step).
+- **A snapshot to run the original's code on** (2026-10-19): `snap:<f>` in a plan pauses
+  DOSBox and writes 32 MB of the game's memory by its own addresses (`<f>.json`: the
+  data object's offset). `tools/snap_emu.py` loads it in Unicorn and calls any routine by
+  its flat address. **Each object was loaded at its own place**: the code object at flat
+  + `0x1e9000`, object 2 + `0xdd000`, object 3 + `0xce000`, the data object and its BSS +
+  `0x1c4000` (from the 27,294 relocated pointers, all agreeing; snapshot `r1a`). Calling
+  `race_draw_frame` `0x5bc40` on a race snapshot runs (1.4 million instructions, no
+  interrupts, no ports) and leaves the whole 320x200 frame (cockpit, mirror, map) at the
+  game's `0xa0000`; the 3D view is drawn first into a 320x127 window at `[0xf88c8]`.
+  The palette is the card's, not in memory.
 - **`tools/nfsdos.py <prefix> "<plan>"`** runs it unseen on `Xvfb :77` as its own child,
   presses keys (XTEST), takes pictures, finds the data object in DOSBox's memory by the
   car sound banks' names (`0xe2d14`) and reads the clocks (the header lists what).

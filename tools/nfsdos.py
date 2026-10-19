@@ -17,6 +17,9 @@ The plan is a comma-separated list of steps:
     mem:<a>:<n>:<f>     n bytes (hex count) at the flat address a (hex) in the data object
     car:<n>             car n's record (through the pointers at 0x13c24c): position +0 +4 +8
                         (16.16), road node +0x48, across the road +0x80, speed +0x70
+    snap:<f>            the game paused and its whole memory (32 MB, by the game's own
+                        addresses) written to f, its offset to the flat image in f.json:
+                        for running the game's code on it (tools/snap_emu.py)
     find                find the game's data object in DOSBox's memory (needed before watch;
                         done by the first watch if not done before)
 
@@ -71,6 +74,7 @@ def find():
     if pid is None:
         sys.exit("no dosbox process")
     mem = open("/proc/%d/mem" % pid, "rb", 0)
+    globals()["pid"] = pid
     for l in open("/proc/%d/maps" % pid):
         m = re.match(r"([0-9a-f]+)-([0-9a-f]+) rw", l)
         if not m:
@@ -182,6 +186,20 @@ try:
                 find()
             open(p[3], "wb").write(os.pread(mem.fileno(), int(p[2], 16), base + int(p[1], 16) - DATA))
             print("0x%s: 0x%s bytes to %s" % (p[1], p[2], p[3]))
+        elif p[0] == "snap":
+            if base is None:
+                find()
+            import json, signal
+            os.kill(pid, signal.SIGSTOP)
+            try:
+                # the game's memory is one run under DOS/4GW's paging: written from where
+                # its address 0 would be, so the file is read by the game's own addresses
+                # (what lies below its program is other memory, 0xa0000 is not the screen)
+                open(p[1], "wb").write(os.pread(mem.fileno(), 32 << 20, base - prog))
+            finally:
+                os.kill(pid, signal.SIGCONT)
+            json.dump({"flat_to_game": prog - DATA}, open(p[1] + ".json", "w"))
+            print("memory to %s (the game's addresses = flat + 0x%x)" % (p[1], prog - DATA))
         elif p[0] == "find":
             find()
         sys.stdout.flush()
