@@ -35,6 +35,7 @@ add_executable(renfs
   src/raster.c
   src/poly.c
   src/road.c
+  src/track.c
 )
 target_include_directories(renfs PRIVATE ${SDL2_INCLUDE_DIRS})
 target_compile_options(renfs PRIVATE ${SDL2_CFLAGS_OTHER})

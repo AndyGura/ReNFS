@@ -146,6 +146,19 @@ read from it section by section as the car goes (`0x4ee30` → `0x4ed74` → `0x
    section. `0x4eb00` turns one into 12 + 528 bytes (i32 points) in a ring of 64 at
    `0x1365e8` (0x8700 bytes); `0x4ee30` keeps the 30 sections round the car there.
 
+**In memory** (snapshot of CY1, 2026-10-19): the head is the file's first 0x1621c bytes
+unchanged (node 0's `+0x14` / `+0x18` from the head's `+0x18` / `+0x20` are the same values
+on CY1; the speed scaling's factor was 1.0); `0x1365e0` = the objects after the 12-byte
+"SJBO" head, the placements `0x13bb94` = that + kinds × 16; the stored sections follow the
+objects in the file. `tri_keep_sections` `0x4ee30(sec)`: L = `0x13bb8c` (sections round a
+circuit, 0x8000 on an open road), the head H `0x1365ec`, ahead A `0x1365f8` = 30, span
+T `0x1365f4` = A + 5; fold(d) = L − d if d > L/2 (sic), d + L if d < −L/2. d = fold(H −
+sec); e = fold(|sec − (H − A)|); e > T → H = (A + sec − T) & mask, d = A − T. While d < A:
+load H, H + 1; while d > A: load H − 1 − T, H − 1 (d folded again each time). A section
+goes to the ring slot (sec × 0x21c) % 0x8700. **Ported (`port/src/track.c`: the whole file
+in memory, the same ring), equal to the original's ring in 3 snapshots
+(`tools/track_emu.py`).**
+
 Units: a node is 6 units from the next; TR1 is 3,066 units round; the speed limits 27 / 33
 would be 60 / 74 mph in metres a second. **Probably metres**, not yet proved (the HUD shows
 "5.2 MILES" at the start of CY1, 11,514 units long: the race may not run the whole file).
