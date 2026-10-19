@@ -1695,6 +1695,34 @@ the view's picture copied at (0, 0) through each. Then `0x2e4f0(car)`, `0x30214`
 **Ported: every frame equal to the original's, on e1 and e3 with the wheel, engine and
 speed set seven ways (`tools/dash_emu.py`, the routines not yet ported left out of both).**
 
+**After the gauges, each frame** (`0x31684`'s end, on the screen's window):
+`0x2e4f0(car)` the gear lever's gate, only with the map off (`0x12b988` = 0): `gate` at
+its place, the knob (`nob1`, `lth3`..`lth1` at `0xea98c`, 4 when there are, `0x12b5e8`)
+at one of the gate's 9 points (`0x12b83c`) by the gear (`+0x421`, `+0x41d`, `+0x3ed`,
+`+0x3bd`), `gbak` without a gear (not ported). `0x30214` **the radar detector**: level
+`0xea814` (5 at most): with any, `bglt` / `bgdk` (`0x12b9f8` flashing) at place 2; when
+the level differs from `0x12b938`: as many `smlt` as the level at places 3..7, the rest
+`smdk` (level 0: `bgdk` and five `smdk`). `0x2f644` the keys of the HUD (`0xf7b0a` the
+status bar's mode: race / segment, or on City-like tracks 3 three ways; `0xf7b09` the
+status bar on / off; the key `0x12d950` held the map on / off and the whole dashboard
+again; `0xf7b0b` the view, `0x14b00`; each once per press, `0xea9a0`), and before them
+the status bar drawn again when the steps pass `0x12b944`. `0x30d8c(car)` **the status
+bar's numbers**: `0x12b948` (`wait`, network) aside; with the bar off or within the
+first 360 steps only (< 360) **the start's lights** `0x2dbbc`: the strip blacked once
+(`0x12b94c`), then five lights 0x41 apart at y 0: `srdd`/`srdl` (red, i < 3) and
+`syld`/`syll` (yellow) dark while i > steps / 60, lit after, all `sgrn` from step 300 (a
+sound each as it comes on, `0x5257c`, flags `0x145c9c`..), `0x12b944` = steps + 10 (so
+the bar's picture comes back 10 steps after the last). After: the speed in red digits
+`0x2ddc0` (x 0x7a; `+0x68`, or `+0x15c` for cars past the humans), the gear `0x2dee8`
+(0xba), the place `0x2e368` (0x121, `0x516d4`), the time `0x2d5dc` (0x48: the player's
+time from the lap table `0x14ea78 + 0x1d2·(+0x47d)`, + 300), the split `0x2e1dc` (0xe0),
+laps `0x2e100` or miles `0x2df78`, the acceleration test `0x2d8c0`; `lost` (`0x145760`,
+network) with `0x12b93c`. The HUD's pictures by name from `0x5f240`: `0x145758` tach,
+`0x14575c` wait, `0x145760` lost, `0x145764` paus, `0x145784` sync, `0x145768` srdd,
+`0x14576c` srdl, `0x145770` syld, `0x145774` syll, `0x145778` sgrn. **The lights, the
+radar and the bar's return ported: equal on e1 and e3 with steps 0..359 and the radar
+at 0..7 (`tools/dash_emu.py`); the numbers after the start wait for the race's timing.**
+
 **load_dash's places** (`0x2e8d4` from `0x2ee4b`): a picture's attachment block is the
 first of its chain of blocks (`+1`, 24 bits: the next) of type 0x7c: `+4` a count, from
 `+8` pairs of 32-bit x, y. Each point on the screen = the picture's centre (`+8`, `+0xa`)

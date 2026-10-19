@@ -19,13 +19,19 @@ from unicorn.x86_const import UC_X86_REG_ESP, UC_X86_REG_EIP
 import roadpic_emu as R
 import cars_emu
 
-# not yet ported: the status bar's numbers, the replay's buttons
-LEFT_OUT = {0x2e4f0: 0, 0x30214: 0, 0x2f644: 0, 0x30d8c: 0, 0x5c5d0: 0}
+# not yet ported: the replay's buttons, and the status bar's numbers after the start
+# (0x30d8c from step 361)
+LEFT_OUT = {0x5c5d0: 0}
+NUMBERS = 0x30d8c
 # the wheel (straight, a little and far each way, all the way), the engine's turns and the
 # speed (metres a second, 16.16) of each frame; the first the snapshot's own
 STEERS = [None, -0x30000, 0x30000, 0x70000, -0x100000, 0x180000, -0x200000, 0, 0]
 RPMS = [None, 900, 1500, 3333, 5000, 6100, 7000, 9999, 0]
 SPEEDS = [None, 0x10000, -0x50000, 0x123456, 0x1c0000, 0x250000, 0x400000, 0x7fffff, 0]
+# the race's steps (the start's lights) and the radar's level and flash
+STEPS = [None, 0, 59, 60, 179, 250, 299, 300, 359]
+RADARS = [None, 0, 1, 2, 3, 5, 7, 7, 0]
+FLASHES = [None, 0, 1, 0, 1, 1, 0, 1, 0]
 
 I = ctypes.c_int
 U8 = ctypes.c_ubyte
@@ -40,7 +46,7 @@ STATUS = [("shown", 0x12b940), ("steps", 0x145c94), ("mode", 0x12b8cc), ("table"
           ("track", 0x12da12), ("segment", 0x12da0e), ("circuit", 0x13bb80), ("ahead", 0x14ea6c),
           ("splits", 0x14ea70), ("best_lap", 0x13c20c), ("race_type", 0x12da20),
           ("detail", 0x143e04), ("mirror", 0x143e08), ("map", 0x12b988), ("mirrored", 0x12dd28),
-          ("running", 0xf6b74), ("kmh", None)]
+          ("running", 0xf6b74), ("kmh", None), ("radar", 0xea814), ("radar_flash", 0x12b9f8)]
 
 
 class Status(ctypes.Structure):
@@ -78,6 +84,11 @@ def left_out(s):
     for at, k in LEFT_OUT.items():
         s.mu.hook_add(UC_HOOK_CODE, hook, k, begin=game(at), end=game(at))
 
+    def numbers(mu, addr, size, k):
+        if s.i32(0x145c94) > 360:
+            hook(mu, addr, size, 0)
+    s.mu.hook_add(UC_HOOK_CODE, numbers, 0, begin=game(NUMBERS), end=game(NUMBERS))
+
 
 def original(s):
     """the screen after the redraw, from a screen of FILL"""
@@ -100,6 +111,9 @@ def original_frames(path):
         for at, v in ((0x18, STEERS[k]), (0x3c1, RPMS[k]), (0x68, SPEEDS[k])):
             if v is not None:
                 s.mu.mem_write(car + at, struct.pack("<i", v))
+        for at, v in ((0x145c94, STEPS[k]), (0xea814, RADARS[k]), (0x12b9f8, FLASHES[k])):
+            if v is not None:
+                s.write(at, struct.pack("<i", v))
         s.call(0x31684, eax=car)
         got.append(bytes(s.mu.mem_read(VGA, W * H)))
     return got
@@ -117,6 +131,7 @@ def port_frames(s, L):
         else:
             ctypes.memmove(p.pix, pix, w * h)
     scr = Picture.in_dll(L, "g_hud_screen")
+    st = Status.in_dll(L, "g_hud")
     ctypes.memset(scr.pix, FILL, W * H)
     L.hud_redraw_due()
     a = player(s)
@@ -127,6 +142,9 @@ def port_frames(s, L):
         for f, v in (("steer", STEERS[k]), ("rpm", RPMS[k]), ("speed", SPEEDS[k])):
             if v is not None:
                 setattr(car, f, v)
+        for f, v in (("steps", STEPS[k]), ("radar", RADARS[k]), ("radar_flash", FLASHES[k])):
+            if v is not None:
+                setattr(st, f, v)
         L.hud_frame(ctypes.byref(car))
         got.append(ctypes.string_at(scr.pix, W * H))
     return got
@@ -182,8 +200,8 @@ def main():
             d = [i for i in range(W * H) if a[i] != b[i]]
             R.png("build/shots/dash_%s_frame%d_orig.png" % (tag, k), a, pal)
             R.png("build/shots/dash_%s_frame%d_port.png" % (tag, k), b, pal)
-            print("  frame %d (the wheel %s, rpm %s, speed %s): %d pixels differ%s" % (
-                k, STEERS[k], RPMS[k], SPEEDS[k], len(d), " (first %d, %d)" % (d[0] % W, d[0] // W) if d else ""))
+            print("  frame %d (wheel %s, rpm %s, speed %s, step %s, radar %s): %d pixels differ%s" % (
+                k, STEERS[k], RPMS[k], SPEEDS[k], STEPS[k], RADARS[k], len(d), " (first %d, %d)" % (d[0] % W, d[0] // W) if d else ""))
 
 
 if __name__ == "__main__":

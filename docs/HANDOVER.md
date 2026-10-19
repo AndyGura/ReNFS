@@ -178,9 +178,12 @@ Ghidra project and `build/decomp`, one command). The git history was started aga
   windscreen's BAMF list, the mirror's picture, the wheel turned by the steering, the two
   gauges with their needles (EA's smoothed wide line `0x8b195`, exact on 10,000 random
   lines; its blend table equal), all equal to the original pixel for pixel on e1 and e3
-  with the wheel, engine and speed set seven ways (`tools/dash_emu.py`). `--race cy1`
-  now shows the dashboard over the view.
-  Not yet: the status bar's numbers (`0x2e4f0`, `0x30214`, `0x2f644`, `0x30d8c`), the map
+  with the wheel, engine and speed set seven ways (`tools/dash_emu.py`), and the start's
+  lights and the radar detector's (equal with steps 0..359, radar 0..7). `--race cy1`
+  now shows the dashboard over the view, the lights counting down, then the status bar.
+  Not yet: the status bar's numbers after the start (`0x30d8c`: speed, gear, place,
+  time, laps; they wait for the race's timing), the gear gate (`0x2e4f0`, map off), the
+  HUD's keys (`0x2f644`), the map
   (`0x31cb4`), the replay's buttons (`0x5c5d0`), the doubled BAMF lists (detail),
   one-colour polygons (`0xaa990`), the police lights, the circuits' sky ring (`0x4ace8`),
   the roadside walls (`0x59294`, other tracks than the cities), 3D roadside models

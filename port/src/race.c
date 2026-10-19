@@ -4,6 +4,7 @@
 #include "camera.h"
 #include "car.h"
 #include "cardraw.h"
+#include "config.h"
 #include "dash.h"
 #include "hud.h"
 #include "exe.h"
@@ -70,6 +71,7 @@ int race_test(const char *name)
     const view_window *w;
     int i, eye, horizon, redline, near, gathered = -1;
     hud_car driver;
+    unsigned start;
     const char *car = "F512TR";
 
     if (!exe_load() || !track_load(name) || !trackinfo_load(name, 1, 0)
@@ -145,6 +147,9 @@ int race_test(const char *name)
     /* the dashboard as the race starts: the status bar still black (its first 360
        steps), standing with the engine idling (+0x3c1 700 at the start) */
     memset(&g_hud, 0, sizeof g_hud);
+    config_load();             /* the records the status bar shows */
+    g_hud.track = 0;           /* City 1 (0x12da12), its first segment */
+    g_hud.table = 1;
     g_hud.shown = 1;
     g_hud.race_type = g_race_type;
     g_hud.running = 1;
@@ -154,6 +159,7 @@ int race_test(const char *name)
     driver.redline = redline;
     driver.speed = 0;
     hud_redraw_due();
+    start = clock_ticks();
 
     while (!g_quit && key_get() != 0x1b) {
         const int *m;
@@ -186,6 +192,9 @@ int race_test(const char *name)
         sky_draw(cam.yaw, m, &win, 0);
         road_objects_start();
         road_draw(DRAWN, cam.node, near, &win);
+        /* the race's steps, a third of the clock's ticks (until the race's own clock,
+           0x4c454's three-cycle, comes with the race's step) */
+        g_hud.steps = (int)((clock_ticks() - start) / 3);
         hud_frame(&driver);
         video_retrace();
     }

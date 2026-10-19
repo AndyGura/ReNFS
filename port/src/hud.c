@@ -29,6 +29,10 @@ static unsigned char *g_mask_pal;    /* its "!pal", 6 bits (0x145608) */
 static int g_redraw;                 /* 0x12b8d4: the whole dashboard is due */
 static int g_wheel_shown;            /* 0x12b8d0: the wheel's picture on the screen (0x63
                                         none), turned left < 0 */
+static int g_radar_shown;            /* 0x12b938: the radar's level on the screen */
+static int g_bar_at;                 /* 0x12b944: the status bar drawn again after this
+                                        step */
+static int g_bar_black;              /* 0x12b94c: its strip to be blacked first */
 
 /* the window drawn into (0xf889c): a picture and its clip */
 static hud_picture g_win;
@@ -153,6 +157,7 @@ int hud_load(void)
     g_hud_view.h = 200;
     g_hud_view.pix = calloc(320 * 200, 1);
     g_redraw = 1;
+    g_bar_black = 1;
     return g_hud_map_back.pix && g_hud_view.pix;
 }
 
@@ -228,7 +233,9 @@ static void status_bar(void)
     /* (mode 2, the acceleration test: 0x145780 and 0x2d8c0, not yet) */
     if (g_hud.mode < 2)
         blit_own(named(&g_mask, g_hud.race_type <= 1 ? "head" : "sing"), COPY);
-    /* (0x2d150: every number shown marked for drawing again) */
+    /* every number shown marked for drawing again (0x2d150) */
+    g_radar_shown = -99;
+    g_bar_at = 0x7d000;
 }
 
 void hud_redraw(void)
@@ -370,6 +377,62 @@ static void needles(const hud_car *c)
         needle(g_dash.sped_pt, g_dash.sped_n, 0, 0, 10, c->number);
 }
 
+/* the radar detector's lights (0x30214): the big one at place 2 while it hears
+   anything, lit or dark as it flashes; the five small ones at places 3..7, as many lit as
+   the level, drawn when it changes */
+static void radar(void)
+{
+    int n = g_hud.radar > 5 ? 5 : g_hud.radar, i;
+    const unsigned char *big = named(&g_dash.file, g_hud.radar_flash ? "bglt" : "bgdk");
+    const unsigned char *lit = named(&g_dash.file, "smlt"), *dark = named(&g_dash.file, "smdk");
+
+    if (g_hud.radar)
+        blit(big, g_dash.place[2][0], g_dash.place[2][1], COPY);
+    if (g_hud.radar != g_radar_shown) {
+        if (!g_hud.radar)
+            blit(named(&g_dash.file, "bgdk"), g_dash.place[2][0], g_dash.place[2][1], COPY);
+        for (i = 0; i < 5; i++)
+            if (g_hud.radar && i < n)
+                blit(lit, g_dash.place[3 + i][0], g_dash.place[3 + i][1], COPY);
+            else if (!g_hud.radar || n <= 4)
+                blit(dark, g_dash.place[3 + i][0], g_dash.place[3 + i][1], COPY);
+    }
+    g_radar_shown = g_hud.radar;
+}
+
+/* the start's lights across the status bar (0x2dbbc), a second (60 steps) each: three
+   red then two yellow lit in turn, all five green from step 300 */
+static void start_lights(void)
+{
+    int k = g_hud.steps / 60, i;
+
+    if (g_bar_black) {
+        raster_fill(0, 0, 320, 16, g_marker_line);
+        g_bar_black = 0;
+    }
+    for (i = 0; i < 5; i++) {
+        const char *name = g_hud.steps >= 300 ? "sgrn"
+                         : i < 3 ? (i > k ? "srdd" : "srdl") : (i > k ? "syld" : "syll");
+
+        /* (each light's sound as it comes on, 0x5257c: not yet) */
+        blit(named(&g_mask, name), 0x41 * i, 0, COPY);
+    }
+    g_bar_at = g_hud.steps + 10;
+}
+
+/* the status bar's numbers (0x30d8c): before the start its lights; then the speed, the
+   gear, the place, the time and the laps or miles (not yet: they wait for the race's
+   timing) */
+static void bar_numbers(void)
+{
+    if (!g_hud.shown || g_hud.steps <= 360) {
+        if (g_hud.steps < 360)
+            start_lights();
+        return;
+    }
+    g_bar_black = 1;
+}
+
 void hud_frame(const hud_car *c)
 {
     int turn = wheel_turn(c->steer), shown = c->steer < 0 ? -turn : turn;
@@ -405,7 +468,14 @@ void hud_frame(const hud_car *c)
              g_dash.sped_box[1], g_dash.sped_box[1] + g_dash.sped_box[3]);
     blit_pixels(g_hud_view.pix, g_hud_view.w, g_hud_view.h, 0, 0, COPY);
 
-    /* (0x2e4f0, 0x30214, 0x2f644, 0x30d8c: the status bar's numbers, not yet) */
+    window_set(&g_hud_screen);
+    /* (0x2e4f0: the gear lever's gate, in the map's box when the map is off: not yet) */
+    radar();
+    /* 0x2f644: the status bar again some steps after the start's lights (and the keys
+       that switch it, the map and the view: not yet) */
+    if (g_hud.steps > g_bar_at)
+        status_bar();
+    bar_numbers();
     if (g_hud.map && g_hud_map.pix)
         blit_pixels(g_hud_map.pix, g_hud_map.w, g_hud_map.h, 0x103, 0x7e, COPY);
     /* (0x5c5d0: the replay's buttons, not yet) */

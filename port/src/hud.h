@@ -32,6 +32,8 @@ typedef struct {
     int running;               /* 0xf6b74 = 1: the race running (else the clip to row
                                   180 for the wheel) */
     int kmh;                   /* 0x15d140: kilometres an hour, not miles */
+    int radar;                 /* 0xea814: the radar detector's level, 0 quiet */
+    int radar_flash;           /* 0x12b9f8: its big light lit */
 } hud_status;
 
 /* what the dashboard shows of the player's car */

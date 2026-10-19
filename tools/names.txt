@@ -520,3 +520,16 @@
 0x8a390 blend_colour_make
 0xa6040 lerp_fixed
 0x96090 get_pixel
+0x2e4f0 hud_gear_gate
+0x30214 hud_radar
+0x2f644 hud_keys
+0x30d8c hud_bar_numbers
+0x2dbbc hud_start_lights
+0x2ddc0 hud_speed_digits
+0x2dee8 hud_gear
+0x2e368 hud_place
+0x2d5dc hud_race_time
+0x2e1dc hud_split
+0x2e100 hud_laps
+0x2df78 hud_miles
+0x2d8c0 hud_accel_test
