@@ -15,6 +15,11 @@ extern race_car *g_car_order[RACE_CARS_MAX]; /* 0x13c224: the cars on the road, 
 extern int g_car_order_n;                    /* 0x13c220 */
 extern int g_player;                         /* 0x12dd58: the player's car */
 extern int g_racers;                         /* 0x13c18c: the cars with a mark */
+extern int g_race_type;                      /* 0x12da20: CONFIG.DAT +0x6d, 0 time trial
+                                                (no markers), 1 head to head, 2 single
+                                                race, 3 tournament */
+extern int g_field;                          /* 0x12da2c: the cars racing (1, 2 or 8) */
+extern int g_humans;                         /* 0x12da30: the players' cars, the first slots */
 extern unsigned char g_car_marks[RACE_CARS_MAX]; /* 0x14e5bc: each one's palette entry */
 extern unsigned char g_cars_seen[CARS_SEEN];     /* 0x14e5d0 */
 extern const race_camera *g_camera;          /* 0x143df4 */

@@ -20,8 +20,8 @@ unsigned char g_shade[256];
 /* the window (0xf88a4 ..) while a polygon is filled */
 static int g_wx0, g_wy0, g_wx1, g_wy1;
 
-enum { VERTICAL = 2, DIAG_LEFT, DIAG_RIGHT, STEEP_LEFT, STEEP_RIGHT, SHALLOW_LEFT,
-       SHALLOW_RIGHT };
+enum { FLAT_BACK, FLAT, VERTICAL, DIAG_LEFT, DIAG_RIGHT, STEEP_LEFT, STEEP_RIGHT,
+       SHALLOW_LEFT, SHALLOW_RIGHT, POINT };
 
 /* an edge (the original's 0x38 bytes at ebp-0x290c) */
 typedef struct {
@@ -31,8 +31,9 @@ typedef struct {
     int count;                 /* +0x18: rows (steep) or x steps (shallow) */
     int top_left, bottom_left, top_right, bottom_right; /* +0x20, +0x24, +0x28, +0x2c */
     uint32_t slope;            /* +0x30 */
-    int kind;                  /* +0x34: 2 vertical, 3/4 diagonal, 5/6 steep, 7/8 shallow
-                                  (the odd ones going left as they go down) */
+    int kind;                  /* +0x34: 0/1 flat (0 given right to left), 2 vertical,
+                                  3/4 diagonal, 5/6 steep, 7/8 shallow (the odd ones going
+                                  left as they go down), 9 a point */
 } edge;
 
 static int whole(int64_t v)
@@ -304,12 +305,61 @@ static int x_code(edge *e, int *code)
     return 0;
 }
 
-/* an edge from (x0, y0) to (x1, y1), y1 > y0 (0xa631c; cut to the window: 0xa632b); the
-   code where it lies if wholly outside, else 0 */
+/* a flat edge, one row (0xa6a79): its run of x cut to the window */
+static int edge_flat(edge *e, int x0, int x1, int y, int cut)
+{
+    int t;
+
+    e->kind = x0 == x1 ? POINT : FLAT;
+    if (x0 > x1) {
+        e->kind = FLAT_BACK;
+        t = x0;
+        x0 = x1;
+        x1 = t;
+        e->x = fixed(x0);
+        e->x1 = x1;
+    }
+    if (!cut) {
+        e->count = x1 - x0 + 1;
+        return 0;
+    }
+    if (y < g_wy0 || y >= g_wy1) {
+        e->y = fixed(y < g_wy0 ? g_wy0 : g_wy1);
+        e->y1 = whole(e->y);
+        e->count = 0;
+        return y < g_wy0 ? 4 : 8;
+    }
+    e->count = x1 - x0 + 1;
+    if (x1 < g_wx0 || x0 >= g_wx1) {
+        e->y1--;
+        if (x1 < g_wx0)
+            e->bottom_left = 1;
+        else
+            e->bottom_right = 1;
+        e->count = 0;
+        return x1 < g_wx0 ? 2 : 1;
+    }
+    if (g_wx0 > x0) {
+        e->x = fixed(g_wx0);
+        e->count -= g_wx0 - x0;
+    }
+    if (x1 > g_wx1 - 1) {
+        e->count -= x1 - (g_wx1 - 1);
+        e->x1 = g_wx1 - 1;
+    }
+    return 0;
+}
+
+/* an edge from (x0, y0) to (x1, y1), from its top end (0xa631c; cut to the window:
+   0xa632b); the code where it lies if wholly outside, else 0 */
 static int edge_make(edge *e, int x0, int y0, int x1, int y1, int cut)
 {
-    int top = 0, bottom = 0, code, dx, dy;
+    int top = 0, bottom = 0, code, dx, dy, t;
 
+    if (y0 > y1) {
+        t = x0, x0 = x1, x1 = t;
+        t = y0, y0 = y1, y1 = t;
+    }
     e->kind = 0xff;
     e->x = fixed(x0);
     e->y = fixed(y0);
@@ -317,6 +367,8 @@ static int edge_make(edge *e, int x0, int y0, int x1, int y1, int cut)
     e->y1 = y1;
     e->top_left = e->bottom_left = e->top_right = e->bottom_right = 0;
     e->slope = 0;
+    if (y0 == y1)
+        return edge_flat(e, x0, x1, y0, cut);
     if (cut) {
         if (y0 >= g_wy1)
             return outside(e, 8);
@@ -658,9 +710,7 @@ void poly_fill(int n, const int *xy, poly_rows rows, int colour)
 
     raster_clip(&g_wx0, &g_wy0, &g_wx1, &g_wy1);
     if (n == 1) {
-        /* a point: 0x8bb3c's line of one pixel (0xa6060), in the colour */
-        if (xy[0] >= g_wx0 && xy[0] < g_wx1 && xy[1] >= g_wy0 && xy[1] < g_wy1)
-            raster_row(xy[1])[xy[0]] = (unsigned char)colour;
+        poly_line(xy[0], xy[1], xy[0], xy[1], colour);   /* a point: 0x8bb3c */
         return;
     }
     min_y = max_y = xy[1];
@@ -684,9 +734,7 @@ void poly_fill(int n, const int *xy, poly_rows rows, int colour)
         return;
     cut = max_x > g_wx1 - 1 || min_x < g_wx0 || max_y >= g_wy1 || min_y < g_wy0;
     if (max_x == min_x) {
-        /* one column: 0x8bb3c's line, cut as an edge, in the colour (0x8a2a0) */
-        if (!edge_make(&e, min_x, min_y, max_x, max_y, 1) && e.count > 0)
-            raster_fill(min_x, whole(e.y), 1, e.count, colour);
+        poly_line(min_x, min_y, max_x, max_y, colour);   /* one column: 0x8bb3c */
         return;
     }
 
@@ -714,6 +762,82 @@ void poly_fill(int n, const int *xy, poly_rows rows, int colour)
     if (y1 - y0 <= 0)
         return;
     rows(g_left + y0, g_right + y0, y0, y1 - y0 + 1, colour);
+}
+
+/* a pixel, if in the window (0xa6060) */
+static void plot(int x, int y, int colour)
+{
+    if (x >= g_wx0 && x < g_wx1 && y >= g_wy0 && y < g_wy1)
+        raster_row(y)[x] = (unsigned char)colour;
+}
+
+/* the edge's pixels (0xa6c38): its ends rounded to 16.16 and only the slope's top 16 bits
+   stepped, so a long line drifts from the polygons' edges */
+static void line_paint(const edge *e, int colour)
+{
+    uint32_t xf = (uint32_t)(e->x >> 16) + 0x8000, yf = (uint32_t)(e->y >> 16) + 0x8000;
+    uint32_t step = e->slope >> 16;
+    int x = (int)(xf >> 16), y = (int)(yf >> 16), row = whole(e->y), n = e->count;
+
+    xf &= 0xffff;
+    yf &= 0xffff;
+    switch (e->kind) {
+    case FLAT_BACK:
+    case FLAT:
+        if (n)
+            raster_fill(x, y, n, 1, colour);
+        break;
+    case VERTICAL:
+        if (n)
+            raster_fill(x, row, 1, n, colour);
+        break;
+    case DIAG_LEFT:
+    case DIAG_RIGHT:
+        for (; n > 0; n--, row++, x += e->kind == DIAG_LEFT ? -1 : 1)
+            plot(x, row, colour);
+        break;
+    case STEEP_LEFT:
+    case STEEP_RIGHT:
+        for (; n > 0; n--, row++) {
+            plot(x, row, colour);
+            xf += step;
+            if (xf & 0xffff0000u) {
+                xf &= 0xffff;
+                x += e->kind == STEEP_LEFT ? -1 : 1;
+            }
+        }
+        break;
+    case SHALLOW_LEFT:
+    case SHALLOW_RIGHT:
+        for (; n > 0; n--) {
+            yf += step;
+            plot(x, y, colour);
+            x += e->kind == SHALLOW_LEFT ? -1 : 1;
+            if (yf & 0xffff0000u) {
+                y++;
+                yf &= 0xffff;
+            }
+        }
+        break;
+    case POINT:
+        plot(x, y, colour);
+        break;
+    }
+}
+
+void poly_line(int x0, int y0, int x1, int y1, int colour)
+{
+    edge e;
+
+    raster_clip(&g_wx0, &g_wy0, &g_wx1, &g_wy1);
+    if (!edge_make(&e, x0, y0, x1, y1, 1) && e.count > 0)
+        line_paint(&e, colour);
+}
+
+void poly_solid_rows(const int *left, const int *right, int y, int n, int colour)
+{
+    for (; n > 0; n--, y++, left++, right++)
+        raster_fill(*left, y, *right - *left + 1, 1, colour);
 }
 
 void poly_shade_rows(const int *left, const int *right, int y, int n, int colour)

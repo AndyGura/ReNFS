@@ -218,3 +218,34 @@ void shade_make(int f)
         g_shade[i] = (unsigned char)pick;
     }
 }
+
+unsigned char g_marker_colour[8];
+int g_marker_line;
+
+/* the entry 0..254 nearest to (r, g, b), 6 bits each, the differences added (0x55790);
+   the first of equals */
+static int hud_nearest(int r, int g, int b)
+{
+    const unsigned char *p8 = video_palette8();
+    int i, d, best = 99999, pick = 0;
+
+    for (i = 0; i < 255; i++) {
+        d = abs((p8[3 * i] >> 2) - r) + abs((p8[3 * i + 1] >> 2) - g)
+            + abs((p8[3 * i + 2] >> 2) - b);
+        if (d < best) {
+            best = d;
+            pick = i;
+        }
+    }
+    return pick;
+}
+
+void hud_colours(void)
+{
+    /* (0x13d5a4.. the HUD's other ones, from (63, 0, 0) on, wait for the dashboard) */
+    static const unsigned char fixed[8] = { 0xf5, 0xf8, 0xf0, 0xfa, 0, 0xf9, 0xfc, 0xfb };
+
+    memcpy(g_marker_colour, fixed, sizeof fixed);
+    g_marker_colour[4] = (unsigned char)hud_nearest(63, 63, 63);   /* 0x13d5c4 */
+    g_marker_line = hud_nearest(0, 0, 0);
+}

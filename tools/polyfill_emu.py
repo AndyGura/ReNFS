@@ -4,8 +4,10 @@ cars' shadows' kind: quads and triangles, small and large, many crossing the win
 edges) shaded through a random table by the original's 0x8a094 (0x8bc71 with the row
 painter 0xa5dd4), run on a snapshot, and by the port's poly_fill (port/src/polyfill.c)
 on the same screen. Prints how many polygons differ and the first few.
+With `solid` the polygons are filled in one colour (0x8bc71, the racers' markers), with
+`line` random lines are drawn (0x8bb3c, their outlines).
 
-    build/venv/bin/python tools/polyfill_emu.py build/snap/e3.bin [count] [seed]
+    build/venv/bin/python tools/polyfill_emu.py build/snap/e3.bin [count] [seed] [shade|solid|line]
 """
 import ctypes, math, os, random, struct, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -49,6 +51,7 @@ def main():
     path = sys.argv[1]
     count = int(sys.argv[2]) if len(sys.argv) > 2 else 2000
     rng = random.Random(int(sys.argv[3]) if len(sys.argv) > 3 else 1)
+    mode = sys.argv[4] if len(sys.argv) > 4 else "shade"
     s = Snap(path)
     mu = s.mu
     W, H = R.W, R.H
@@ -66,22 +69,38 @@ def main():
         s.write(0xf88a4, struct.pack("<4i", *clip))
         L.raster_window(fbuf, W, *clip)
         pts = polygon(rng)
+        if mode == "line":
+            pts = pts[:2]
+            if rng.random() < 0.3:     # flat, upright, a point, diagonal
+                x, y = pts[0]
+                d = rng.randrange(-300, 300)
+                pts[1] = rng.choice(((x + d, y), (x, y + d), (x, y), (x + d, y + d), (x + d, y - d)))
+        colour = rng.randrange(256)
         screen = bytes(rng.randrange(256) for _ in range(W * H))
         mu.mem_write(R.SCREEN, screen)
         ctypes.memmove(fbuf, screen, W * H)
         mu.mem_write(PTS, struct.pack("<%di" % (2 * len(pts)), *[v for p in pts for v in p]))
-        s.call(0x8a094, len(pts), PTS)
+        flat = [v for p in pts for v in p]
+        xy = (ctypes.c_int * (2 * len(pts)))(*flat)
+        if mode == "line":
+            s.call(0x8bb3c, *flat, colour)
+            L.poly_line(*flat, colour)
+        elif mode == "solid":
+            s.call(0x8bc71, colour, len(pts), *flat)
+            L.poly_fill(len(pts), xy, L.poly_solid_rows, colour)
+        else:
+            s.call(0x8a094, len(pts), PTS)
+            L.poly_fill(len(pts), xy, L.poly_shade_rows, 0)
         want = bytes(mu.mem_read(R.SCREEN, W * H))
-        xy = (ctypes.c_int * (2 * len(pts)))(*[v for p in pts for v in p])
-        L.poly_fill(len(pts), xy, L.poly_shade_rows, 0)
         got = bytes(fbuf)
         if got != want:
             bad += 1
             if bad <= 5:
                 d = [i for i in range(W * H) if got[i] != want[i]]
-                print("polygon %d %s window %s: %d pixels differ, first (%d, %d)" % (
+                print("shape %d %s window %s: %d pixels differ, first (%d, %d)" % (
                     k, pts, clip, len(d), d[0] % W, d[0] // W))
-    print("%d polygons: %s" % (count, "%d differ" % bad if bad else "all equal"))
+    print("%d %s: %s" % (count, "lines" if mode == "line" else "polygons",
+                         "%d differ" % bad if bad else "all equal"))
 
 
 if __name__ == "__main__":

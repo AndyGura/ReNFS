@@ -1454,8 +1454,8 @@ opaque and puts 0x45 back.)
 **Ported (`port/src/cardraw.c`, `model.c`), equal by palette entry to the original on
 e1, e3, e4, e5, r1a and r1b (`tools/cars_emu.py`: the original's sky `0x4a9d0`, `0x597e4`
 and `0x5a4f0` with the cars in, run on the snapshot, against the port's; left out on
-both sides: the walls `0x59294`, the 3D roadside objects `0x66738`, the cars' shadows
-`0x8a094` and the racers' markers `0x66b98`).**
+both sides: the walls `0x59294` and the 3D roadside objects `0x66738`; the shadows and
+the racers' markers are in since, still 0 pixels differing).**
 
 **Which road rows have a car.** The race's step (`0x51f8f`) lists the cars on the road in
 `0x13c224` (count `0x13c220`): for each car of the order `0x13c298` with `+0x51a` & 4 and
@@ -1571,6 +1571,41 @@ or x1 / x1 − 1 so they are empty unless the other side widens them). **Ported
 (`port/src/polyfill.c`), equal to the original on 7,300 random convex polygons from a
 pixel to 2,000 wide, most crossing the window (`tools/polyfill_emu.py`).** Not ported:
 mode 1, the halving of coordinates past 31 bits (`0xa6b39`).
+**Lines** `0x8bb3c(x0, y0, x1, y1, colour)`: the edge made cut (`0xa632b`; its ends taken
+top first, swapped when y0 > y1), drawn by `0xa6c38` only if it returns 0 and its count
+> 0. A flat edge (y0 = y1, `0xa6a79`): kind 1, 9 if x0 = x1 (a point), 0 if x0 > x1 (the
+ends swapped); cut: y < y0 → code 4 (y = y0), y ≥ y1 → 8, all left (max < x0) → code 2,
+y1 − 1, one row left (`+0x24`), all right (min ≥ x1) → code 1, `+0x2c`, each with count
+0; else the ends clamped to x0 and x1 − 1, the count shortened. `0xa6c38`: x and y to
+16.16 (whole << 16 | the fraction's top 16 bits) + 0x8000, their whole parts the rounded
+x and y (16 bits); **only the slope's top 16 bits are stepped**. Kinds 0, 1: a run (x, y,
+count, 1) through `0x8a2a0`; 2: (x, whole y, 1, count); 3/4: a pixel per row, x ∓ 1; 5/6:
+pixel (x, row), the fraction += slope, the row on, on a carry x ∓ 1; 7/8: the fraction +=
+slope, pixel (x, y), x ∓ 1, on a carry y + 1 (the pixel takes y before it); 9: one pixel.
+The pixel `0xa6060` is cut to the window. One-colour rows (`0xa6e80`, `0x8bc71`'s):
+`0x8a2a0(left, y, right − left + 1, 1, colour)` each. **Ported (`poly_line`,
+`poly_solid_rows`), equal on 10,000 random lines (a third flat, upright, diagonal or
+points) and 10,000 one-colour polygons (`tools/polyfill_emu.py … line|solid`).**
+
+**The racers' markers** (ported, `cardraw.c`; in `tools/cars_emu.py`, still 0 pixels
+differing, 8 pixels of marker on e3). After `0x66880` in `0x66d08`: the player's own car
+(slot = `0x12dd58`) only with the word `0x15d13a` (0 in a race played; else `0x64a74` on
+`0x1464d0` when `+0x175` has 2); any car when `0x12da20` (the race type, CONFIG.DAT +0x6d:
+`0x36c5c` loads the word as dword `+0x6b` >> 16) ≥ 1 and slot ≤ `0x12da2c` − 1 (the cars
+racing: 1 time trial, 2 head to head, 8 single race and tournament). Its place `0x591a4`:
+(car − camera) >> `0xf6aa4` (11, never written) turned by `[0x143df8]`; a copy put on the
+near plane (`[0x143dfc]+4`) when nearer, projected (`0x94c80`, shift 16). The point: x,
+y − 0x3800 / z − 15 at 640x480 (`0x12c308`), y − 0x2000 / z − 7 at 320x200, z the turned
+one's. `0x66b98(x, y, slot, z)`: nothing with the byte `0x12d9db` (a key toggles it,
+`0x481d7`) or slot < 0; half width w and height h (3, 1) at 320x200, else by z: > 3000
+(3, 1), > 2000 (5, 2), > 1000 (8, 3), else (9, 4). The triangle (x − w, y − h), (x + w −
+1, y − h), (x, y) filled (`0x8bc71`) in `0x13d5e8[slot]`, then the lines (x − w, y − h)–
+(x + w, y − h), (x + w, y − h)–(x, y), (x − w, y − h)–(x, y) in `0x13d5c8`; a second one
+the same h higher when slot < `0x12da30` (the players' cars). The colours (`0x55abc`,
+before the shade table): `0x13d5e8` = f5 f8 f0 fa, the nearest white (`0x13d5c4`), f9 fc
+fb; `0x13d5c8` the nearest black: `0x55790(r, g, b)`, the entry 0..254 of the 6-bit
+palette with the least |dr| + |dg| + |db|, the first of equals. (`0x13d5a4`..`0x13d5e4`,
+`0x12b9fc`, `0x12ba08`: the HUD's other colours, the same way.) Equal on all 7 snapshots.
 
 **In the port's race (`--race cy1`)**: the two racers on the grid, standing (`+0x351` = the
 grid's yaw), the list made each frame (the step's job), the rows marked, the cars painted

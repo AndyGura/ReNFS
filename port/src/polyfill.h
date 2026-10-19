@@ -8,8 +8,14 @@ typedef void (*poly_rows)(const int *left, const int *right, int y, int n, int c
 
 /* the polygon of n corners (x, y pairs, whole pixels) in order round it; a convex one
    (the walk the other way round takes the first side it leaves for all its rows after,
-   0x8c276). A point or one column (0x8bb3c's lines) is left out */
+   0x8c276). A point or one column is a line in the colour */
 void poly_fill(int n, const int *xy, poly_rows rows, int colour);
+
+/* a line from (x0, y0) to (x1, y1), both ends in, cut to the window (0x8bb3c) */
+void poly_line(int x0, int y0, int x1, int y1, int colour);
+
+/* rows of one colour (0xa6e80, 0x8bc71's) */
+void poly_solid_rows(const int *left, const int *right, int y, int n, int colour);
 
 /* the shadow's rows (0xa5dd4): each pixel through the shade table */
 void poly_shade_rows(const int *left, const int *right, int y, int n, int colour);

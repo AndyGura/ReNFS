@@ -169,7 +169,10 @@ Ghidra project and `build/decomp`, one command). The git history was started aga
   **The cars' shadows**: EA's polygon filler (`polyfill.c`, exact on 7,300 random
   polygons, `tools/polyfill_emu.py`), the shadow laid on the road's slope, the darkening
   table (equal); the cars test still 0 pixels differing with shadows in.
-  Not yet: the racers' markers `0x66b98`, one-colour polygons (`0xaa990`), the
+  **The racers' markers** (`0x66b98`: the small triangle over each rival, its outline
+  drawn by EA's line routine, exact on 10,000 random lines; colours from `0x55abc`):
+  0 pixels differing with markers in (8 pixels of marker on e3).
+  Not yet: one-colour polygons (`0xaa990`), the
   police lights, the circuits' sky ring (`0x4ace8`), the roadside walls (`0x59294`, other
   tracks than the cities), 3D roadside models (`0x66738`, the same library), the mirror,
   the dashboard and HUD, the physics, the race's setup from the front end.
@@ -200,8 +203,8 @@ races 320x200 / 320x240; commit locally as the work goes.
    the main menu, the settings kept and the options screen done too. Next: the screens
    behind the options (credits, audio, graphics, controls, load / save), Danik chose
    (2026-10-19): **the race next**, the remaining menus later. In the race, the
-   port now makes a first frame of its own (`--race cy1`), the cars and their shadows
-   in it. Next: the dashboard picture under the
+   port now makes a first frame of its own (`--race cy1`), the cars, their shadows
+   and the racers' markers in it. Next: the dashboard picture under the
    view (`0x2e8bc`'s shapes, the BAMF lists), the mirror (`0x4fed8`, `0x5aa84`), then the
    player's car driving (the physics, 33.3 steps a second), the fade table `0x8a390`.
    Open: who writes `0x136618` (28 sections drawn: a detail setting?). The walls `0x59294`

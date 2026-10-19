@@ -56,6 +56,7 @@ def race_pictures(s, L, keep, marks):
     L.pal_remap(bank, pal)
     L.pal_tint(0, 0x100, pal)
     L.cars_remap(keep, len(keep), marks, s.i32(0x12dd08))
+    L.hud_colours()
     L.shade_make(0x9999)
     L.pal_apply_remaps()
 
@@ -106,6 +107,9 @@ def check(path, name, L):
                 pbad.append("car %d %s: %d bytes" % (k, "near far".split()[e], d))
     print("   pictures: %s" % ("; ".join(pbad) if pbad else "every car's near and far equal"))
     shade = bytes((U8 * 256).in_dll(L, "g_shade"))
+    marks = bytes((U8 * 8).in_dll(L, "g_marker_colour")) + struct.pack("<i", ctypes.c_int.in_dll(L, "g_marker_line").value)
+    if marks != s.read(0x13d5e8, 8) + s.read(0x13d5c8, 4):
+        print("%s: the markers' colours differ: %s, original %s" % (path, marks.hex(), (s.read(0x13d5e8, 8) + s.read(0x13d5c8, 4)).hex()))
     want = s.read(0xf8118, 256)
     print("   shade table: %s" % ("equal" if shade == want else "%d entries differ" % sum(
         x != y for x, y in zip(shade, want))))

@@ -491,3 +491,7 @@
 0x384bc shadow_axes_drawn
 0x38434 shadow_axes_yaw
 0x3e880 cross_product
+0x591a4 car_marker_place
+0xa6a79 edge_make_flat
+0xa6060 plot_pixel
+0xa6e80 poly_solid_rows

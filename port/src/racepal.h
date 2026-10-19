@@ -32,4 +32,10 @@ void car_pics_remap(unsigned char *bank, const unsigned char *pal, int mark, int
    each colour of the palette set times f (16.16, 0x9999 = 0.6), to the nearest allowed */
 void shade_make(int f);
 
+/* the HUD's colours (0x55abc, before the shade table): the palette's nearest to some
+   fixed ones (0x55790); so far the racers' markers' */
+void hud_colours(void);
+extern unsigned char g_marker_colour[8];   /* 0x13d5e8: each racer's marker, by slot */
+extern int g_marker_line;                  /* 0x13d5c8: their outline, the nearest black */
+
 #endif

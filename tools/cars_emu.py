@@ -26,7 +26,7 @@ I, U8, P = ctypes.c_int, ctypes.c_ubyte, ctypes.c_void_p
 SOURCES = ["cardraw.c", "model.c", "polyfill.c", "camera.c", "car.c", "dash.c", "view.c", "sky.c", "roaddraw.c",
            "trackinfo.c", "road.c", "poly.c", "raster.c", "track.c", "files.c", "exe.c", "trackfam.c",
            "racepal.c", "font.c", "video.c", "fsh.c", "unpack.c"]
-LEFT_OUT = {0x59294: 3, 0x66738: 0, 0x66b98: 0}
+LEFT_OUT = {0x59294: 3, 0x66738: 0}
 
 
 class Model(ctypes.Structure):
@@ -170,6 +170,9 @@ def load_cars(s, name, L):
     I.in_dll(L, "g_car_order_n").value = n
     I.in_dll(L, "g_player").value = s.i32(0x12dd58)
     I.in_dll(L, "g_racers").value = s.i32(0x13c18c)
+    for sym, at in (("g_race_type", 0x12da20), ("g_field", 0x12da2c), ("g_humans", 0x12da30),
+                    ("g_view_res", 0x12c308)):
+        I.in_dll(L, sym).value = s.i32(at)
     ctypes.memmove(ctypes.addressof((U8 * 12).in_dll(L, "g_car_marks")), s.read(0x14e5bc, 12), 12)
     ctypes.memmove(ctypes.addressof((U8 * 35).in_dll(L, "g_cars_seen")), s.read(0x14e5d0, 35), 35)
     return cars, addrs
@@ -192,6 +195,9 @@ def check(path, name, L):
     ctypes.c_void_p.in_dll(L, "g_camera").value = ctypes.addressof(cam)
     ctypes.c_void_p.in_dll(L, "g_camera_m").value = ctypes.addressof(camm)
     s.write(0xf88a4, struct.pack("<4i", *R.CLIP))
+    # the view current (0x143dfc): its near plane for the markers
+    rec = (I * 8)(*struct.unpack("<2i", s.raw(s.u32(0x143dfc), 8)))
+    ctypes.c_void_p.in_dll(L, "g_view_now").value = ctypes.addressof(rec)
     got = port(s, name, L, n, node, cars)
     # a snapshot taken inside a painter may hold one see-through picture's mark switched
     mine, base = ctypes.c_void_p.in_dll(L, "g_fam").value, s.u32(0x145c50)

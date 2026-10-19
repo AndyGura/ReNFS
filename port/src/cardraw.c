@@ -3,6 +3,7 @@
 #include "camera.h"
 #include "exe.h"
 #include "polyfill.h"
+#include "racepal.h"
 #include "track.h"
 #include "video.h"
 #include <string.h>
@@ -13,6 +14,9 @@ race_car *g_car_order[RACE_CARS_MAX];
 int g_car_order_n;
 int g_player;
 int g_racers;
+int g_race_type;
+int g_field;
+int g_humans;
 unsigned char g_car_marks[RACE_CARS_MAX];
 unsigned char g_cars_seen[CARS_SEEN];
 const race_camera *g_camera;
@@ -182,6 +186,61 @@ static void car_models(race_car *c, const int m[9])
         }
 }
 
+/* a racer's marker (0x66b98): a small triangle pointing down at (x, y), in the racer's
+   colour and outlined, bigger the nearer it is (z) in 640x480; a player's (slot below
+   g_humans) has a second one on top */
+static void car_marker(int x, int y, int slot, int z)
+{
+    int h = 9, w = 4, k, xy[6];
+
+    if (slot < 0)              /* (and while a key has them off, 0x12d9db) */
+        return;
+    if (!g_view_res || z > 0xbb8) {
+        h = 3;
+        w = 1;
+    } else if (z > 0x7d0) {
+        h = 5;
+        w = 2;
+    } else if (z > 0x3e8) {
+        h = 8;
+        w = 3;
+    }
+    for (k = 0; k < (g_humans > slot ? 2 : 1); k++, y -= h) {
+        xy[0] = x - w;
+        xy[1] = y - h;
+        xy[2] = x + w - 1;
+        xy[3] = y - h;
+        xy[4] = x;
+        xy[5] = y;
+        poly_fill(3, xy, poly_solid_rows, g_marker_colour[slot & 7]);
+        poly_line(x - w, y - h, x + w, y - h, g_marker_line);
+        poly_line(x + w, y - h, x, y, g_marker_line);
+        poly_line(x - w, y - h, x, y, g_marker_line);
+    }
+}
+
+/* where a car's marker goes (0x66fe5): the car's place seen (0x591a4, 1/32 units, put
+   on the near plane if nearer) on the screen, raised by a height that shrinks with the
+   distance */
+static void car_marker_at(const race_car *c)
+{
+    vec3 d, seen, p;
+    scr2 s;
+
+    d.x = (c->pos.x - g_camera->pos.x) >> 11;
+    d.y = (c->pos.y - g_camera->pos.y) >> 11;
+    d.z = (c->pos.z - g_camera->pos.z) >> 11;
+    rotate(&d, g_camera_m, &seen);
+    p = seen;
+    if (p.z < g_view_now->near)
+        move_to_near(&p, g_view_now->near);
+    project(&p, &s);
+    if (g_view_res)
+        car_marker(s.x, s.y - 0x3800 / seen.z - 15, c->slot, seen.z);
+    else
+        car_marker(s.x, s.y - 0x2000 / seen.z - 7, c->slot, seen.z);
+}
+
 /* a car in the view ahead (0x66d08 with 0): near enough and not off to the side, its
    turn from its own matrix or from its angles and sway, into the view */
 static void car_draw(race_car *c)
@@ -211,7 +270,10 @@ static void car_draw(race_car *c)
         c->far_m.flags &= ~2u;
     }
     car_models(c, r);
-    /* (then, in a race with marks, a racer's marker above it: 0x66b98, not ported yet) */
+    /* (the player's own car, seen from behind: only with the word 0x15d13a, 0 in a race
+       played; else 0x64a74 on 0x1464d0 when its +0x175 has 2) */
+    if (c->slot != g_player && g_race_type >= 1 && c->slot <= g_field - 1)
+        car_marker_at(c);
 }
 
 void cars_at_node(int node)
