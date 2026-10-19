@@ -32,6 +32,7 @@ add_executable(renfs
   src/menu.c
   src/mainmenu.c
   src/options.c
+  src/raster.c
 )
 target_include_directories(renfs PRIVATE ${SDL2_INCLUDE_DIRS})
 target_compile_options(renfs PRIVATE ${SDL2_CFLAGS_OTHER})
