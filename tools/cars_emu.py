@@ -25,7 +25,7 @@ from setup_check import Fam
 I, U8, P = ctypes.c_int, ctypes.c_ubyte, ctypes.c_void_p
 SOURCES = ["cardraw.c", "model.c", "polyfill.c", "camera.c", "car.c", "dash.c", "hud.c", "config.c", "view.c", "sky.c", "roaddraw.c",
            "trackinfo.c", "road.c", "poly.c", "raster.c", "track.c", "files.c", "exe.c", "trackfam.c",
-           "racepal.c", "font.c", "video.c", "fsh.c", "unpack.c", "crash.c", "smoke.c", "drive.c", "timing.c", "opponent.c", "collide.c"]
+           "racepal.c", "font.c", "video.c", "fsh.c", "unpack.c", "crash.c", "smoke.c", "drive.c", "timing.c", "opponent.c"]
 LEFT_OUT = {0x59294: 3, 0x66738: 0}
 
 
@@ -56,7 +56,7 @@ def lib():
     import subprocess
     out = "build/cars_test.so"
     subprocess.check_call(["cc", "-O1", "-g", "-shared", "-fPIC", "-o", out] +
-                          ["port/src/" + f for f in SOURCES] + ["tools/timing_test.c", "-Iport/src"] +
+                          ["port/src/" + f for f in SOURCES] + ["tools/timing_test.c", "tools/collide_test.c", "-Iport/src"] +
                           subprocess.check_output(["sdl2-config", "--cflags", "--libs"]).decode().split())
     return ctypes.CDLL(os.path.abspath(out))
 
@@ -142,6 +142,11 @@ def load_cars(s, name, L):
         cid = 400 if c.police else s.i32(0x12dce4 + 4 * k)
         if not L.car_load(ctypes.byref(c), cid):
             sys.exit("no car %d" % cid)
+        # the model's size (0x65160) as the original's +0x64e, +0x652, +0x64a
+        size = (I * 3)()
+        L.collide_test_size(ctypes.byref(c), size)
+        if list(size) != [g(a, 0x64e), g(a, 0x652), g(a, 0x64a)]:
+            sys.exit("car %d's size %s / %s" % (k, [g(a, 0x64e), g(a, 0x652), g(a, 0x64a)], list(size)))
         c.pos = Vec3(g(a, 0), g(a, 4), g(a, 8))
         c.pitch, c.yaw, c.roll, c.node = g(a, 0xc), g(a, 0x10), g(a, 0x14), g(a, 0x48)
         c.body_roll, c.body_pitch, c.dist = g(a, 0x365), g(a, 0x369), g(a, 0x39d)

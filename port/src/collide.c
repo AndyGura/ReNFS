@@ -6,7 +6,9 @@
 #include "collide.h"
 #include "cardraw.h"
 #include "crash.h"
+#include "drive.h"
 #include "exe.h"
+#include "road.h"
 #include "timing.h"
 #include "track.h"
 
@@ -503,6 +505,93 @@ static int collide(race_car *a, race_car *b)
     return 1;
 }
 
+/* ---- a car and the roadside objects ----------------------------------------------- */
+
+/* 0x1ee80: is the point (x, z) under the car, within half its model's width across it
+   and half its length along it? (The force feedback 0x4d730 and the knock's sound near
+   the camera, 0x52d2c: not in the port) */
+static int object_under(const race_car *c, int x, int z)
+{
+    int dx = x - c->pos.x, dz = z - c->pos.z, a = c->yaw >> 8;
+    int co = ea_cos(a), si = ea_sin(a), across, along;
+
+    across = mulr(co, dx) - mulr(si, dz);
+    if (across > c->size[0] >> 1 || across < -(c->size[0] >> 1))
+        return 0;
+    along = mulr(si, dx) + mulr(co, dz);
+    return along <= c->size[2] >> 1 && along >= -(c->size[2] >> 1);
+}
+
+static int placement_node(int i)
+{
+    const unsigned char *p = g_track.placements + 16 * i;
+
+    return (int)(p[0] | p[1] << 8 | p[2] << 16 | (unsigned)p[3] << 24);
+}
+
+/* placement i, of the car's node, standing and under the car: knocked over (its byte the
+   step counter / 1800 + 1), the road gathered again */
+static int knock_object(const race_car *c, int i)
+{
+    const unsigned char *p = g_track.placements + 16 * i;
+    int x, z;
+
+    if (c->node != c->obj_node || g_track.fallen[2 * i])
+        return 0;
+    x = node_i32(c->node, 8) + (int)((unsigned)(short)(p[0xa] | p[0xb] << 8) << 8);
+    z = node_i32(c->node, 0x10) + (int)((unsigned)(short)(p[0xe] | p[0xf] << 8) << 8);
+    if (!object_under(c, x, z))
+        return 0;
+    g_track.fallen[2 * i] = (unsigned char)(g_drive.steps / 1800 + 1);
+    road_refresh();
+    return 1;
+}
+
+/* car_objects_collide 0x1ebf4: a player's car outside the lanes against the roadside
+   objects of its node. Its place in the TRI's list (+0x4ee, its node +0x4ea) is walked
+   from where it was: back before the node's first, then on (or back) through the node's
+   objects; the first under the car is knocked over */
+static int objects_collide(race_car *c)
+{
+    int node = c->node;
+
+    while (node == c->obj_node && c->obj_index) {
+        c->obj_index--;
+        c->obj_node = placement_node(c->obj_index);
+    }
+    if (node >= c->obj_node) {
+        if (placement_node(c->obj_index + 1) == -1)
+            return 0;
+        for (;;) {
+            if (knock_object(c, c->obj_index))
+                return 1;
+            c->obj_index++;
+            c->obj_node = placement_node(c->obj_index);
+            if (node < c->obj_node || placement_node(c->obj_index + 1) == -1)
+                return 0;
+        }
+    }
+    if (!c->obj_index)
+        return 0;
+    for (;;) {
+        if (knock_object(c, c->obj_index))
+            return 1;
+        c->obj_index--;
+        c->obj_node = placement_node(c->obj_index);
+        if (node > c->obj_node || !c->obj_index)
+            return 0;
+    }
+}
+
+/* the lanes' edges at the car's node (0x1c878): the right lanes' width out, the left's */
+static int outside_lanes(const race_car *c)
+{
+    const unsigned char *nd = node_ptr(c->node);
+    int w = (int)((unsigned)lane_width(nd[4] & 15, nd[1] >> 3) << 8);
+
+    return (nd[4] & 15) * w < c->road_off || (nd[4] >> 4 & 15) * -w > c->road_off;
+}
+
 /* 0x1c800: a player's car the police have caught (+0x176 & 1) steers towards the police
    car (car 2), its throttle off */
 static void steer_to_police(race_car *c)
@@ -533,8 +622,8 @@ void collide_world(void)
 
         if (human(c))
             steer_to_police(c);
-        /* (a player's car outside the lanes against the roadside objects, 0x1ebf4:
-           not yet) */
+        if (human(c) && outside_lanes(c))
+            objects_collide(c);
         if (c->state == 6 || (c->part & 6) != 6)
             continue;
         last = total - c->node < 4 ? g_ncars + 4 : g_ncars;

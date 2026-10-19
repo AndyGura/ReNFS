@@ -2,6 +2,7 @@
    timing_emu.py): collide.c itself, so that its parts can be tried one by one, and its
    state set from the original's. */
 #include "collide.c"
+#include <string.h>
 
 /* EA's random numbers' state (0xf8a8c, six words) */
 void collide_test_random(unsigned *r, int set)
@@ -50,6 +51,28 @@ int collide_test_push(race_car *a, race_car *b, const int *pt, const int *n)
 int collide_test_cars(race_car *a, race_car *b)
 {
     return collide(a, b);
+}
+
+/* the roadside objects knocked over (0xea5d8: 2 bytes a placement), n bytes */
+void collide_test_fallen(unsigned char *b, int n, int set)
+{
+    if (set)
+        memcpy(g_track.fallen, b, (size_t)n);
+    else
+        memcpy(b, g_track.fallen, (size_t)n);
+}
+
+int collide_test_placements(void)
+{
+    return g_track.nplacements;
+}
+
+/* a car's model size (0x65160: +0x64e, +0x652, +0x64a) */
+void collide_test_size(const race_car *c, int *out)
+{
+    out[0] = c->size[0];
+    out[1] = c->size[1];
+    out[2] = c->size[2];
 }
 
 unsigned collide_test_rand(void)

@@ -258,7 +258,16 @@ Ghidra project and `build/decomp`, one command). The git history was started aga
   random pairs on all 11 snapshots (`tools/collide_emu.py`, every live instruction run)
   and races with the opponent placed beside, ahead and behind the player, touching up to
   188 times and a hard hit (`tools/opponent_emu.py`). `RENFS_PLACE=s:a,c,v` places the
-  opponent in `--race`. Not yet: the roadside objects `0x1ebf4`, the sounds.
+  opponent in `--race`. Not yet: the sounds.
+
+- **Roadside objects knocked over** (`port/src/collide.c` `objects_collide`, NOTES §4.15):
+  a player's car outside the lanes knocks over the signs and posts under it (`0x1ebf4`,
+  the box test `0x1ee80` from the model's size `0x65160`), the road gathered again so the
+  object lies flat (`0x5004c`). **Equal**: the fallen array compared every step in
+  `tools/drive_emu.py` and `tools/opponent_emu.py` on all 11 snapshots. In `--race cy1`
+  (`RENFS_SEED=7`, gas from retrace 420) the "65" sign falls at about retrace 1100;
+  `RENFS_VIEW=n` (a test) watches the race from camera n (`build/shots/knock_sign.png`,
+  camera 4). Not yet: its force feedback and sound.
 
 **Progress page for Danik**: https://claude.ai/artifact/VZdxTpYC3oLXYeBVJpoDoM (every step,
 its percent done and weight). Update its steps file after each finished step.
@@ -287,8 +296,9 @@ races 320x200 / 320x240; commit locally as the work goes.
    the racers' markers, the dashboard, the map and the mirror in it, and the player's car
    drives and crashes (equal step for step), and the status bar's numbers and the race's
    timing, the camera outside and the crash's smoke, the opponent's driving, and cars
-   meeting cars. Next: the roadside objects (`0x1ebf4`, `0x1ee80`), the traffic
-   (`0x79500`, `0x77de8`, `0x7cac8`), the police, the sounds.
+   meeting cars, and the roadside objects knocked over. Next: the traffic
+   (`0x79500`, `0x77de8`, `0x7cac8`), the police, the sounds, the race's keys
+   (`race_keys` `0x47c88`: the cameras, the watched car).
    Open: who writes `0x136618` (28 sections drawn: a detail setting?). The walls `0x59294`
    and the circuits' sky ring `0x4ace8` can be checked on CY1 memory with made-up input,
    or on snapshots of another track (`tools/nfsdos.py`).

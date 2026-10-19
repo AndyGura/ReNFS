@@ -167,6 +167,11 @@ typedef struct {
                                   the other cars */
     int smoke_point;           /* +0x616: its near model's point "smok", where the smoke
                                   is drawn from (0x65f8b) */
+    int size[3];               /* +0x64e, +0x652, +0x64a: its near model's width, height
+                                  and length (0x65160), 16.16 */
+    int obj_node, obj_index;   /* +0x4ea, +0x4ee: the roadside object it was last tried
+                                  against (collide.c): its node, its place in the TRI's
+                                  list */
 } race_car;
 
 /* the car's place on the starting grid (0x7c938): grid its slot (0x12dca0[player]),

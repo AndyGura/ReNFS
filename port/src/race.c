@@ -156,7 +156,7 @@ int race_test(const char *name)
     race_camera cam;
     road_window win;
     const view_window *w;
-    int i, eye, horizon, redline, near, gathered = -1;
+    int i, eye, horizon, redline, near;
     hud_car driver;
     hud_map_state map;
     unsigned start;
@@ -268,6 +268,8 @@ int race_test(const char *name)
     }
     g_ncars = RACERS;
     g_player = 0;
+    if (getenv("RENFS_VIEW"))  /* a test: the race watched from camera mode n */
+        camera_set_car(&cam, &cars[0], atoi(getenv("RENFS_VIEW")));
     g_racers = RACERS;
     g_race_type = 1;           /* head to head (0x36c5c from CONFIG.DAT) */
     g_field = RACERS;
@@ -340,13 +342,13 @@ int race_test(const char *name)
         driver.node = cars[0].node;
 
         /* the road's points (0x50070): its sections kept, gathered again when the
-           camera is on another quarter */
+           camera is on another quarter (or an object was knocked over) */
         track_keep_sections(quarter(cam.node));
-        if (gathered < 0 || quarter(gathered) != quarter(cam.node)) {
+        if (g_track.last_node < 0 || quarter(g_track.last_node) != quarter(cam.node))
             road_gather(cam.node, quarter(cam.node), DRAWN);
-            gathered = cam.node;
-        }
-        if (cam.flags)         /* (the road behind for the mirror: 0x50070's end) */
+        /* (the road behind for the mirror: 0x50070's end, when the camera's node changed
+           or an object was knocked over: 0x5004c sets the camera's flag) */
+        if (cam.flags || g_track.last_kinds < 0)
             road_gather_behind(cam.node);
         cam.flags = 0;
 

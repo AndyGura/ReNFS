@@ -51,6 +51,9 @@ static const struct { int at, off, size; } fields[] = {
     I(0x512, state), I(0x516, slot),
     /* the timing's */
     B(0x51a, part),
+    /* the roadside objects' (collide.c) */
+    I(0x4ea, obj_node), I(0x4ee, obj_index), I(0x64e, size[0]), I(0x652, size[1]),
+    I(0x64a, size[2]),
 };
 
 /* the computer's driving's fields (opponent_emu.py; not compared for the player's car) */

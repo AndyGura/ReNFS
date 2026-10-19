@@ -63,6 +63,11 @@ void road_clip_direction(int section);
    section node / 4. Returns the near plane (also the view's +4) */
 int road_transform(const vec3 *pos, const int m[9], int node);
 
+/* 0x5004c: the road's points gathered again at the next frame (a roadside object knocked
+   over), the mirror's too (the original sets the camera's flag for it; race.c asks
+   for last_kinds < 0) */
+void road_refresh(void);
+
 /* the road behind for the mirror (0x50070's end, 0x4fed8), when the camera's node
    changed: the first row of five sections from (node + 3) / 4 - 4 */
 void road_gather_behind(int node);

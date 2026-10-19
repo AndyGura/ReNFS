@@ -28,12 +28,12 @@ SOURCES = ["drive.c", "cardraw.c", "model.c", "polyfill.c", "camera.c", "car.c",
 # (crash.c is compiled into drive_test.c, which reaches its parts)
 # sounds (0x52d2c, 0x52e40, 0x52ea8: two words on the stack each), highlights, the
 # acceleration test's times, speech, force feedback, the wall's sound by the camera,
-# EXPLODE's push; the crash's sounds (0x53214, 0x531dc), the roadside objects 0x1ebf4
+# EXPLODE's push; the crash's sounds (0x53214, 0x531dc)
 LEFT_OUT = {0x52d2c: 2, 0x52e40: 2, 0x52ea8: 2, 0x5c6d4: 0, 0x2d71c: 0, 0x2d778: 0,
             0x722b4: 0, 0x72438: 0, 0x4d8c0: 0, 0x4d878: 0, 0x7fb58: 0, 0x78c30: 0,
-            0x53214: 0, 0x531dc: 0, 0x1ebf4: 0}
+            0x53214: 0, 0x531dc: 0}
 KIND = {2: 0x382d0, 4: 0x1cfe0}
-CAR, SPEC = 0x600, 0x800
+CAR, SPEC = 0x800, 0x800
 
 # the driving's globals, in drive_test.c's order: (address, size)
 GLOBALS = [(0x145c94, 4), (0x12f1bc, 1), (0xf6b74, 4), (0x12da12, 4), (0x12da0e, 4), (0x12dd2c, 4),
@@ -193,7 +193,9 @@ PORTED = [(0x10010, 0x10428), (0x483e4, 0x48b80), (0x5162c, 0x51690), (0x3e918, 
           # the cars meeting
           (0x1c6a4, 0x1c7ff), (0x1c800, 0x1c875), (0x1e314, 0x1e6cb), (0x1e838, 0x1e9ca),
           (0x2afb8, 0x2b863), (0x2b864, 0x2bf9b), (0x26324, 0x2a331), (0x2bf9c, 0x2c0f1),
-          (0x2c1c0, 0x2c259), (0x52580, 0x52599), (0x91e04, 0x91e6a)]
+          (0x2c1c0, 0x2c259), (0x52580, 0x52599), (0x91e04, 0x91e6a),
+          # the roadside objects
+          (0x1ebf4, 0x1ee57), (0x1ee80, 0x1efa8)]
 HIT = set()
 
 
@@ -205,6 +207,21 @@ def set_collide(L, s):
     n = s.i32(0x12da38)
     L.collide_test_order((ctypes.c_int * n)(*struct.unpack("<%di" % n, s.read(0x13c298, 4 * n))), n)
     s.write(0x15d144, b"\0\0\0\0")           # (no force feedback)
+    # the roadside objects knocked over
+    n = 2 * L.collide_test_placements()
+    L.collide_test_fallen(ctypes.create_string_buffer(s.raw(s.u32(0xea5d8), n), n), n, 1)
+
+
+def fallen_differ(L, s):
+    """the roadside objects knocked over: the first that differs, else None"""
+    n = 2 * L.collide_test_placements()
+    mine = ctypes.create_string_buffer(n)
+    L.collide_test_fallen(mine, n, 0)
+    theirs = s.raw(s.u32(0xea5d8), n)
+    if mine.raw == theirs:
+        return None
+    i = next(i for i in range(n) if mine.raw[i] != theirs[i])
+    return "object %d knocked %d/%d" % (i // 2, theirs[i], mine.raw[i])
 
 
 def run(L, F, path, scr, var, coverage=False):
@@ -279,6 +296,12 @@ def run(L, F, path, scr, var, coverage=False):
             others.append(o)
         L.drive_test_car(k, o)
     set_collide(L, s)
+    knocked = [0]
+
+    def knock(mu, addr, size, u):
+        knocked[0] += 1
+    for at in (0x1ed0a, 0x1ee16):     # (0x5004c after an object is knocked over)
+        mu.hook_add(UC_HOOK_CODE, knock, None, begin=game(at), end=game(at))
     n = tumbling = 0
     for steps, w in script(scr):
         for _ in range(steps):
@@ -327,6 +350,9 @@ def run(L, F, path, scr, var, coverage=False):
                 at = next(i for i in range(SMOKE_LEN) if smoke.raw[i] != theirs_smoke[i])
                 diff.append("smoke from +%#x (%s / %s)" % (at, theirs_smoke[at - at % 4:at - at % 4 + 16].hex(),
                                                             smoke.raw[at - at % 4:at - at % 4 + 16].hex()))
+            fd = fallen_differ(L, s)
+            if fd:
+                diff.append(fd)
             if diff:
                 return "step %d (word %#x, steps %d, kind %d): %s" % (n, w, st, kind, ", ".join(diff[:12]))
             wr(s, 0x145c94, 4, st + 2)
@@ -337,6 +363,8 @@ def run(L, F, path, scr, var, coverage=False):
             n += 1
     f = lambda o: struct.unpack("<i", bytes(mu.mem_read(car + o, 4)))[0]
     crash = ", %d tumbling, %d crashes" % (tumbling, rd(s, CRASHES[player], 4)) if tumbling else ""
+    if knocked[0]:
+        crash += ", %d objects knocked over" % knocked[0]
     return "equal, %d steps (to node %d, %.1f m/s, gear %d, %d rpm%s)" % (
         n, f(0x48), f(0x68) / 65536, f(0x3ed), f(0x3c1), crash)
 

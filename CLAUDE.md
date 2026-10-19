@@ -132,7 +132,9 @@ A race ends through `0x13c178`: 1 finished,
 The original in DOSBox: `nfs-dos`, `tools/nfsdos.py` (unseen, keys, memory; NOTES §5).
 Cars meeting (NOTES §4.14): `0x1c878` after the driving, the boxes `0x2b864`, the hit
 `0x2afb8`, hard above `0xea5b0` (`0xea5b4` with a player); a thrown computer's car stood up,
-kind 5 `0x7d9e4`; EA's random numbers `0x91e04` start from the image.
+kind 5 `0x7d9e4`; EA's random numbers `0x91e04` start from the image. Roadside objects
+(NOTES §4.15): a player outside the lanes `0x1ebf4`, under the car `0x1ee80` (the model's box
+`0x65160`), fallen bytes `0xea5d8`, the road gathered again `0x5004c`.
 Cars drawn: `cars_at_node` `0x6837c` → `0x66d08` → `0x66880` (NOTES §4.10); their
 pictures re-coloured by `0x65020` through a colour map `0xf9520` that keeps what the last
 re-colouring left. Snapshots e1..e5: a 320x200 race, `NFS_DOS_DIR=$PWD/build/dosnfs`.
@@ -200,6 +202,7 @@ once; for `--shot` tests);
 `RENFS_SHOTRAW=f`: `--shot` also writes the palette numbers (comparing by entry);
 `RENFS_THROW=s:x,y,z`: the car given a speed at race step s (to see a crash);
 `RENFS_PLACE=s:a,c,v`: the opponent put a m ahead and c m beside at v m/s at race step s;
+`RENFS_VIEW=n`: the race watched from camera n (outside: 2..5, 8..12);
 `RENFS_CONFIG=f`: a CONFIG.DAT for the test (the original's, `nfsdos.py mem:156c14:5f52:f`).
 `RENFS_SEED=n`: the race's random numbers seeded with n (else the time, as the original).
 Sound: SDL's device at 44.1 kHz 16-bit stereo, each stream converted by an
@@ -234,7 +237,8 @@ the race's end; equal step for step, `tools/timing_emu.py`; NOTES §4.12), `oppo
 `tools/opponent_emu.py`; NOTES §4.13), `race.c` (`--race`: the loading
 and the frame, a step every 3 ticks),
 `collide.c` (cars meeting cars: `0x1c878`'s loop, the boxes pushed apart `0x2b864`/`0x26324`,
-the hit `0x2afb8`, EA's random numbers `0x91e04`; equal, `tools/collide_emu.py`, NOTES §4.14),
+the hit `0x2afb8`, EA's random numbers `0x91e04`; equal, `tools/collide_emu.py`, NOTES §4.14;
+the roadside objects knocked over `0x1ebf4`, NOTES §4.15),
 `exe.c`: **the game's fixed tables are read from the CD's `NFS_DOS.EXE`** at the
 original's addresses (checked by a sum of the image), never copied into the port. The menus' look is checked against the
 original's screenshots by palette entry (DOSBox Staging changes colours slightly).

@@ -371,6 +371,9 @@ def run(L, F, OF, path, scr, var, coverage=False):
                 diff.append("EA's random numbers")
             if rd(s, 0xea668) != L.collide_test_impulse():
                 diff.append("hit %#x/%#x" % (rd(s, 0xea668), L.collide_test_impulse()))
+            fd = D.fallen_differ(L, s)
+            if fd:
+                diff.append(fd)
             if diff:
                 return "step %d (word %#x, steps %d, kinds %s, met %d, touched %d): %s" % (
                     n, w, st, kinds, met[0x1c6a4], met[0x2afb8], ", ".join(diff[:12]))

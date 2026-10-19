@@ -61,6 +61,29 @@ static unsigned char *car_palette(unsigned char *bank, const char *name)
 /* the polygon groups drawn one after the other (0xe3d10 ..), and the wheels' pictures */
 static const char *const group_names[4] = {"inside", "surface", "outside", "convex"};
 
+/* 0x65160: the near model's size along each axis, from its body's points furthest out
+   either way (the origin counting as one), 1/128 units made 16.16 */
+static void car_extents(race_car *c)
+{
+    const unsigned char *o = c->near_m.orip, *p;
+    int lo[3] = { 0, 0, 0 }, hi[3] = { 0, 0, 0 }, n, i, k;
+
+    p = o + (o[0x18] | o[0x19] << 8 | o[0x1a] << 16 | (unsigned)o[0x1b] << 24);
+    n = (int)(o[0x14] | o[0x15] << 8 | o[0x16] << 16 | (unsigned)o[0x17] << 24);
+    for (i = 0; i < n; i++, p += 12)
+        for (k = 0; k < 3; k++) {
+            int v = (int)(p[4 * k] | p[4 * k + 1] << 8 | p[4 * k + 2] << 16
+                          | (unsigned)p[4 * k + 3] << 24);
+
+            if (v < lo[k])
+                lo[k] = v;
+            if (v > hi[k])
+                hi[k] = v;
+        }
+    for (k = 0; k < 3; k++)
+        c->size[k] = (int)((unsigned)(hi[k] - lo[k]) << 9);
+}
+
 /* the near and far models made drawable with their pictures (0x65c11 ..), their groups,
    and a racer's wheels showing their fourth picture (0x65e61 ..) */
 static int car_models(race_car *c, int id)
@@ -83,6 +106,7 @@ static int car_models(race_car *c, int id)
         if (c->groups[k].index < 0)
             c->groups[k].count = 0;
     }
+    car_extents(c);
     c->smoke_point = model_find_point(&c->near_m, "smok");
     if (id >= 200) {
         front = model_find_texture(&c->near_m, "frntires");

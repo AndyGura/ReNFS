@@ -280,6 +280,12 @@ void road_gather(int node, int sec, int drawn)
     section_points(base, sec + 1, 1, 0);
 }
 
+void road_refresh(void)
+{
+    g_track.last_node = -1;
+    g_track.last_kinds = -1;
+}
+
 /* 0x4fed8: section sec's first row as the mirror's detail keeps it */
 static void behind_points(int sec)
 {

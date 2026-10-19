@@ -1553,7 +1553,7 @@ the window and the horizon **`road_draw` `0x5a4f0(N = 0x136618, S = the camera's
 
 - **`cars_meet_world` `0x1c878`**, every step after the driving: every 4th call
   (`0x129fac` counts down from 4) `traffic_police_tick` `0x7a040`. Then for every racer
-  `0x1c800`, and `car_wall_collide` `0x1ebf4` when the car is further across the road than
+  `0x1c800`, and `car_objects_collide` `0x1ebf4` (the roadside objects, §4.15) when the car is further across the road than
   the node's lanes reach (node byte 4: lanes on each side, a nibble each; lane widths from
   `0x15d15a`). Then each car (not kind 6, flags `+0x51a` & 6 = 6) against the next ones in
   road order, as long as they are within two nodes: if both are within the sum of their
@@ -2253,7 +2253,7 @@ goes through the cars by node (`0x13c298`). A player's car: caught by the police
 (`+0x176` & 1) it steers towards car 2, the police car (`police_steer` `0x1c800`: the
 angle to it less its heading, half of it added to half its steering, held within
 ±0x140000, the throttle off); outside the lanes (`lanes right × width < +0x80`, or the
-left's) it meets the roadside objects (`0x1ebf4`, not ported). A car not of kind 6 with
+left's) it meets the roadside objects (`0x1ebf4`, §4.15). A car not of kind 6 with
 `+0x51a` & 6 = 6 is tried against the cars after it in that order (round past the last
 when within 4 nodes of the loop's end) until one is more than 2 nodes ahead (only while
 the loop's end is more than 4 away), each with `+0x51a` & 5 = 5 and both |Δx| and |Δz|
@@ -2338,8 +2338,47 @@ hard hit, both thrown, the opponent stood up, the player put back and the oppone
 it), and started thrown about (tumbling, on its roof, rolling; near the player or far
 ahead; with the player's car thrown at a wall too, so that the player is put back while
 the opponent still lies there). Not run: the police's parts, the long cars (traffic) and
-kind 6. `RENFS_PLACE=s:a,c,v` puts the opponent so in `--race`. Not yet: the roadside
-objects `0x1ebf4`, the traffic's placing `0x7cac8`, the police's parts, the sounds.
+kind 6. `RENFS_PLACE=s:a,c,v` puts the opponent so in `--race`. Not yet: the traffic's placing `0x7cac8`, the police's parts, the sounds.
+
+### 4.15 The roadside objects knocked over (2026-10-19)
+
+Signs, lamp posts and the like (the TRI's placements, 16 bytes each at `0x13bb94`, `+0` the
+node as an i32, `+0xa/+0xc/+0xe` the place from the node's point as i16 << 8) fall when a
+player's car drives over them. Only humans: `cars_meets_world` `0x1c878` takes
+`w = lane_width(nd[4] & 15, nd[1] >> 3) << 8` and calls `car_objects_collide` `0x1ebf4` when
+`(nd[4] & 15) × w < +0x80` (the car further right than the lanes) or
+`(nd[4] >> 4 & 15) × −w > +0x80` (further left).
+
+- **`0x1ebf4`** keeps the car's place in the list: `+0x4ee` the index, `+0x4ea` its node
+  (both 0 from `car_reset` `0x50830`). First, while the car's node equals `+0x4ea` and the
+  index is not 0, it steps back (index − 1, `+0x4ea` = that placement's node). Then, if the
+  car's node ≥ `+0x4ea` and the next placement's node is not −1, it walks forward: the
+  current one is tried (its node the car's, its byte in the fallen array `0xea5d8` [2i]
+  still 0, and under the car); a hit sets that byte to the step counter `0x145c94` / 1800
+  + 1, calls `0x5004c` and returns 1; else index + 1, `+0x4ea` = its node, and the walk ends
+  (0) once the car's node < `+0x4ea` or the next node is −1. Otherwise, the index not 0, the
+  same walk backwards, ending once the car's node > `+0x4ea` or the index is 0.
+- **`car_over_object` `0x1ee80`** (x, y, z on the stack, `ret 0xc`): dx, dz from the car's
+  place, a = yaw >> 8; across = mulr(cos a, dx) − mulr(sin a, dz) within ±`+0x64e` / 2,
+  along = mulr(sin a, dx) + mulr(cos a, dz) within ±`+0x64a` / 2 (EA's sin `0x80b00`, cos
+  `0x80b70`). A hit also starts the wheel's force feedback (`0x4d730`) and, near the camera,
+  a sound (`0x52d2c`): neither ported yet.
+- **`0x5004c`** (`road_force_gather`): `0x136610` = `0x136614` = −1 and the camera's flags
+  `0x129f08` |= 1, so the road ahead and the mirror's are gathered again next frame and the
+  object is drawn lying down (`0x4f7d4`'s fallen branch, already in `road.c`).
+- **`car_model_extents` `0x65160`** (called at `0x65e39` after the model's polygon groups):
+  the near ORIP's body points (count `orip+0x14`, offset `orip+0x18`), min and max on each
+  axis starting from 0; `+0x64e` = (max x − min x) << 9, `+0x652` y, `+0x64a` z: the box
+  `0x1ee80` uses.
+
+**Ported (`port/src/collide.c` `objects_collide`, `car.c` `car_extents`, `road.c`
+`road_refresh`): equal to the original.** `tools/drive_emu.py` compares the fallen array
+every step (and counts the knocks) on all 11 snapshots: 408 runs equal, 83 of them knocking
+an object over; `0x1ebf4` 203 of 213 instructions run (not: the forward walk reaching the
+list's end), `0x1ee80` all but the force feedback. `tools/opponent_emu.py` too (386 equal);
+`tools/cars_emu.py` checks the box against the snapshots' `+0x64e/+0x652/+0x64a`. In
+`--race cy1` (`RENFS_SEED=7`, gas from retrace 420) the "65" sign at node 74 falls at about
+retrace 1100; `RENFS_VIEW=4` shows it from outside.
 
 ## 5. The original in DOSBox (2026-10-19)
 
