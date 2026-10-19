@@ -164,6 +164,7 @@ German has a `G` in front (`GART`, `GSHOW`, ...).
 cmake -S port -B port/build && cmake --build port/build
 port/build/renfs                                   # the game (movies, title, game mode screen, for now)
 port/build/renfs --shot build/shots/title.ppm 120  # no window: the picture of retrace 120
+port/build/renfs --race cy1                        # straight into City 1 from the grid (road and sky so far)
 port/build/renfs --help
 ```
 
@@ -194,7 +195,9 @@ music), `config.c` (CONFIG.DAT), `main.c`.
 The race so far: `raster.c` (the quad and triangle painters), `poly.c` (projection, quad cutting),
 `road.c` (the frame's points, into the view), `roaddraw.c` (the road painted far to near,
 the roadside objects; pixel-exact on the snapshots, `tools/roadpic_emu.py`), `track.c`
-(the TRI and its ring of sections), `trackinfo.c`, `trackfam.c`, `racepal.c`,
+(the TRI and its ring of sections), `trackinfo.c`, `trackfam.c`, `racepal.c`, `sky.c`, `view.c` (windows, lens,
+matrices), `car.c` (cars' files, the grid), `camera.c` (the driver's eyes), `dash.c`
+(the dashboard's colours), `race.c` (`--race`: the loading and the frame),
 `exe.c`: **the game's fixed tables are read from the CD's `NFS_DOS.EXE`** at the
 original's addresses (checked by a sum of the image), never copied into the port. The menus' look is checked against the
 original's screenshots by palette entry (DOSBox Staging changes colours slightly).

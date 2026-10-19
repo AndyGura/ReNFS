@@ -34,7 +34,7 @@ add_executable(renfs
   src/options.c
   src/raster.c
   src/poly.c
-  src/road.c src/roaddraw.c src/sky.c src/view.c src/car.c src/camera.c src/dash.c
+  src/road.c src/roaddraw.c src/sky.c src/view.c src/car.c src/camera.c src/dash.c src/race.c
   src/track.c
   src/exe.c
   src/trackinfo.c

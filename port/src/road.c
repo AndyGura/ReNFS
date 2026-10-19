@@ -243,6 +243,10 @@ void road_gather(int node, int sec, int drawn)
     road_state *r = &g_road;
     int base = node / 4, i;
     g_track.last_node = node;
+    /* (the original's are the globals themselves: 0x13bb90 is the track's mask, 0x136618
+       the count 0x50070 hands over) */
+    r->sec_mask = g_track.sec_mask;
+    r->drawn = drawn;
     r->base = base;
     r->fill = r->count = 0;
     first_object((int)((unsigned)base & g_track.sec_mask));

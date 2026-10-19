@@ -3,6 +3,7 @@
 #include "audio.h"
 #include "fe.h"
 #include "files.h"
+#include "race.h"
 #include "video.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,11 +14,14 @@ static const char usage[] =
     "ReNFS: The Need for Speed SE, for Linux.\n"
     "\n"
     "    renfs [-data <folder>] [-home <folder>] [--shot <file.ppm> <frames>]\n"
+    "          [--race <track>]\n"
     "\n"
     "  -data <folder>   the game: the CD's files as they are (else $RENFS_DATA, else\n"
     "                   ./NFSSE, else NFSSE beside the program)\n"
     "  -home <folder>   the port's own settings (else $RENFS_HOME, else ~/.config/renfs)\n"
     "  --shot <f> <n>   no window: write the picture of retrace n (60 a second) to f\n"
+    "  --race <track>   straight into a race on the track (cy1 ..: for now the 512TR\n"
+    "                   standing on the grid, the road and the sky only; Esc ends it)\n"
     "\n"
     "  RENFS_LANG=de    the German art (GART, ...)\n"
     "  RENFS_NOSOUND=1  no sound\n"
@@ -27,7 +31,7 @@ static const char usage[] =
 
 int main(int argc, char **argv)
 {
-    const char *data = 0, *home = 0, *shot = 0;
+    const char *data = 0, *home = 0, *shot = 0, *race = 0;
     int shot_frames = 0;
 
     for (int i = 1; i < argc; i++) {
@@ -38,7 +42,9 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "--shot") && i + 2 < argc) {
             shot = argv[++i];
             shot_frames = atoi(argv[++i]);
-        } else {
+        } else if (!strcmp(argv[i], "--race") && i + 1 < argc)
+            race = argv[++i];
+        else {
             fputs(usage, strcmp(argv[i], "--help") && strcmp(argv[i], "-h") ? stderr : stdout);
             return strcmp(argv[i], "--help") && strcmp(argv[i], "-h") ? 1 : 0;
         }
@@ -54,7 +60,10 @@ int main(int argc, char **argv)
     if (!shot && !getenv("RENFS_NOSOUND"))
         audio_init();
     srand(shot ? 1 : (unsigned)time(0));   /* pictures without a window: the same each time */
-    fe_outer_loop();
+    if (race)
+        race_test(race);
+    else
+        fe_outer_loop();
 
     if (shot)                  /* the program ended before the frame asked for */
         fprintf(stderr, "renfs: ended before frame %d\n", shot_frames);

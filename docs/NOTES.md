@@ -1379,6 +1379,22 @@ the traffic (7, 5, 0, 11, 6, 4 in r1). `race_colours` `0x2e74c`: the DAC read ba
 and the marks `0x14e5bc[i]`, the inverse table; then the fog table `0x8a390` (car `+0x48a`'s
 colour `0xea710`), the dashboard re-coloured and tinted, the DAC again into `0x12ba30`.
 
+**The port's first race frame (`race.c`, `renfs --race cy1`, 2026-10-19).** The loading
+in `race_main`'s order: the track, its INFO and family, the nine cars' CFMs (r1's ids),
+the 512TR's PBS (`+0x36c` 63569 the eyes' height, `+0x370` 87 the horizon), the
+dashboard's colours, the pieces set, `race_colours`, the re-colouring; `view_init`,
+`camera_init`, `view_setup` ahead, mirror, ahead again; the two racers on the grid (slots
+7 and 6) and `track_follow`; the camera on car 0, mode 0. Then a frame per retrace in
+`race_draw_frame`'s order: `camera_update`, the sections kept and gathered again when the
+camera's quarter changes (`0x50070`), `view_select(0)`, `view_matrix`, `road_transform`,
+the sky, `road_draw(28)`. **By palette entry the frame equals the original's road and sky
+at the standing start (r1a)** (the port's `roadpic_emu` picture of r1a, which equals the
+original's with the one picture mark the snapshot caught mid-paint put back). Two
+globals the original shares that the port keeps twice: `0x13bb90` (the track's section
+mask, also the road's) and `0x136618` (the sections drawn): `road_gather` now copies both
+into `g_road`; left 0, the road painted its sections all into section 0 (a view that
+looked turned). `0x136618` = 28 on every snapshot; its writer is not found yet.
+
 One palette for everything in a race, made of **pieces**: `pal_queue_piece` `0x55ea0(start,
 count, pal)` lists them (50 at most, 0x13c7f0), `0x55f58` sets them all (setpalette) after
 the loading, once, in `race_main`. In CY1 (d2): 0x90+0x60 the road's palette, 0x30+0x17

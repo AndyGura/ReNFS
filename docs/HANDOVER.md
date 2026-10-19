@@ -152,9 +152,15 @@ Ghidra project and `build/decomp`, one command). The git history was started aga
   and **the open roads' sky (`sky.c`, with EA's sin, cos and atan2 in `exe.c`)**:
   City 1's view, sky and road together, the same picture pixel for pixel on 5 snapshots
   (`tools/roadpic_emu.py`; `build/shots/road_d2_port.png` next to `road_d2_orig.png`).
+  Then the views and lens (`view.c`), the starting grid, the node a car is on and the
+  driver's camera (`car.c`, `camera.c`), and the race palette made alone with Thomas's
+  inverse colormap (`racepal.c`, `font.c`, `dash.c`): all equal on the 6 snapshots.
+  **`renfs --race cy1` draws City 1 from the starting grid by itself** (`race.c`): the
+  512TR standing in slot 7, the driver's view, sky and road; the same picture by palette
+  entry as the original's road and sky at the standing start (r1a).
   Not yet: the circuits' sky ring (`0x4ace8`), the roadside walls (`0x59294`, other
-  tracks than the cities), 3D roadside models, the cars, the camera, the race palette's
-  composition.
+  tracks than the cities), 3D roadside models, the cars, the mirror, the dashboard and
+  HUD, the physics, the race's setup from the front end.
 
 **Progress page for Danik**: https://claude.ai/artifact/VZdxTpYC3oLXYeBVJpoDoM (every step,
 its percent done and weight). Update its steps file after each finished step.
@@ -181,14 +187,12 @@ races 320x200 / 320x240; commit locally as the work goes.
 3. **The port's skeleton: done** (movies, title, game mode screen, exit dialog). Name entry
    the main menu, the settings kept and the options screen done too. Next: the screens
    behind the options (credits, audio, graphics, controls, load / save), Danik chose
-   (2026-10-19): **the race next**, the remaining menus later. In the race, next: the
-   race's loading in `race_main` `0x6356c`'s order (cars' files and palettes `0x64e14`,
-   the dashboard `0x2e8bc`, traffic `0x7de84`, then `0x55f58` the palette pieces and
-   `0x2e74c`: the allowed entries `0xf77c8` (0..254 less 0x47, 0x5f, 0xfa..0xff and the
-   list at `0x14e5bc`), the inverse table `0x8227c` from the DAC, the fade table
-   `0x8a390`), the cars' placing on the grid (`0x7c938`), then the camera
-   (`camera_update` `0x136b0`, 2.7 KB; `0x1486c` makes the view current: matrix camera
-   +0x94, mirror +0xb8), so the port makes a first frame of its own. The walls `0x59294`
+   (2026-10-19): **the race next**, the remaining menus later. In the race, the
+   port now makes a first frame of its own (`--race cy1`). Next: the cars drawn
+   (`0x679ec` a row's cars, `0x6837c`, the CFM models), the dashboard picture under the
+   view (`0x2e8bc`'s shapes, the BAMF lists), the mirror (`0x4fed8`, `0x5aa84`), then the
+   player's car driving (the physics, 33.3 steps a second), the fade table `0x8a390`.
+   Open: who writes `0x136618` (28 sections drawn: a detail setting?). The walls `0x59294`
    and the circuits' sky ring `0x4ace8` can be checked on CY1 memory with made-up input,
    or on snapshots of another track (`tools/nfsdos.py`).
 4. Front end (menus, car and track choice), then the race (track, cars, physics, HUD,

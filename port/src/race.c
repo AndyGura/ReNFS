@@ -1,0 +1,149 @@
+/* A race (NOTES §4.3, §4.7): the loading of race_main 0x6356c and the frame of
+   race_draw_frame 0x5bc40, as far as the port has them. */
+#include "race.h"
+#include "camera.h"
+#include "car.h"
+#include "dash.h"
+#include "exe.h"
+#include "files.h"
+#include "racepal.h"
+#include "road.h"
+#include "roaddraw.h"
+#include "sky.h"
+#include "track.h"
+#include "trackfam.h"
+#include "trackinfo.h"
+#include "unpack.h"
+#include "video.h"
+#include "view.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+/* the race the snapshots were taken in: the 512TR against the Testarossa, a police car
+   and six of the traffic (0x12dce4) */
+#define RACE_CARS 9
+static const int race_ids[RACE_CARS] = { 204, 201, 400, 7, 5, 0, 11, 6, 4 };
+#define RACERS 2
+#define DRAWN 28               /* the sections drawn ahead (0x136618) */
+
+/* the player's car's physics (SIMDATA/CARSPECS, 30FB): +0x36c the driver's eyes above
+   the road, +0x370 where the horizon is in the view */
+static int car_spec(const char *name, int *eye, int *horizon)
+{
+    char path[64];
+    long len, n;
+    unsigned char *d, *u;
+
+    snprintf(path, sizeof path, "SIMDATA/CARSPECS/%s.PBS", name);
+    d = file_load(path, &len);
+    if (!d)
+        return 0;
+    u = is_packed(d, len) ? unpack(d, len, &n) : (n = len, d);
+    if (u != d)
+        free(d);
+    if (!u || n < 0x374) {
+        free(u);
+        return 0;
+    }
+    *eye = u[0x36c] | u[0x36d] << 8 | u[0x36e] << 16 | u[0x36f] << 24;
+    *horizon = u[0x370] | u[0x371] << 8 | u[0x372] << 16 | u[0x373] << 24;
+    free(u);
+    return 1;
+}
+
+static int quarter(int node)
+{
+    return node >= 0 ? node / 4 : -(-node / 4);
+}
+
+int race_test(const char *name)
+{
+    static race_car cars[RACE_CARS];
+    race_car *list[RACE_CARS];
+    unsigned char marks[RACE_CARS] = { 0 };
+    race_camera cam;
+    road_window win;
+    const view_window *w;
+    int i, eye, horizon, near, gathered = -1;
+    const char *car = "F512TR";
+
+    if (!exe_load() || !track_load(name) || !trackinfo_load(name, 1, 0)
+        || !trackfam_load(name, 1, 0) || !car_spec(car, &eye, &horizon)) {
+        fprintf(stderr, "renfs: the track %s or its car could not be loaded\n", name);
+        return 0;
+    }
+    g_view.min_z = exe_i32(0xf7938);
+    g_view.far_shift = *exe_at(0xf6aa4, 1);
+    g_view.max_level = exe_i32(0xeaad8);
+    g_road_mirror = 0;
+
+    /* the cars and the palette, in race_main's order */
+    for (i = 0; i < RACE_CARS; i++) {
+        memset(&cars[i], 0, sizeof cars[i]);
+        cars[i].player = i;
+        cars[i].police = race_ids[i] >= 400;
+        if (!car_load(&cars[i], race_ids[i]))
+            return 0;
+        list[i] = &cars[i];
+    }
+    cars_queue_colours(list, RACE_CARS, marks);
+    if (!dash_load(car, 0))
+        return 0;
+    dash_queue_colours();
+    cockpit_queue_colours();
+    video_mode(320, 200);
+    pal_apply_pieces();
+    race_colours(marks, RACE_CARS, 0);
+    pal_apply_remaps();
+
+    /* the views and the camera in the driver's seat; the racers on the grid, the player
+       in slot 7 (0x12dca0) */
+    view_init(0, cars[0].number, horizon);
+    camera_init(eye);
+    view_setup(&g_view_ahead, exe_i32(0xe8de8 + 0x10));
+    view_setup(&g_view_mirror, exe_i32(0xe8e28 + 0x10));
+    view_setup(&g_view_ahead, exe_i32(0xe8de8 + 0x10));
+    for (i = 0; i < RACERS; i++) {
+        car_grid_place(&cars[i], 7 - i, RACERS, 0);
+        track_follow(&cars[i].pos, &cars[i].node);
+    }
+    memset(&cam, 0, sizeof cam);
+    camera_set_car(&cam, &cars[0], 0);
+
+    while (!g_quit && key_get() != 0x1b) {
+        const int *m;
+
+        camera_update(&cam);
+        /* the road's points (0x50070): its sections kept, gathered again when the
+           camera is on another quarter */
+        track_keep_sections(quarter(cam.node));
+        if (gathered < 0 || quarter(gathered) != quarter(cam.node)) {
+            road_gather(cam.node, quarter(cam.node), DRAWN);
+            gathered = cam.node;
+        }
+        cam.flags = 0;
+
+        m = view_select(&cam, 0);
+        view_matrix(&cam);
+        w = g_view_now->win;
+        near = road_transform(&cam.pos, m, cam.node);
+        win.x = w->x;
+        win.y = w->y;
+        win.w = w->cw;
+        win.h = w->ch;
+        memset(g_fb, 0, sizeof g_fb);
+        raster_window(g_fb, 320, win.x, win.y, win.x + win.w, win.y + win.h);
+        sky_draw(cam.yaw, m, &win, 0);
+        road_objects_start();
+        road_draw(DRAWN, cam.node, near, &win);
+        video_retrace();
+    }
+
+    for (i = 0; i < RACE_CARS; i++)
+        car_free(&cars[i]);
+    dash_free();
+    trackfam_free();
+    track_free();
+    return 1;
+}
