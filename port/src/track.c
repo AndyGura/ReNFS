@@ -31,7 +31,9 @@ static void wr32(unsigned char *p, int v)
 
 const unsigned char *node_ptr(int node)
 {
-    return g_track.nodes + (unsigned)(node & g_track.node_mask) * 0x24;
+    /* signed: on an open road (no mask) a node before the first reads the head before
+       them, as the original's 32-bit address does */
+    return g_track.nodes + (long)(int)(node & g_track.node_mask) * 0x24;
 }
 
 int node_i32(int node, int at)
@@ -194,4 +196,39 @@ void track_keep_sections(int section)
         t->ring_head = (int)((unsigned)(t->ring_head - 1) & t->sec_mask);
         d = fold(t->ring_head - section, t->length);
     }
+}
+
+/* the squared distance (in 1/256ths) from p to the midpoint of nodes a and b, unsigned
+   as the original compares it */
+static unsigned mid_dist(const vec3 *p, int a, int b)
+{
+    int mx = (int)((unsigned)node_i32(a, 8) + (unsigned)node_i32(b, 8)) >> 1;
+    int mz = (int)((unsigned)node_i32(a, 0x10) + (unsigned)node_i32(b, 0x10)) >> 1;
+    int dz = (p->z - mz) >> 8, dx = (p->x - mx) >> 8;
+
+    return (unsigned)dz * (unsigned)dz + (unsigned)dx * (unsigned)dx;
+}
+
+int track_follow(const vec3 *p, int *node)
+{
+    int changed = 0, was;
+
+    if (*node != -1)
+        do {
+            int n = was = *node;
+            unsigned here = mid_dist(p, n, n + 1);
+
+            if (mid_dist(p, n + 1, n + 2) < here) {
+                *node = n + 1;
+                changed = 1;
+            } else if ((n > 0 || g_track.loop) && mid_dist(p, n - 1, n) < here) {
+                *node = n - 1;
+                changed = 1;
+            }
+        } while (was != *node);
+    if (*node & ~g_track.node_mask) {
+        *node &= g_track.node_mask;
+        changed = 1;
+    }
+    return changed;
 }

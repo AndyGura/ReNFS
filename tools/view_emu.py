@@ -35,9 +35,11 @@ class Rec(ctypes.Structure):
 
 
 class Camera(ctypes.Structure):
-    _fields_ = [("pos", Vec3), ("node", I), ("pitch", I), ("yaw", I), ("roll", I),
-                ("ahead", ctypes.POINTER(Rec)), ("mirror", ctypes.POINTER(Rec)),
-                ("m", I * 9), ("mm", I * 9)]
+    """race_camera (view.h); the car pointer left out of the test"""
+    _fields_ = [("mode", I), ("pos", Vec3), ("off", Vec3), ("node", I), ("flags", I),
+                ("pitch", I), ("yaw", I), ("roll", I), ("tilt", I * 3), ("eye", Vec3),
+                ("mirror_on", I), ("yaw_follow", I), ("ahead", ctypes.POINTER(Rec)),
+                ("mirror", ctypes.POINTER(Rec)), ("car", ctypes.c_void_p), ("m", I * 9), ("mm", I * 9)]
 
 
 class View(ctypes.Structure):

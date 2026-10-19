@@ -3,6 +3,8 @@
 #ifndef RENFS_TRACK_H
 #define RENFS_TRACK_H
 
+#include "poly.h"
+
 #define TRACK_RING 0x8700              /* 64 decoded sections of 0x21c bytes */
 #define SECTION_BYTES 0x21c
 
@@ -37,6 +39,9 @@ void track_free(void);
 int node_i32(int node, int at);
 const unsigned char *node_ptr(int node);
 
+/* the road node nearest to p, from *node stepping one at a time while the next or the
+   last midpoint between nodes is nearer (0x4f534; -1 stays); 1 if *node changed */
+int track_follow(const vec3 *p, int *node);
 /* the ring kept round section `section` (0x4ee30): sections from 5 behind to 30 ahead */
 void track_keep_sections(int section);
 /* a decoded section in the ring: 12 bytes, then 4 rows of 11 points x 3 i32 */

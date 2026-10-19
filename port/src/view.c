@@ -61,7 +61,7 @@ void view_setup(view_rec *v, int mode)
 }
 
 /* the turns about each axis (0x58500 x, 0x5855c y, 0x585b8 z), 0x1000000 a turn */
-static void turn(int axis, int angle, int m[9])
+void mat_turn(int axis, int angle, int m[9])
 {
     int s = ea_sin(angle >> 8), c = ea_cos(angle >> 8);
 
@@ -97,9 +97,9 @@ void view_matrix(race_camera *c)
 {
     int x[9], y[9], z[9], s[9], f[9], half[9], yz[9], yzx[9], t[9];
 
-    turn(0, c->pitch, x);
-    turn(2, c->roll, z);
-    turn(1, c->yaw, y);
+    mat_turn(0, c->pitch, x);
+    mat_turn(2, c->roll, z);
+    mat_turn(1, c->yaw, y);
     scale(1, g_view_now->win->squash, s);
     scale(0, g_road_mirror ? -0x10000 : 0x10000, f);
     mat_mul(y, z, yz);
@@ -107,7 +107,7 @@ void view_matrix(race_camera *c)
     mat_mul(yzx, s, t);
     mat_mul(t, f, c->m);
     /* the mirror looks back: half a turn more, neither squashed nor turned over */
-    turn(1, 0x800000, half);
+    mat_turn(1, 0x800000, half);
     mat_mul(yzx, half, c->mm);
 }
 

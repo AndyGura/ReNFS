@@ -946,11 +946,67 @@ race_from_menu 0x3770c (from fe_main_menu)
   setting 0's 30: perhaps what it was made for).
 - `car_check_lap` `0x5056c` (called by the opponents too; speaks `besttime` / `bestlast` /
   `finallap` for the player).
+- **Making the cars** (`cars_create` `0x51388`, from `race_main`): for each of the
+  `0x12da38` cars a record (`+0x516` / `+0x47d` its number), `car_setup` `0x51200`
+  (racers: `load_car_pbs`; the others: driving kind 3, `+0x48a` from `0x12da53 + 0x4b·n`)
+  → `car_reset` `0x50830` (everything cleared: position (1, 0, 1), the shakes `+0x427..`
+  0, `+0x88` = itself, `+0xc0` = `+0xc4` its body, `+0x39d` = 10·n), then
+  `car_setup_body` `0x512e8` (the PDN); `race_sort_order` `0x518c0` sorts the order
+  tables `0x13c298` (by node, then `+0x39d`) and `0x13c274` (by `+0x4c`). `0x506dc` is not
+  the grid: it clears the laps and times (`0x13c160..`, the standings `0x14ec18 + 0x1d2·n`
+  by `0x685e4`).
+- **The starting grid: `car_grid_place` `0x7c938`** (`port/src/car.c`; for the
+  `0x12da30` racers at the end of `load_traffic_cfg` `0x7de84`). With g = `0x12dca0[+0x47d]`
+  (the grid slot: 7 the player, 6 the opponent on CY1) and w = the lane width at node 10 (the
+  table `0x15d15c`, made in `0x7de84`: row n of 40 shorts holds i / n in 8.8 for n = 1..3,
+  read at row (node +4 & 15) [node +1 >> 3]) << 8: node = 32 − (`0x12da2c` > 2 ? 2g : g/2·4),
+  x = −w/2 + (g % 2)·w (+ the node's x and its heading as the yaw when `0x12da12` > 2),
+  one more lane left (x −= w) for even g when node 20 has 2 lanes left and 1 right; `+0x39d`
+  = 0, z = the node's z. CY1: the player at (2.5, 0, node 20's z), node 20; the first step's
+  `track_follow` makes it 19.
+- **`track_follow` `0x4f534(pos, &node)`** (`port/src/track.c`): the midpoints m(n, n+1)
+  of the nodes (x and z, sums `>> 1`); d = ((pos.z − m.z) >> 8)² + ((pos.x − m.x) >> 8)²
+  in 32 bits, compared unsigned; one node ahead while d(n+1, n+2) < d(n, n+1), else one
+  back while d(n−1, n) < d(n, n+1) (only for n > 0 or on a circuit), until it stays; then
+  masked by `0x13bb88`; returns 1 if the node changed. −1 stays.
+- Both checked by `tools/camera_emu.py` (every racer's place; every car's node from 12
+  behind to 12 ahead, 149 to 193 searches a snapshot): equal on all 6 snapshots.
 
 ### 4.7 Drawing a frame
 
 - `camera_update` `0x136b0` (also in the step), `camera_set_car` `0x13530`
-  (`0x129ecc` = the camera, a car, a mode: 3 seen).
+  (`0x129ecc` = the camera, a car, a mode: 3 seen). **The camera is the only one, at
+  `0x129ecc`**: the decompiler shows its fields as globals (`0x129f04` is its `+0x38`, the
+  node; `0x129f08` its `+0x3c`, the flags).
+- **The camera (`port/src/camera.c`; the driver's modes 0 and 1, checked by
+  `tools/camera_emu.py`: equal on all 6 snapshots, CY1 in-car, d3 with the body leaning
+  and shaking).** Its record: `+0` mode, `+4` the mode wanted, `+0xc` frames left of a
+  move, `+0x10` position, `+0x1c` the next position, `+0x28` → the car's position, `+0x2c`
+  the eye from the car turned, `+0x38` node, `+0x3c` flags (1 the node changed), `+0x40`
+  angles (pitch, yaw, roll), `+0x4c` the next angles, `+0x58` → the car's angles (its
+  `+0xc`), `+0x5c` tilt (added to the car's angles), `+0x68` the mirror drawn, `+0x6c` the
+  eye in the car, `+0x78` the yaw followed, `+0x88` / `+0x8c` the views, `+0x90` the car.
+  The modes' settings `0xe80f0`, 0x58 bytes each, 14: `+0` the view (`0xe8de8 + 32·it`:
+  0 the 85° one, 1 the 96° `0xe8e08`), `+4` the eye (mode 0: (−0.4, eye, 0), the eye the
+  car spec's `+0x36c`, put into modes 0 and 10 by `0x147b2`), `+0x10` → the angle followed
+  (set each frame), `+0x18` how it follows, `+0x2c` / `+0x30`, `+0x38` the mirror, `+0x3c`
+  (0: the eye taken from `+4`), `+0x40` the mode next, `+0x44`, `+0x48` an eye to start
+  from, `+0x54` (use it). `camera_set_target` `0x13450(cam, pos, angles, car, mode)`
+  copies them in, clears `+0x2c` and the tilt, node = the car's, `+0x78` = the car's
+  node's heading if the car is another, then `camera_set_mode` `0x14b00(cam, mode)`:
+  modes < 4, 10, 11 become 13 unless `car_upright_on_road` `0x14de8` (the yaw within 30°
+  (0x1e0000) of the node's heading, |pitch| and |roll| ≤ 0x240000); with `0x15d13a` or
+  `0x145c90` 0 → 1 and 10 → 11; the views, `+0x68`, `+0xc`, the eye; tilt 0;
+  `camera_update`; `view_set_layout`. **Modes 0, 1 in `camera_update`**: tilt pitch =
+  `0x12ba20` + (`0xea70c` (1.0, never written) >> 8)·(car `+0x369` >> 8) −
+  `shake_wave(car +0x42d, car +0x428)`, tilt roll = (`0xea70c` >> 9)·(car `+0x365` >> 8) −
+  `shake_wave(car +0x429, car +0x427)` (`0x3e900`: the wave `0xec28c` (0, 0, −1, −2, −2,
+  −1, 0, 1, 2, 3, 4, 5, 5, 4, ..) at the phase times the amount, / 16 truncated);
+  `camera_turn_eye` `0x13544(eye, out, pitch, roll, yaw)`: the eye >> 8 turned by
+  X(−pitch)·Z(−roll)·Y(−yaw) (`0x83a54`), << 8; position = car + that; the node and its
+  flag from the car's; `+0x78` = the car's yaw; the eye from the mode (so the eye turned is
+  the last frame's). The end of every mode: angles = (the car's + tilt) & 0xfffc00, the
+  position and angles taken from the next ones; modes > 1 add `0xf6b8c` to the roll.
 - `draw_road_sections` `0x5aa84`: the track **from far to near** (a painter's order), a
   section = 4 road nodes (`0x13bb90` the sections' mask); per section 11 points, 3D at
   `0x13b728` (12 bytes each, `0x84` a section) and on the screen at `0x13b9bc` (8 bytes,

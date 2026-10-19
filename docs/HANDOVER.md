@@ -186,7 +186,7 @@ races 320x200 / 320x240; commit locally as the work goes.
    the dashboard `0x2e8bc`, traffic `0x7de84`, then `0x55f58` the palette pieces and
    `0x2e74c`: the allowed entries `0xf77c8` (0..254 less 0x47, 0x5f, 0xfa..0xff and the
    list at `0x14e5bc`), the inverse table `0x8227c` from the DAC, the fade table
-   `0x8a390`), the cars' placing on the grid (`0x506dc`), then the camera
+   `0x8a390`), the cars' placing on the grid (`0x7c938`), then the camera
    (`camera_update` `0x136b0`, 2.7 KB; `0x1486c` makes the view current: matrix camera
    +0x94, mirror +0xb8), so the port makes a first frame of its own. The walls `0x59294`
    and the circuits' sky ring `0x4ace8` can be checked on CY1 memory with made-up input,

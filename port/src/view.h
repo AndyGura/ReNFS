@@ -4,6 +4,7 @@
 #define RENFS_VIEW_H
 
 #include "poly.h"
+#include "car.h"
 
 #define VIEW_WINDOWS 17        /* a resolution's, 0xe85c0 + 0x2a8 × resolution */
 
@@ -24,12 +25,20 @@ typedef struct {
     const view_window *win;    /* +0x1c */
 } view_rec;
 
-/* what the frame is drawn from (the camera record [0x143df4]) */
+/* what the frame is drawn from (the camera record [0x143df4], 0x129ecc) */
 typedef struct {
+    int mode;                  /* +0: 0, 1 the driver's eyes (camera.c) .. 13 */
     vec3 pos;                  /* +0x10: in the world, 16.16 */
+    vec3 off;                  /* +0x2c: the eye from the car, turned with it */
     int node;                  /* +0x38: its road node */
+    int flags;                 /* +0x3c: 1 the node changed */
     int pitch, yaw, roll;      /* +0x40, +0x44, +0x48: 0x1000000 a turn */
+    int tilt[3];               /* +0x5c ..: added to the car's pitch, yaw, roll */
+    vec3 eye;                  /* +0x6c: the eye in the car */
+    int mirror_on;             /* +0x68: the mirror is drawn */
+    int yaw_follow;            /* +0x78 */
     view_rec *ahead, *mirror;  /* +0x88, +0x8c */
+    const race_car *car;       /* +0x90: the car followed */
     int m[9];                  /* +0x94: the world into the view ahead */
     int mm[9];                 /* +0xb8: the same for the mirror */
 } race_camera;
@@ -51,6 +60,9 @@ void view_matrix(race_camera *c);
    matrix to draw with returned */
 const int *view_select(race_camera *c, int mirror);
 
+/* a turn about x (0), y (1) or z (2) by angle, 0x1000000 a turn (0x58500, 0x5855c,
+   0x585b8) */
+void mat_turn(int axis, int angle, int m[9]);
 /* 3 x 3 matrices of 16.16, each product >> 16 on its own (0x839f8): out = a b */
 void mat_mul(const int a[9], const int b[9], int out[9]);
 
