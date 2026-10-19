@@ -137,6 +137,9 @@ Ghidra project and `build/decomp`, one command). The git history was started aga
   "No mercy", Esc / Cancel go back, the right button asks "Exit game ?", 2 minutes untouched
   shows the title. Race, Options, the cars' showcase and the track records do nothing yet.
 
+**Progress page for Danik**: https://claude.ai/artifact/VZdxTpYC3oLXYeBVJpoDoM (every step,
+its percent done and weight). Update its steps file after each finished step.
+
 ## Waiting for Danik
 
 - **Which settings a first start uses.** The CD carries a CONFIG.DAT (head to head,

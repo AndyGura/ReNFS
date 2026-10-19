@@ -7,9 +7,12 @@
 
 extern unsigned char g_config[CONFIG_SIZE];
 
-/* cfg_load_config_dat 0x39c40: the CD's GAMEDATA/CONFIG/CONFIG.DAT; 0 if it is missing
-   or not its size */
+/* cfg_load_config_dat 0x39c40: the port's copy (home/config.dat), else the CD's
+   GAMEDATA/CONFIG/CONFIG.DAT; 0 if neither is there at its size */
 int config_load(void);
+/* cfg_save_config_dat 0x3a134: written whole into home/config.dat (never the game's
+   folder) */
+void config_save(void);
 /* a word of it (the menus' choices are 16-bit, at odd places) */
 int config_word(int at);
 void config_set_word(int at, int v);

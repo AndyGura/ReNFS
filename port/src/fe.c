@@ -302,8 +302,9 @@ void fe_outer_loop(void)
             again = 1;
         if (state == 0) {
             /* 0x7469c (a new session: the tournament's records cleared) comes with the
-               tournament; the settings saved after (cfg_save_config_dat 0x3a134): next */
+               tournament */
             state = fe_main_menu();        /* 2: the title, then the game mode again */
+            config_save();
         }
     } while (state != 1 && !g_quit);
     music_fade_out();
