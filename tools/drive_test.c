@@ -48,6 +48,8 @@ static const struct { int at, off, size; } fields[] = {
     I(0x134, body.radius), VA(0x138, body.half, 0), I(0x144, body.wait), I(0x15c, road_speed),
     B(0x174, bits[0]), B(0x175, bits[1]), B(0x176, bits[2]), I(0x4f2, crashing),
     I(0x512, state), I(0x516, slot),
+    /* the timing's */
+    B(0x51a, part),
 };
 
 /* the i-th field's offset in the original's record and its size; 0 past the last */

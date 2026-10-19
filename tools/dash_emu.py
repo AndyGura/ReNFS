@@ -6,7 +6,8 @@ a row), and the port's hud_redraw from a screen of the same colour, with the rac
 pictures and colours made by the port (as tools/cars_emu.py). Then a whole frame in the
 driver's seat (0x31684 against hud_frame) with the wheel turned several ways, on the
 snapshot's view, mirror and map pictures, the routines not yet ported left out on both
-sides (LEFT_OUT). Writes build/shots/dash_<snap>_{orig,port,diff}.png and
+sides (LEFT_OUT); then frames after the start with the status bar's numbers (0x30d8c: the
+speed, gear, place, time, split, laps or miles) as NUMBERS changes the race. Writes build/shots/dash_<snap>_{orig,port,diff}.png and
 dash_<snap>_frame<k>_{orig,port}.png.
 
     build/venv/bin/python tools/dash_emu.py cy1 build/snap/e3.bin [...]
@@ -18,11 +19,10 @@ from unicorn import UC_HOOK_CODE
 from unicorn.x86_const import UC_X86_REG_ESP, UC_X86_REG_EIP
 import roadpic_emu as R
 import cars_emu
+import timing_emu
 
-# not yet ported: the replay's buttons, and the status bar's numbers after the start
-# (0x30d8c from step 361)
+# not yet ported: the replay's buttons
 LEFT_OUT = {0x5c5d0: 0}
-NUMBERS = 0x30d8c
 # the wheel (straight, a little and far each way, all the way), the engine's turns and the
 # speed (metres a second, 16.16) of each frame; the first the snapshot's own
 STEERS = [None, -0x30000, 0x30000, 0x70000, -0x100000, 0x180000, -0x200000, 0, 0]
@@ -38,6 +38,28 @@ MAP_MORE = [("mirrored", None), ("cop", None), ("cop", -20), ("cop", -300), ("co
 STEPS = [None, 0, 59, 60, 179, 250, 299, 300, 359]
 RADARS = [None, 0, 1, 2, 3, 5, 7, 7, 0]
 FLASHES = [None, 0, 1, 0, 1, 1, 0, 1, 0]
+# then frames after the start, each changing the race (on both sides) for the status
+# bar's numbers: the race's steps, the viewed car's speed, gear, node and lap, the split,
+# the mode (0 the segment, 1 the race), a circuit, kilometres, the finish, a new best lap,
+# the race type
+NUMBERS = [
+    {"steps": 361}, {"steps": 371}, {"steps": 400, "speed": 0x1c0000, "gear": 1},
+    {"steps": 501, "speed": 0x50000, "gear": -1}, {"steps": 502, "gear": -2, "node": 600},
+    {"steps": 760, "split": 125, "shown": 50, "speed": 0x3c0000, "gear": 4},
+    {"steps": 800, "split": -340}, {"steps": 801, "split": 0},
+    {"steps": 4000, "shown": 0, "node": 1700}, {"steps": 4001, "mode": 1, "split": -3999},
+    {"steps": 4002, "split": 77, "shown": 9},
+    {"steps": 4100, "mode": 0, "circuit": 1, "laps": 3, "lap limit": 8, "lap": 2,
+     "lap time 1": 3500, "split": 0, "shown": 0},
+    {"steps": 4200}, {"steps": 4500, "lap": 3, "lap time 2": 4300}, {"steps": 4900},
+    {"steps": 5000, "mode": 1}, {"steps": 5001, "mode": 0, "lap": 11, "laps": 12,
+                                 "lap limit": 12},
+    {"steps": 5002, "circuit": 0, "kmh": 1, "speed": -0x420000, "node": 100},
+    {"steps": 5003, "node": 1, "gear": 0}, {"steps": 5004, "node": 1500},
+    {"steps": 9000, "node": 1800, "finish": 7000, "kmh": 0},
+    {"steps": 9001, "new best": 1}, {"steps": 9002, "node": 900, "race type": 0, "split": 9},
+    {"steps": 9003, "split": -9}, {"steps": 9004, "race type": 2},
+    {"steps": 9005, "speed": 0x7fffff}, {"steps": 99999, "speed": 0}]
 
 I = ctypes.c_int
 U8 = ctypes.c_ubyte
@@ -53,7 +75,8 @@ STATUS = [("shown", 0x12b940), ("steps", 0x145c94), ("mode", 0x12b8cc), ("table"
           ("splits", 0x14ea70), ("best_lap", 0x13c20c), ("race_type", 0x12da20),
           ("detail", 0x143e04), ("mirror", 0x143e08), ("map", 0x12b988), ("mirrored", 0x12dd28),
           ("running", 0xf6b74), ("kmh", None), ("radar", 0xea814), ("radar_flash", 0x12b9f8),
-          ("cop_flash", 0x12ba04)]
+          ("cop_flash", 0x12ba04), ("laps", 0x13c160), ("lap_limit", 0x12dd14),
+          ("finish_node", 0x13c164)]
 
 
 class Status(ctypes.Structure):
@@ -66,7 +89,66 @@ class MapState(ctypes.Structure):
 
 
 class HudCar(ctypes.Structure):
-    _fields_ = [("steer", I), ("number", I), ("rpm", I), ("redline", I), ("speed", I)]
+    _fields_ = [("steer", I), ("number", I), ("rpm", I), ("redline", I), ("speed", I),
+                ("viewed", I), ("human", I), ("road_speed", I), ("gear", I), ("player", I),
+                ("lap", I), ("node", I)]
+
+
+REC = 0x1d2
+
+
+def number_change(s, car, k, v):
+    """a NUMBERS change on the original's side"""
+    w = lambda a, x: s.write(a, struct.pack("<i", x))
+    c = lambda o, x: s.mu.mem_write(car + o, struct.pack("<i", x))
+    p = struct.unpack("<i", s.raw(car + 0x47d, 4))[0]
+    if k.startswith("lap time "):
+        w(0x14ea80 + REC * p + 4 * int(k[9:]), v)
+        return
+    {"steps": lambda: w(0x145c94, v), "speed": lambda: c(0x68, v), "gear": lambda: c(0x3ed, v),
+     "node": lambda: c(0x48, v), "lap": lambda: c(0x50, v), "split": lambda: w(0x14ea6c, v),
+     "shown": lambda: w(0x14ea70, v), "mode": lambda: w(0x12b8cc, v),
+     "circuit": lambda: w(0x13bb80, v), "laps": lambda: w(0x13c160, v),
+     "lap limit": lambda: w(0x12dd14, v), "kmh": lambda: s.write(0x15d140, struct.pack("<h", v)),
+     "finish": lambda: w(0x14ec3c + REC * p, v), "new best": lambda: w(0x13c208, v),
+     "race type": lambda: w(0x12da20, v)}[k]()
+
+
+def number_port(L, st, car, k, v):
+    """the same change on the port's side"""
+    var = lambda i: L.timing_test_var(i)
+    arr = lambda i: L.timing_test_array(i)
+    if k.startswith("lap time "):
+        arr(6)[16 * car.player + int(k[9:])] = v
+        return
+    if k == "steps":
+        st.steps = var(0)[0] = v
+    elif k in ("speed", "gear", "node", "lap"):
+        setattr(car, k, v)
+        L.timing_test_car_set(L_cars[car.viewed], car.lap, car.node, car.node)
+    elif k == "split":
+        st.ahead = var(18)[0] = v
+    elif k == "shown":
+        st.splits = var(19)[0] = v
+    elif k == "mode":
+        st.mode = v
+    elif k == "circuit":
+        st.circuit = var(15)[0] = v
+    elif k == "laps":
+        st.laps = var(4)[0] = v
+    elif k == "lap limit":
+        st.lap_limit = var(13)[0] = v
+    elif k == "kmh":
+        st.kmh = v
+    elif k == "finish":
+        arr(4)[car.player] = v
+    elif k == "new best":
+        var(23)[0] = v
+    elif k == "race type":
+        st.race_type = var(6)[0] = v
+
+
+L_cars = []
 
 W, H, VGA = 320, 200, 0xa0000
 
@@ -96,10 +178,6 @@ def left_out(s):
     for at, k in LEFT_OUT.items():
         s.mu.hook_add(UC_HOOK_CODE, hook, k, begin=game(at), end=game(at))
 
-    def numbers(mu, addr, size, k):
-        if s.i32(0x145c94) > 360:
-            hook(mu, addr, size, 0)
-    s.mu.hook_add(UC_HOOK_CODE, numbers, 0, begin=game(NUMBERS), end=game(NUMBERS))
 
 
 def original(s):
@@ -128,6 +206,11 @@ def original_frames(path):
                 s.write(at, struct.pack("<i", v))
         s.call(0x31684, eax=car)
         got.append(bytes(s.mu.mem_read(VGA, W * H)))
+    for change in NUMBERS:
+        for k, v in change.items():
+            number_change(s, car, k, v)
+        s.call(0x31684, eax=car)
+        got.append(bytes(s.mu.mem_read(VGA, W * H)))
     return got
 
 
@@ -144,7 +227,10 @@ def port_frames(s, L):
     L.hud_redraw_due()
     a = player(s)
     g = lambda at, o: struct.unpack("<i", s.raw(at + o, 4))[0]
-    car = HudCar(g(a, 0x18), g(a, 0x48a), g(a, 0x3c1), g(g(a, 0x479), 0xac), g(a, 0x68))
+    viewed = s.i32(0x12dd54)
+    car = HudCar(g(a, 0x18), g(a, 0x48a), g(a, 0x3c1), g(g(a, 0x479), 0xac), g(a, 0x68),
+                 viewed, int(viewed < s.i32(0x12da30)), g(a, 0x15c), g(a, 0x3ed), g(a, 0x47d),
+                 g(a, 0x50), g(a, 0x48))
     got = []
     for k in range(len(STEERS)):
         for f, v in (("steer", STEERS[k]), ("rpm", RPMS[k]), ("speed", SPEEDS[k])):
@@ -153,6 +239,11 @@ def port_frames(s, L):
         for f, v in (("steps", STEPS[k]), ("radar", RADARS[k]), ("radar_flash", FLASHES[k])):
             if v is not None:
                 setattr(st, f, v)
+        L.hud_frame(ctypes.byref(car))
+        got.append(ctypes.string_at(scr.pix, W * H))
+    for change in NUMBERS:
+        for k, v in change.items():
+            number_port(L, st, car, k, v)
         L.hud_frame(ctypes.byref(car))
         got.append(ctypes.string_at(scr.pix, W * H))
     return got
@@ -240,6 +331,13 @@ def port_map(s, L, picks):
 
 def port(s, name, L):
     cars, _ = cars_emu.load_cars(s, name, L)
+    L_cars[:] = [ctypes.byref(c) for c in cars]
+    timing_emu.typed(L)
+    n = s.i32(0x12da38)
+    timing_emu.state_put(L, timing_emu.original_state(s, n), n)
+    for c, a in zip(cars, [s.u32(0x13c24c + 4 * k) for k in range(n)]):
+        g = lambda o: struct.unpack("<i", s.raw(a + o, 4))[0]
+        L.timing_test_car_set(ctypes.byref(c), g(0x50), g(0x48), g(0x4c))
     ctypes.memmove(ctypes.addressof((U8 * 0x5f52).in_dll(L, "g_config")), s.read(0x156c14, 0x5f52), 0x5f52)
     st = Status.in_dll(L, "g_hud")
     for n, a in STATUS:
@@ -251,6 +349,8 @@ def port(s, name, L):
     got = ctypes.string_at(scr.pix, W * H), ctypes.string_at(back.pix, back.w * back.h), port_frames(s, L)
     if not L.track_load(name.encode()):
         sys.exit("no track")
+    for n, a in STATUS:          # the numbers' changes undone for the map
+        setattr(st, n, s.i32(a) if a else struct.unpack("<h", s.read(0x15d140, 2))[0])
     got += (port_map(s, L, MAP_NODES),)
     for c in cars:
         L.car_free(ctypes.byref(c))
@@ -289,8 +389,11 @@ def main():
             d = [i for i in range(W * H) if a[i] != b[i]]
             R.png("build/shots/dash_%s_frame%d_orig.png" % (tag, k), a, pal)
             R.png("build/shots/dash_%s_frame%d_port.png" % (tag, k), b, pal)
-            print("  frame %d (wheel %s, rpm %s, speed %s, step %s, radar %s): %d pixels differ%s" % (
-                k, STEERS[k], RPMS[k], SPEEDS[k], STEPS[k], RADARS[k], len(d), " (first %d, %d)" % (d[0] % W, d[0] // W) if d else ""))
+            what = ("wheel %s, rpm %s, speed %s, step %s, radar %s" % (
+                STEERS[k], RPMS[k], SPEEDS[k], STEPS[k], RADARS[k]) if k < len(STEERS)
+                else ", ".join("%s %s" % kv for kv in NUMBERS[k - len(STEERS)].items()))
+            print("  frame %d (%s): %d pixels differ%s" % (
+                k, what, len(d), " (first %d, %d)" % (d[0] % W, d[0] // W) if d else ""))
 
         w, h, _ = picture(s, 0xf4584)
         for k, (a, b) in enumerate(zip(maps, got_maps)):

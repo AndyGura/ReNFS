@@ -601,3 +601,7 @@
 0x2c920 body_setup_pdn
 0x2ce5c vec_mat
 0x3e848 mat_transpose
+0x685e4 timing_setup
+0x68d7c splits_pass
+0x68d00 split_update
+0x516d4 car_race_state

@@ -35,6 +35,9 @@ typedef struct {
     int radar;                 /* 0xea814: the radar detector's level, 0 quiet */
     int radar_flash;           /* 0x12b9f8: its big light lit */
     int cop_flash;             /* 0x12ba04: the police's dot on the map, 0..10 */
+    int laps;                  /* 0x13c160: the race's laps */
+    int lap_limit;             /* 0x12dd14: the most the bar shows */
+    int finish_node;           /* 0x13c164: an open road's finish */
 } hud_status;
 
 /* what the map shows (0x31cb4) */
@@ -57,6 +60,15 @@ typedef struct {
     int redline;               /* its physics' +0xac: the most the needle shows, less
                                   980 */
     int speed;                 /* +0x68: metres a second, 16.16 */
+    /* and what the status bar's numbers show of the viewed car (0x12dd54) */
+    int viewed;                /* 0x12dd54: which car */
+    int human;                 /* a player's (0x12dd54 < 0x12da30): its own speed and
+                                  gear, else its speed along the road */
+    int road_speed;            /* +0x15c */
+    int gear;                  /* +0x3ed: -2 reverse, -1 neutral, 0 first .. */
+    int player;                /* +0x47d: its place in the race's tables */
+    int lap;                   /* +0x50 */
+    int node;                  /* +0x48 */
 } hud_car;
 
 extern hud_status g_hud;

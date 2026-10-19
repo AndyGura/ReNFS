@@ -15,6 +15,7 @@
 #include "road.h"
 #include "roaddraw.h"
 #include "sky.h"
+#include "timing.h"
 #include "track.h"
 #include "trackfam.h"
 #include "trackinfo.h"
@@ -98,8 +99,14 @@ static void race_step(race_car *player)
     race_throw(player, st);
     if (g_drive.flags & 4)
         drive_controls(player);
+    /* (race_update_cars 0x519d8) the finish, the driving, the cars sorted round the
+       world's checks, the splits */
+    timing_step();
     drive_step(player);
+    timing_sort();
     crash_world();
+    timing_sort();
+    timing_splits();
     g_drive.steps = st + 2;
 }
 
@@ -135,6 +142,8 @@ int race_test(const char *name)
     g_drive.last_node = g_track.loop ? g_track.length * 4
         : (short)(g_track.head[6] | g_track.head[7] << 8) * 4 - 0xb5;
     snprintf(g_drive.track, sizeof g_drive.track, "%s", name);
+    /* the best lap to beat: the track's lap record (load_dash 0x2e8d4) */
+    g_drive.best_lap = S32(g_config, 0xd0 + g_drive.kind * 0xa6b);
     g_drive.chase = 1;         /* (the police on in these races, 0x12dd08, 0x12da34) */
     g_drive.police = 1;
     memset(&g_crash, 0, sizeof g_crash);
@@ -211,6 +220,14 @@ int race_test(const char *name)
     g_field = RACERS;
     g_humans = 1;
     memcpy(g_car_marks, marks, RACERS);
+    for (i = 0; i < RACERS; i++)
+        cars[i].part = 7;      /* (+0x51a: racers, meeting the others) */
+    /* the race's timing (race_start 0x506dc): the settings' laps (CONFIG.DAT +0xb1,
+       0x12dd14), the race length's times (0x12dd24) */
+    g_timing.lap_limit = config_word(0xb1);
+    g_timing.table = 1;
+    timing_cars();
+    timing_start();
     g_camera = &cam;
     g_road_paint.cars = cars_at_node;
     g_road_paint.cars_behind = cars_behind_at;
@@ -224,6 +241,12 @@ int race_test(const char *name)
     g_hud.race_type = g_race_type;
     g_hud.running = 1;
     g_hud.map = 1;             /* (0x12b988: on as a race starts) */
+    g_hud.laps = g_drive.laps;
+    g_hud.lap_limit = g_timing.lap_limit;
+    g_hud.finish_node = g_drive.last_node;
+    g_hud.circuit = g_track.loop;
+    g_hud.segment = g_drive.segment;
+    /* (kilometres an hour: the settings' 0x15d140, not read yet; miles) */
     memset(&map, 0, sizeof map);
     map.place = 1;
     for (i = 0; i < RACERS; i++)
@@ -234,10 +257,13 @@ int race_test(const char *name)
     driver.rpm = 700;
     driver.redline = redline;
     driver.speed = 0;
+    driver.viewed = 0;
+    driver.human = 1;
+    driver.player = 0;
     hud_redraw_due();
     start = clock_ticks();
 
-    while (!g_quit && key_get() != 0x1b) {
+    while (!g_quit && key_get() != 0x1b && !g_timing.result) {
         const int *m;
 
         /* the race's steps: one each three ticks of the clock (the race clock's
@@ -249,6 +275,10 @@ int race_test(const char *name)
         driver.steer = cars[0].steer;
         driver.rpm = cars[0].rpm;
         driver.speed = cars[0].speed;
+        driver.road_speed = cars[0].road_speed;
+        driver.gear = cars[0].gear;
+        driver.lap = cars[0].lap;
+        driver.node = cars[0].node;
 
         camera_update(&cam);
         /* the road's points (0x50070): its sections kept, gathered again when the
@@ -286,9 +316,14 @@ int race_test(const char *name)
         road_objects_start();
         road_draw(DRAWN, cam.node, near, &win);
         g_hud.steps = g_drive.steps;
+        g_hud.ahead = g_timing.split;
+        g_hud.splits = g_timing.split_shown;
+        g_hud.best_lap = g_drive.best_lap;
         map.node = (short)cars[0].node;
         for (i = 0; i < RACERS; i++)
             map.nodes[i] = (short)cars[i].node;
+        map.place = g_timing.place_shown;   /* (the last frame's, as the map comes first) */
+        memcpy(map.places, g_timing.places, sizeof map.places);
         hud_map(&map);
         hud_frame(&driver);
         video_retrace();

@@ -209,8 +209,15 @@ Ghidra project and `build/decomp`, one command). The git history was started aga
   seen 19 m/s across, 24 needed): `RENFS_THROW=200:48,0,32` shows one
   (`build/shots/crash_tumble.png`, `crash_back.png`). The camera's outside crash view
   (`0x6324c`) and the smoke's drawing are not in yet: the tumble is seen from the seat.
-  Not yet: the status bar's numbers after the start (`0x30d8c`: speed, gear, place,
-  time, laps; they wait for the race's timing), the gear gate (`0x2e4f0`, map off), the
+  **The status bar's numbers and the race's timing** (`hud.c` `bar_numbers`, `timing.c`;
+  NOTES §4.11, §4.12): after the start the speed, gear, place, time, the split against
+  the rival (or the time to beat in a time trial) and the miles left or the lap; each
+  racer's finish (or turning back), the race's two orders, the splits, the places, the
+  best lap; the race ends when every player is in and stopped. **Equal step for step in
+  143 runs** (`tools/timing_emu.py`, 13 kinds of race on all 11 snapshots) and the bar
+  pixel for pixel in 27 cases on all 11 (`tools/dash_emu.py`). `--race cy1` ends at the
+  finish line (no results screen yet).
+  Not yet: the gear gate (`0x2e4f0`, map off), the
   HUD's keys (`0x2f644`), the map at 640x480, the replay's buttons (`0x5c5d0`), the doubled BAMF lists (detail),
   one-colour polygons (`0xaa990`), the police lights, the circuits' sky ring (`0x4ace8`),
   the roadside walls (`0x59294`, other tracks than the cities), 3D roadside models
@@ -243,8 +250,8 @@ races 320x200 / 320x240; commit locally as the work goes.
    (2026-10-19): **the race next**, the remaining menus later. In the race, the
    port now makes a first frame of its own (`--race cy1`), the cars, their shadows,
    the racers' markers, the dashboard, the map and the mirror in it, and the player's car
-   drives and crashes (equal step for step). Next: the status bar's numbers (the race's
-   timing), the camera's crash view (`0x6324c`) and the smoke (`0x66d08`), then the opponents'
+   drives and crashes (equal step for step), and the status bar's numbers and the race's
+   timing. Next: the camera's crash view (`0x6324c`) and the smoke (`0x66d08`), then the opponents'
    driving (`drive_opponent` `0x7b34c`), the traffic, cars meeting cars, the sounds.
    Open: who writes `0x136618` (28 sections drawn: a detail setting?). The walls `0x59294`
    and the circuits' sky ring `0x4ace8` can be checked on CY1 memory with made-up input,

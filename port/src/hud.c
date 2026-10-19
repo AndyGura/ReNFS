@@ -6,12 +6,14 @@
 #include "hud.h"
 #include "config.h"
 #include "dash.h"
+#include "drive.h"
 #include "exe.h"
 #include "files.h"
 #include "fsh.h"
 #include "polyfill.h"
 #include "racepal.h"
 #include "raster.h"
+#include "timing.h"
 #include "track.h"
 #include "video.h"
 #include <stdio.h>
@@ -35,8 +37,26 @@ static int g_bar_at;                 /* 0x12b944: the status bar drawn again aft
                                         step */
 static int g_bar_black;              /* 0x12b94c: its strip to be blacked first */
 static int g_map_back_taken;         /* 0x12ba0c: the map's background taken */
+/* the status bar's numbers as last drawn, each drawn again only when it changes (-99:
+   to be drawn, 0x2d150) */
+static int g_speed_shown[3];         /* 0x12b8e4: the speed's digits, 10 blank */
+static int g_gear_shown;             /* 0x12b92c */
+static int g_place_drawn;            /* 0x12b918 */
+static int g_time_shown[3];          /* 0x12b8fc, 0x12b8f8, 0x12b8f4: minutes, seconds,
+                                        tenths */
+static int g_split_drawn;            /* 0x12b8e0: the split (its place shared with the
+                                        laps and miles) */
+static int g_lap_shown;              /* 0x12b928 */
+static int g_mile_shown[2];          /* 0x12b91c, 0x12b920: whole and tenths */
 
 /* the window drawn into (0xf889c): a picture and its clip */
+/* a times b, 16.16, rounded by the last bit out */
+static int mulr(int a, int b)
+{
+    long long p = (long long)a * b;
+    return (int)(p >> 16) + (int)((p >> 15) & 1);
+}
+
 static hud_picture g_win;
 static int g_cx0, g_cy0, g_cx1, g_cy1;
 
@@ -180,9 +200,20 @@ void hud_free(void)
     g_hud_map_back.pix = g_hud_view.pix = g_hud_map.pix = g_hud_mirror.pix = 0;
 }
 
-/* a time (1/60 s) as minutes, seconds and tenths in grey digits (0x2d6b4 with 0x2d3ac:
-   300 taken off first, never below 0; 0x2d47c each group) */
-static void digits(int v, int x, int y, int step, int n)
+/* the HUD's digits by the program's tables of names: grey (0xf6c84: gry0 .. gry9, gryb,
+   kept at 0x1456b8), yellow (0xf6cb0: yel0 .. yel9, yelr, yeln, plus, mnus, yelb, at
+   0x1456e8) and red (0xf6cec: red0 .. red9, redb, at 0x145728) */
+#define GREY 0xf6c84
+#define YELLOW 0xf6cb0
+#define RED 0xf6cec
+#define YELLOW_R 10
+#define YELLOW_N 11
+#define YELLOW_PLUS 12
+#define YELLOW_MINUS 13
+#define YELLOW_BLANK 14
+
+/* n digits of v, the most significant first, step apart (0x2d47c) */
+static void digits_in(unsigned table, int v, int x, int y, int step, int n)
 {
     int d[8], i;
 
@@ -191,7 +222,14 @@ static void digits(int v, int x, int y, int step, int n)
         v = v >= 10 ? v / 10 : 0;
     }
     for (i = n - 1; i >= 0; i--, x += step)
-        blit(table_named(0xf6c84, d[i]), x, y, COPY);
+        blit(table_named(table, d[i]), x, y, COPY);
+}
+
+/* a time (1/60 s) as minutes, seconds and tenths in grey digits (0x2d6b4 with 0x2d3ac:
+   300 taken off first, never below 0; 0x2d47c each group) */
+static void digits(int v, int x, int y, int step, int n)
+{
+    digits_in(GREY, v, x, y, step, n);
 }
 
 static void time_draw(int t, int x, int y, int step, int gap)
@@ -218,6 +256,17 @@ static int record_time(int track, int k)
 
 /* the status bar (0x2f2a4): its picture, what is timed, the record to beat, laps or
    miles, the kind of race; a black strip for the first 360 steps */
+/* every number shown marked for drawing again (0x2d150) */
+static void numbers_reset(void)
+{
+    g_radar_shown = -99;
+    g_speed_shown[0] = g_speed_shown[1] = g_speed_shown[2] = -99;
+    g_gear_shown = g_place_drawn = g_split_drawn = g_lap_shown = -99;
+    g_time_shown[0] = g_time_shown[1] = g_time_shown[2] = -99;
+    g_mile_shown[0] = g_mile_shown[1] = -99;
+    g_bar_at = 0x7d000;
+}
+
 static void status_bar(void)
 {
     if (!g_hud.shown || g_hud.steps < 360) {
@@ -230,12 +279,12 @@ static void status_bar(void)
         time_draw(record_time(g_hud.track, 6 + (g_hud.circuit ? 10 * g_hud.table : 0)) + 300,
                   0x11, 3, 6, 2);
         blit_own(named(&g_mask, "splt"), COPY);
-        blit_own(table_named(0xf6cb0, g_hud.ahead >= 0 ? 12 : 13), COPY);
+        blit_own(table_named(YELLOW, g_hud.ahead >= 0 ? YELLOW_PLUS : YELLOW_MINUS), COPY);
     } else if (g_hud.mode == 0) {
         blit_own(named(&g_mask, "segt"), COPY);
         if (g_hud.splits > 0) {
             blit_own(named(&g_mask, "splt"), COPY);
-            blit_own(table_named(0xf6cb0, g_hud.ahead >= 0 ? 12 : 13), COPY);
+            blit_own(table_named(YELLOW, g_hud.ahead >= 0 ? YELLOW_PLUS : YELLOW_MINUS), COPY);
         } else
             blit_own(named(&g_mask, g_hud.circuit ? "lap#" : "mile"), COPY);
         time_draw((g_hud.circuit ? g_hud.best_lap : record_time(g_hud.track, g_hud.segment)) + 300,
@@ -244,9 +293,7 @@ static void status_bar(void)
     /* (mode 2, the acceleration test: 0x145780 and 0x2d8c0, not yet) */
     if (g_hud.mode < 2)
         blit_own(named(&g_mask, g_hud.race_type <= 1 ? "head" : "sing"), COPY);
-    /* every number shown marked for drawing again (0x2d150) */
-    g_radar_shown = -99;
-    g_bar_at = 0x7d000;
+    numbers_reset();
 }
 
 void hud_redraw(void)
@@ -268,6 +315,7 @@ void hud_redraw(void)
     status_bar();
     g_wheel_shown = 0x63;
     g_redraw = 0;
+    numbers_reset();
 }
 
 void hud_redraw_due(void)
@@ -432,16 +480,235 @@ static void start_lights(void)
     g_bar_at = g_hud.steps + 10;
 }
 
-/* the status bar's numbers (0x30d8c): before the start its lights; then the speed, the
-   gear, the place, the time and the laps or miles (not yet: they wait for the race's
-   timing) */
-static void bar_numbers(void)
+/* the speed in red digits, the leading noughts blank (0x2ddc0): a player's own speed, a
+   computer's car's along the road; miles or kilometres an hour */
+static void speed_number(const hud_car *c, int x, int y, int step)
 {
+    int v = c->human ? c->speed : c->road_speed, d[3], i, leading = 1;
+
+    v = mulr(v > 0 ? v : -v, g_hud.kmh ? 0x39999 : 0x23d70) >> 16;
+    for (i = 0; i < 3; i++) {
+        d[i] = v >= 10 ? v % 10 : v;
+        v = v >= 10 ? v / 10 : 0;
+    }
+    for (i = 0; i < 3; i++, x += step) {
+        int k = d[2 - i];
+
+        if (k == 0 && i < 2 && leading) {
+            if (g_speed_shown[i] != 10) {
+                blit(table_named(RED, 10), x, y, COPY);
+                g_speed_shown[i] = 10;
+            }
+        } else {
+            leading = 0;
+            if (g_speed_shown[i] != k) {
+                blit(table_named(RED, k), x, y, COPY);
+                g_speed_shown[i] = k;
+            }
+        }
+    }
+}
+
+/* the gear (0x2dee8): R, N or its number. (A computer's car's, worked out from its speed
+   against its gears' speeds +0x308, comes with them) */
+static void gear_number(const hud_car *c, int x, int y)
+{
+    int g = c->gear;
+
+    if (g == g_gear_shown)
+        return;
+    blit(table_named(YELLOW, g >= 0 ? g + 1 : g == -1 ? YELLOW_N : YELLOW_R), x, y, COPY);
+    g_gear_shown = g;
+}
+
+/* the place (0x2e368), worked out by the race's timing */
+static void place_number(const hud_car *c, int x, int y, int step)
+{
+    int place = timing_place(c->viewed);
+
+    if (place != g_place_drawn) {
+        g_timing.place_shown = place;
+        digits_in(YELLOW, place, x, y, step, 1);
+        g_place_drawn = place;
+    }
+    g_timing.place_shown = place;
+}
+
+/* minutes, seconds and tenths of t less 300 (0x2d3ac) */
+static void split_time(int t, int *min, int *sec, int *tenths)
+{
+    int left = t > 300 ? t - 300 : 0;
+
+    *min = left / 3600;
+    left -= *min * 3600;
+    *sec = left / 60;
+    *tenths = (left - *sec * 60) / 6;
+}
+
+/* the time in yellow (0x2d5dc), from step 390; each part drawn when it changes; a new best
+   lap brings the whole bar back (its record time) */
+static void time_number(int t, int x, int y, int step, int gap)
+{
+    int v[3], i;
+
+    if (g_hud.steps < 0x186)
+        return;
+    split_time(t, &v[0], &v[1], &v[2]);
+    for (i = 0; i < 3; i++) {
+        if (v[i] != g_time_shown[i]) {
+            digits_in(YELLOW, v[i], x, y, step, i < 2 ? 2 : 1);
+            g_time_shown[i] = v[i];
+        }
+        x += 2 * step + gap;
+    }
+    if (g_drive.new_best) {
+        g_hud.shown = 1;
+        status_bar();
+        g_drive.new_best = 0;
+    }
+}
+
+/* the split against the rival (0x2e1dc): "splt", plus behind or minus ahead, minutes,
+   seconds and tenths of the gap; the laps' and miles' numbers in the same place drawn
+   again after it */
+static void split_number(int x, int y, int step, int gap)
+{
+    int v, min, sec, tenths;
+
+    if (g_split_drawn == -99) {
+        blit_own(named(&g_mask, "splt"), COPY);
+        blit_own(table_named(YELLOW, g_hud.ahead < 0 ? YELLOW_PLUS : YELLOW_MINUS), COPY);
+        g_split_drawn = -99;
+    }
+    if (g_hud.ahead == g_split_drawn)
+        return;
+    if ((g_hud.ahead >= 0) != (g_split_drawn >= 0))
+        blit_own(table_named(YELLOW, g_hud.ahead < 0 ? YELLOW_PLUS : YELLOW_MINUS), COPY);
+    g_split_drawn = g_hud.ahead;
+    v = g_hud.ahead > 0 ? g_hud.ahead : -g_hud.ahead;
+    split_time(v + 300, &min, &sec, &tenths);
+    digits_in(YELLOW, min, x, y, step, 1);
+    digits_in(YELLOW, sec, x + step + gap, y, step, 2);
+    digits_in(YELLOW, tenths, x + 3 * step + 2 * gap, y, step, 1);
+    g_lap_shown = g_mile_shown[0] = g_mile_shown[1] = -99;
+}
+
+/* the lap of the laps on a circuit (0x2e100): "lap#", the lap (at most the settings'
+   laps) and the race's laps at (x2, y2) */
+static void laps_number(const hud_car *c, int x, int y, int step, int x2, int y2)
+{
+    int lap = c->lap < g_hud.lap_limit ? c->lap : g_hud.lap_limit;
+
+    if (g_lap_shown == -99)
+        blit_own(named(&g_mask, "lap#"), COPY);
+    if (lap != g_lap_shown) {
+        g_lap_shown = lap;
+        if (lap >= 10)
+            digits_in(YELLOW, lap, x, y, step, 2);
+        else {
+            digits_in(YELLOW, lap, x + step, y, step, 1);
+            blit(table_named(YELLOW, YELLOW_BLANK), x, y, COPY);
+        }
+        digits_in(YELLOW, g_hud.laps, x2, y2, step, g_hud.laps >= 10 ? 2 : 1);
+    }
+    g_split_drawn = -99;
+}
+
+/* the distance to an open road's finish (0x2df78): "mile", whole and tenths, 48 units a
+   node over 1600 a mile (1000 a kilometre, the whole then in two places) */
+static void miles_number(const hud_car *c, int x, int y, int step, int gap)
+{
+    int left = g_hud.finish_node - c->node, v, whole, tenths, at = x;
+
+    if (g_mile_shown[0] == -99)
+        blit_own(named(&g_mask, "mile"), COPY);
+    v = left * 48 / (g_hud.kmh ? 1000 : 1600);
+    v = g_hud.finish_node > c->node ? v + 1 : 0;
+    whole = v / 10;
+    tenths = v - whole * 10;
+    if (whole != g_mile_shown[0]) {
+        g_mile_shown[0] = whole;
+        if (g_hud.kmh) {
+            if (whole > 9) {
+                blit(table_named(YELLOW, 1), x, y, COPY);
+                blit(table_named(YELLOW, 0), x + step, y, COPY);
+            } else {
+                blit(table_named(YELLOW, YELLOW_BLANK), x, y, COPY);
+                blit(table_named(YELLOW, whole), x + step, y, COPY);
+            }
+            at = x + step;
+        } else
+            blit(table_named(YELLOW, whole), x, y, COPY);
+    } else if (g_hud.kmh)
+        at = x + step;
+    at += step + gap;
+    if (tenths != g_mile_shown[1]) {
+        blit(table_named(YELLOW, tenths), at, y, COPY);
+        g_mile_shown[1] = tenths;
+    }
+    g_split_drawn = -99;
+}
+
+/* the time the bar shows (0x30d8c): the race's steps; an open road's finishing time once
+   past it; on a circuit from the second lap the time the lap began for four seconds (in
+   the segment's mode from the third lap the last lap's time), then the lap's so far (the
+   race's so far in the race's mode); in the race's mode the segments before added */
+static int shown_time(const hud_car *c)
+{
+    int t = g_hud.steps, p = c->player, i;
+
+    if (p < 0 || p >= DRIVE_PLAYERS)
+        p = 0;
+    if (!g_hud.circuit) {
+        if (g_hud.finish_node < c->node)
+            t = g_timing.finish[p] + 300;
+    } else if (c->lap > 1 && c->lap <= DRIVE_LAPS) {
+        int began = g_drive.lap_times[p][c->lap - 1] + 300;
+
+        if (g_hud.steps - began < 0xf0) {
+            t = began;
+            if (g_hud.mode == 0 && c->lap > 2)
+                t = began - g_drive.lap_times[p][c->lap - 2];
+        } else if (g_hud.mode == 0)
+            t = g_hud.steps - g_drive.lap_times[p][c->lap - 1];
+    }
+    if (g_hud.mode == 1)
+        for (i = 0; i < g_hud.segment && i < 3; i++)
+            t += g_timing.segment_times[i];
+    return t;
+}
+
+/* the status bar's numbers (0x30d8c): before the start its lights; then the speed, the
+   gear, the place, the time, and the split or the laps or the miles (the segment's
+   mode) or the split (the race's) */
+static void bar_numbers(const hud_car *c)
+{
+    int t = shown_time(c);
+
     if (!g_hud.shown || g_hud.steps <= 360) {
         if (g_hud.steps < 360)
             start_lights();
         return;
     }
+    if (g_hud.mode < 2) {
+        speed_number(c, 0x7a, 1, 0xe);
+        gear_number(c, 0xba, 1);
+        place_number(c, 0x121, 1, 7);
+    }
+    if (g_hud.mode == 1) {
+        time_number(t, 0x48, 1, 8, 3);
+        split_number(0xe0, 1, 8, 3);
+    } else if (g_hud.mode == 0) {
+        time_number(t, 0x48, 1, 8, 3);
+        if (g_hud.splits > 0)
+            split_number(0xe0, 1, 8, 3);
+        else if (g_hud.circuit)
+            laps_number(c, 0xde, 1, 8, 0xf5, 1);
+        else
+            miles_number(c, 0xd9, 1, 8, 2);
+    }
+    /* (mode 2, the acceleration test's figures 0x2d8c0: not yet; a network race's
+       "lost" 0x12b93c) */
     g_bar_black = 1;
 }
 
@@ -487,7 +754,7 @@ void hud_frame(const hud_car *c)
        that switch it, the map and the view: not yet) */
     if (g_hud.steps > g_bar_at)
         status_bar();
-    bar_numbers();
+    bar_numbers(c);
     if (g_hud.map && g_hud_map.pix)
         blit_pixels(g_hud_map.pix, g_hud_map.w, g_hud_map.h, 0x103, 0x7e, COPY);
     /* (0x5c5d0: the replay's buttons, not yet) */
@@ -499,13 +766,6 @@ void hud_frame(const hud_car *c)
 #define MAP_X 0x1d                     /* its centre: 1 + 0x1c */
 #define MAP_Y 0x1d                     /* the road's; the dots' 1 + 0x19 */
 #define MAP_DOT_Y 0x1a
-
-/* a times b, 16.16, rounded by the last bit out */
-static int mulr(int a, int b)
-{
-    long long p = (long long)a * b;
-    return (int)(p >> 16) + (int)((p >> 15) & 1);
-}
 
 static int rd32(const unsigned char *p)
 {

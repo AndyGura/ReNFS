@@ -24,7 +24,7 @@ from unicorn.x86_const import UC_X86_REG_ESP, UC_X86_REG_EIP, UC_X86_REG_EAX
 SOURCES = ["drive.c", "cardraw.c", "model.c", "polyfill.c", "camera.c", "car.c", "dash.c", "hud.c",
            "config.c", "view.c", "sky.c", "roaddraw.c", "trackinfo.c", "road.c", "poly.c",
            "raster.c", "track.c", "files.c", "exe.c", "trackfam.c", "racepal.c", "font.c",
-           "video.c", "fsh.c", "unpack.c"]
+           "video.c", "fsh.c", "unpack.c", "timing.c"]
 # (crash.c is compiled into drive_test.c, which reaches its parts)
 # sounds (0x52d2c, 0x52e40, 0x52ea8: two words on the stack each), highlights, the
 # acceleration test's times, speech, force feedback, the wall's sound by the camera,

@@ -1929,7 +1929,7 @@ network) with `0x12b93c`. The HUD's pictures by name from `0x5f240`: `0x145758` 
 `0x14575c` wait, `0x145760` lost, `0x145764` paus, `0x145784` sync, `0x145768` srdd,
 `0x14576c` srdl, `0x145770` syld, `0x145774` syll, `0x145778` sgrn. **The lights, the
 radar and the bar's return ported: equal on e1 and e3 with steps 0..359 and the radar
-at 0..7 (`tools/dash_emu.py`); the numbers after the start wait for the race's timing.**
+at 0..7 (`tools/dash_emu.py`); the numbers below.**
 
 **load_dash's places** (`0x2e8d4` from `0x2ee4b`): a picture's attachment block is the
 first of its chain of blocks (`+1`, 24 bits: the next) of type 0x7c: `+4` a count, from
@@ -1996,6 +1996,97 @@ with `+0x51a` & 4, `0x12dd08`, head to head): within 0x140 nodes and |y| < 0x1d 
 flashing by `0x12ba04` (0..10: colour of marker 0 above 5, else marker 6).
 **Ported (`hud_map`): equal on e1, e3, e5 at the snapshot's node and 8 others, mirrored,
 with the police flashing and from outside (18 maps each, `tools/dash_emu.py`).**
+
+**The status bar's numbers** (`0x30d8c` after the start's 360 steps; each routine draws
+only when its value differs from its cache, all set to −99 by `hud_reset_shown` `0x2d150`, at every redraw of the dashboard). Digits by
+`hud_digits` `0x2d47c(v, x, y, step, n, table)`, the most significant first, copied:
+grey `0xf6c84` (→ `0x1456b8`), yellow `0xf6cb0` (yel0..9, `yelr` 10, `yeln` 11, `plus`
+12, `mnus` 13, `yelb` 14 → `0x1456e8`), red `0xf6cec` (red0..9, `redb` → `0x145728`).
+- `hud_speed_digits` `0x2ddc0(car, 0x7a, 1, 0xe)`: |speed| in mph (as the needle), three red
+  digits, the leading noughts `redb`; cache `0x12b8e4`[viewed].
+- `hud_gear` `0x2dee8(0xba, 1)`: the gear (−1 `yeln` neutral, below that `yelr`
+  reverse, else gear + 1 as a digit); cache `0x12b92c`.
+- `hud_place` `0x2e368(0x121, 1, 7)`: the place worked out (below), a yellow digit at
+  0x121; the record's place written; cache `0x12b918`, the place `0x12b8c8`.
+- `hud_race_time` `0x2d5dc(t, 0x48, 1, 8, 3)`: the time from the lap table (`0x14ea78 +
+  0x1d2·player`) split by `hud_time_split` `0x2d3ac`, minutes, seconds, tenths; caches
+  `0x12b8fc`/`f8`/`f4`. A new best lap (`0x13c208`) shows the bar again first (so the
+  bar is blank for a frame, as in the original).
+- `hud_split` `0x2e1dc(0xe0, 1, 8, 3)` while `0x14ea70` > 0: `plus` for a split below 0,
+  `mnus` from 0 on (the opposite of the status bar's own picture), then the time of
+  |split|; cache `0x12b8e0`.
+- `hud_laps` `0x2e100(car, 0xde, 1, 8, 0xf5, 1)`: `lap#`, the lap (at most `0x12dd14`;
+  one digit after `yelb`, or two), and the race's laps at (0xf5, 1); cache `0x12b928`.
+- `hud_miles` `0x2df78(car, 0xd9, 1, 8, 2)`: `mile`, the road left to the finish node,
+  48 units a node over 1600 a mile (1000 a km), + 1 tenth while short of it (else 0):
+  the whole and the tenths 8 + 2 on; in km (`0x15d140`) the whole in two places, which
+  overlap the `MILES` label, as in the original. Caches `0x12b91c`, `0x12b920`.
+- Mode 2 (the acceleration test, `0x2d8c0`): not ported.
+**Ported (`hud.c` `bar_numbers`): equal pixel for pixel on e3 in 27 cases (speeds,
+gears, places, times, splits both ways, laps, miles, a new best lap; `tools/dash_emu.py`).**
+
+### 4.12 The race's timing (2026-10-19)
+
+**Who is timed** (`race_laps_init` `0x506dc`): the result `0x13c178` = 0; by the race type
+`0x12da20` (0 time trial, 1 head to head, 2 single race, 3 tournament): the racers
+checked `0x13c18c` = 1 and the humans `0x13c190` = 1 in a time trial, 2 and the players
+head to head, the field else. `timing_setup` `0x685e4`: each racer's record (0x1d2 bytes
+from `0x14ea78`) cleared where the race writes it: the lap times (`+8` + 4k), finish
+`+0x1c4` (`0x14ec3c`), place `+0x1d2` (`0x14ec4a`), top speed (`0x14ec44`). **The
+splits**: 85 points (5 a lap, 17 laps) `0x14e62c`, point k of lap i = the table
+`0xf701c` row (3·track + segment)·5 + k plus i · the finish node; passed: mine `0x14e794`
+(times `0x14e79c`), theirs `0x14e798` (times `0x14e904`), both 0 in a race. A time trial
+sets theirs passed to 85 and fills their times with the times to beat: an open road the
+segment's record (CONFIG.DAT +0xb5 + track·0xa6b + k·0x27 + 0x1b) shared out by the row
+3·track + segment of `0xf7238` (16.16 fractions, `mulr`), then the record; the fifth
+point moved to the finish when within 0x27 nodes. A circuit: the first lap by the row
+3t + 0 times the first lap's share (row 3t + 2), the others the rest of the race's record
+(6 + 10·`0x12dd24`) shared over the lap limit − 1 by row 3t + 1; 300 added to each (the
+start's wait). (The original first takes the other player's splits from the record's
+`+0x44`, kept from the race before; the port keeps none yet.) The split `0x14ea6c`, its
+shown steps `0x14ea70`, the camera switch `0xede80` = 0; the segment times `0x14ea74`[3]
+cleared on segment 0.
+
+**Every step** (`race_update_cars` `0x519d8`, in state 1): `car_check_finish` `0x51760`
+for each racer with `+0x51a` & 4, by `car_race_state` `0x516d4` (circuit: lap < 1 →
+1, lap > laps → 2; open road: node < 12 → 1, past the finish node → 2; the port's
+`drive_race_progress`): 1 for a human: turned back, its lap time `+1` and finish −999;
+2: finished, lap time `−1` and finish = steps − 300; the player's place (not in a
+replay) one more than those finished before. Then **over** when every human has
+finished (or turned back) and goes slower than 0x8000; two players: the first in and
+stopped sets `0x145c90`, and the view goes to the one still racing (`0xede80`, camera
+`0x13530` mode 3: not ported). Result 1 if any human finished, else 0x10 (all turned
+back); `race_main` ends on it. Then the driving, the two orders sorted by `race_sort_order`
+`0x518c0` (bubble sort, a swap when the first is further: `0x13c298` by node then
+across `+0x60`, `0x13c274` by progress `+0x4c` then across; both the identity from
+`cars_create` `0x51388`), the world, sorted again, and `splits_pass` `0x68d7c` (each a
+split at most a step: mine when the player's progress passes it, theirs (a race only)
+the rival's: the other car with two, else the leader, or the second when the player
+leads) and `split_update` `0x68d00` (theirs − mine at the last split both passed;
+when it changes, shown for 90 steps, counted down).
+
+**The clock shown runs fast.** Times are in 1/60 s of the step counter `0x145c94`, which
+goes on 2 a step; at the default 33.3 steps a second (§4.3) that is 66.7 a second, so a
+race's "second" is 0.9 s of real time (the port does the same: 24.3 s after starting
+`--race cy1` shows 00:21.9 with the 5 s of lights taken off).
+
+**The place** (`hud_place` `0x2e368`): finished, one more than those in before; a time
+trial 1 ahead of the time to beat (split > 0) else 2; else each car's place from
+`0x13c274` (count − index) into `0x12bd33` (the map's arrows) and the records; head to
+head 1 or 2 by the other car's index, else count − index.
+
+**The best lap** (`car_check_lap` `0x5056c`): the player's lap 2..16 done, the lap's time
+below `0x13c20c` (the record's, CONFIG +0xd0 + track·0xa6b, at the start) becomes it and
+sets `0x13c208` (the status bar shows it). (Lap 1 is skipped in the port: the original
+reads the word before the table.)
+
+**Ported (`port/src/timing.c`): equal to the original step for step in 143 runs on all
+11 snapshots, 13 kinds of race (won, lost, dead heat, turned back, three time-trial
+segments, circuit, circuit time trial, single race, tournament, two players;
+`tools/timing_emu.py`).** Not yet: the race-end screens and the records written, the
+tickets and the record's other fields, the speech (`0x722b4`, `0x72438`), the network
+branches, the old race's splits (`+0x44`), a computer car's gear from `+0x308`, the HUD's
+keys `0x2f644`, km/h from the settings.
 
 ## 5. The original in DOSBox (2026-10-19)
 

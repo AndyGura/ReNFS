@@ -391,7 +391,7 @@ static void pedals_slope(race_car *c, unsigned word)
 
 /* car_race_progress 0x5162c: 1 before the start (an open road's car kept past its
    first 1.1 m), 2 past the finish, else 0. (The network's check first: not here) */
-static int race_progress(race_car *c)
+int drive_race_progress(race_car *c)
 {
     if (g_track.loop) {
         if (c->lap < 1)
@@ -472,7 +472,7 @@ void drive_controls(race_car *c)
         pedals_slope(c, word);
     else
         pedals_keys(c, word);
-    if (race_progress(c))
+    if (drive_race_progress(c))
         drive_itself(c);
     else
         c->auto_mode = 0;
@@ -1448,10 +1448,22 @@ int drive_check_lap(race_car *c)
         return moved;
     }
     if (was > g_drive.last_node - 2 && n < 2) {
-        if (c->player < DRIVE_PLAYERS && c->lap >= 0 && c->lap < DRIVE_LAPS)
-            g_drive.lap_times[c->player][c->lap] = g_drive.steps - 300;
+        int p = c->player;
+
+        if (p >= 0 && p < DRIVE_PLAYERS && c->lap >= 0 && c->lap < DRIVE_LAPS)
+            g_drive.lap_times[p][c->lap] = g_drive.steps - 300;
         c->lap++;
-        /* (the best lap and the last lap called out, 0x722b4) */
+        /* the player's lap: its time against the best (in a race played; a replay's is
+           the viewed car's) */
+        if (p == g_player && p < DRIVE_PLAYERS && c->lap >= 2 && c->lap <= DRIVE_LAPS) {
+            int t = g_drive.lap_times[p][c->lap - 1] - g_drive.lap_times[p][c->lap - 2];
+
+            if (t < g_drive.best_lap) {
+                g_drive.best_lap = t;
+                g_drive.new_best = 1;
+            }
+            /* (the speech: a best lap, the last lap, 0x722b4 / 0x72438: not yet) */
+        }
     } else if (was < 2 && g_drive.last_node - 2 < n)
         c->lap--;
     c->progress = (c->lap - 1) * g_track.length * 4 + c->node;

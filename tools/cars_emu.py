@@ -25,7 +25,7 @@ from setup_check import Fam
 I, U8, P = ctypes.c_int, ctypes.c_ubyte, ctypes.c_void_p
 SOURCES = ["cardraw.c", "model.c", "polyfill.c", "camera.c", "car.c", "dash.c", "hud.c", "config.c", "view.c", "sky.c", "roaddraw.c",
            "trackinfo.c", "road.c", "poly.c", "raster.c", "track.c", "files.c", "exe.c", "trackfam.c",
-           "racepal.c", "font.c", "video.c", "fsh.c", "unpack.c", "crash.c", "drive.c"]
+           "racepal.c", "font.c", "video.c", "fsh.c", "unpack.c", "crash.c", "drive.c", "timing.c"]
 LEFT_OUT = {0x59294: 3, 0x66738: 0}
 
 
@@ -56,7 +56,7 @@ def lib():
     import subprocess
     out = "build/cars_test.so"
     subprocess.check_call(["cc", "-O1", "-g", "-shared", "-fPIC", "-o", out] +
-                          ["port/src/" + f for f in SOURCES] + ["-Iport/src"] +
+                          ["port/src/" + f for f in SOURCES] + ["tools/timing_test.c", "-Iport/src"] +
                           subprocess.check_output(["sdl2-config", "--cflags", "--libs"]).decode().split())
     return ctypes.CDLL(os.path.abspath(out))
 

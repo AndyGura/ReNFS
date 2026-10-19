@@ -137,6 +137,10 @@ typedef struct {
     int road_speed;            /* +0x15c: its speed along the road (each fourth step) */
     int crashing;              /* +0x4f2: thrown about after a hard hit, until it is put
                                   back on the road */
+
+    /* what the race's timing needs (timing.c) */
+    unsigned char part;        /* +0x51a: 4 a racer (its finish checked), 2 it meets
+                                  the other cars */
 } race_car;
 
 /* the car's place on the starting grid (0x7c938): grid its slot (0x12dca0[player]),

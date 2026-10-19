@@ -50,6 +50,9 @@ typedef struct {
     int keys[8];               /* the controls' keys (0x12d92c ..): left, right, faster,
                                   brake, gear up, gear down, handbrake, horn; PC scan
                                   codes */
+    int best_lap;              /* 0x13c20c: the best lap's time (the track's lap record
+                                  as the race starts) */
+    int new_best;              /* 0x13c208: a new best lap, the status bar to show it */
     int chase;                 /* 0x12dd08: the police chase in this race */
     int police;                /* 0x12da34: 1 with a police car (the chase's flags) */
 } drive_race;
@@ -81,6 +84,9 @@ void drive_controls(race_car *c);
    drive_crashed 0x1cfe0), then car_road_offset 0x51598 */
 void drive_step(race_car *c);
 
+/* car_race_progress 0x5162c: 1 before the start (an open road's car kept past its
+   first metres), 2 past the finish, else 0 */
+int drive_race_progress(race_car *c);
 /* car_check_lap 0x5056c (crash.c's too): 1 if the car is on another node */
 int drive_check_lap(race_car *c);
 /* 0x38808: the car on the road under it; place 0 (a car put back after a crash) only

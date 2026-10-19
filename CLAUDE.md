@@ -125,7 +125,9 @@ runs at 100 Hz; the race clock divides it in a 3-cycle (`race_timer_tick` `0x4c4
 33.3 Hz by default (measured in DOSBox), 30–60 Hz by `0x12dd0c`. Names: `tools/names.txt`.
 Arithmetic: 16.16 fixed point, the multiply rounds, 65,536 = a full turn (NOTES §4.5).
 A step: the cars' driving every step, their sounds and the gearbox every 2nd, traffic and
-police every 4th (flags `0x12f1bc`, measured). A race ends through `0x13c178`: 1 finished,
+police every 4th (flags `0x12f1bc`, measured). Timing (NOTES §4.12): `race_update_cars` `0x519d8` checks each racer's finish, sorts two
+orders (`0x518c0`), passes splits (`0x68d7c`); the status bar's numbers `0x30d8c`.
+A race ends through `0x13c178`: 1 finished,
 4 arrested (the second police ticket), 0x10 everyone turned back (NOTES §4.3, §4.8).
 The original in DOSBox: `nfs-dos`, `tools/nfsdos.py` (unseen, keys, memory; NOTES §5).
 Cars drawn: `cars_at_node` `0x6837c` → `0x66d08` → `0x66880` (NOTES §4.10); their
@@ -216,7 +218,8 @@ matrices), `car.c` (cars' files, the grid), `camera.c` (the driver's eyes), `das
 (the dashboard's file, colours, places and BAMF lists), `drive.c` (the player's car driven: controls, gearbox, engine, tyres, walls, jumps;
 equal step for step, `tools/drive_emu.py`; NOTES §4.6), `crash.c` (a hard wall hit: the car
 tumbling as a box, landing or put back, its smoke; the 4th-step refresh 0x786d4; equal step
-for step, drive_emu), `race.c` (`--race`: the loading
+for step, drive_emu), `timing.c` (the finish, the racers' order and places, the splits,
+the race's end; equal step for step, `tools/timing_emu.py`; NOTES §4.12), `race.c` (`--race`: the loading
 and the frame, a step every 3 ticks),
 `exe.c`: **the game's fixed tables are read from the CD's `NFS_DOS.EXE`** at the
 original's addresses (checked by a sum of the image), never copied into the port. The menus' look is checked against the
