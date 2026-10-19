@@ -109,4 +109,10 @@ void hud_outside_screen(const int box[4]);
    numbers, the small rev counter's needle (0x31168), the map */
 void hud_outside_frame(const hud_car *c, int redraw, int layout);
 
+/* the police's ticket or warning over the whole screen (0x30424): loaded as it comes,
+   its colours over the race's; 1 while shown (the race's view and dashboard not
+   drawn). Once both are 0 again (0x306e8) the race's colours come back (unless `over`)
+   and the dashboard is drawn again: 2 that frame, else 0 */
+int hud_ticket(int ticket, int warning, int over);
+
 #endif

@@ -1484,6 +1484,8 @@ void drive_step(race_car *c)
         opponent_recover(c);
     else if (c->state == 6)
         opponent_wait(c);
+    else if (c->state == 1)
+        opponent_player_wait(c);
     else {
         physics(c);
         drive_check_lap(c);

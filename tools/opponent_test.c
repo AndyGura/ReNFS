@@ -10,7 +10,10 @@ int *opp_test_var(int k)
         &g_opp.off, &g_opp.explode, &g_opp.traffic, &g_opp.wander, &g_opp.bend_drop,
         &g_opp.bend_slow, &g_opp.behind, (int *)&g_opp.random, (int *)&g_opp.mult,
         (int *)&g_opp.last, &g_race_type, &g_drive.police, &g_opp.waiting, &g_opp.sides[0],
-        &g_opp.sides[1], &g_opp.rival_car, &g_opp.chase_off,
+        &g_opp.sides[1], &g_opp.rival_car, &g_opp.chasing, &g_opp.come_node,
+        &g_opp.long_chases, &g_opp.linked, &g_opp.ticket_up, &g_opp.warning_up,
+        &g_opp.msg_time, &g_timing.tickets[0], &g_timing.warnings[0], &g_timing.finish[0],
+        &g_timing.result,
     };
 
     return k >= 0 && k < (int)(sizeof v / sizeof v[0]) ? v[k] : 0;
@@ -74,6 +77,15 @@ void opp_test_settings(int *out)
     settings();
     memcpy(out, g_opp.cfg, sizeof keep);
     memcpy(g_opp.cfg, keep, sizeof keep);
+}
+
+/* the police spots' odds, from the program as opponent_start reads them */
+void opp_test_odds(void)
+{
+    int k;
+
+    for (k = 0; k < 4; k++)
+        g_opp.come_odds[k] = exe_i32(0xf7500 + 4 * k);
 }
 
 void opp_test_humans_only(int v)

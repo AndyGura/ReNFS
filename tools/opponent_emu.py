@@ -12,12 +12,15 @@ road, both random numbers (the opponent's and EA's), the last hit between the ca
 the orders are compared. The cars meet as in the original (collide.c); some settings put
 the opponent beside, ahead of or behind the player, or start it thrown about (kind 4),
 the player's car thrown at a wall too, and the result counts how often they came near,
-touched and hit hard. The traffic's coming and going (0x79500), the sounds and the
-replay's highlights are left out on the original's side.
+touched and hit hard. The sounds and the replay's highlights are left out on the
+original's side (and the police's coming: settings +0x34 made 0).
 
 With --full the race is kept whole (the snapshot's 9 cars: the traffic waiting off the
 road (kind 6, drive_opponent_wait 0x7e0c8), placed and placed again (0x7cac8), the police
-car parked: its coming 0x79500 left out on both sides) and every car is compared.
+car parked until it comes out ahead (0x79500), its chase and pull-over (0x79728), the
+player held after it (kind 1, 0x7ea20)) and every car is compared, with the police's
+counts, the tickets and warnings and the race's end. --only=<variant> or
+--only="<drive> <variant>" picks runs.
 
     build/venv/bin/python tools/opponent_emu.py [--full] [--coverage] [--only=<variant>] [snapshot ..]
     (default: all d*, e*, r*)
@@ -31,9 +34,9 @@ import drive_emu as D
 
 SOURCES = [f for f in D.SOURCES if f != "opponent.c"]
 LEFT_OUT = dict(D.LEFT_OUT)
-# the traffic's coming and going; sounds; the police's lanes; EXPLODE's push
-LEFT_OUT.update({0x79500: 0, 0x80a60: 0, 0x79728: 0, 0x78370: 0})
-KIND = {2: 0x382d0, 3: 0x7b34c, 4: 0x1cfe0, 5: 0x7d9e4, 6: 0x7e0c8}
+# sounds; EXPLODE's push
+LEFT_OUT.update({0x80a60: 0, 0x78370: 0})
+KIND = {1: 0x7ea20, 2: 0x382d0, 3: 0x7b34c, 4: 0x1cfe0, 5: 0x7d9e4, 6: 0x7e0c8}
 CAR = 0x800
 
 # opponent_test_var's order
@@ -42,7 +45,10 @@ VARS = [(0x15d470, "brake"), (0x15d474, "lead"), (0x15d4b8, "ticks"), (0x15d4bc,
         (0xf74f0, "wander"), (0x15d47c, "bend drop"), (0x15d478, "bend slow"),
         (0x15d484, "behind"), (0xeab70, "random"), (0xeab78, "multiplier"), (0xeab74, "last"),
         (0x12da20, "race type"), (0x12da34, "police"), (0x15d480, "waiting"),
-        (0x15d154, "side 0"), (0x15d158, "side 1"), (0x12da9e, "rival car"), (0xf74a8, "chase off")]
+        (0x15d154, "side 0"), (0x15d158, "side 1"), (0x12da9e, "rival car"), (0xf74a8, "chasing"),
+        (0xf7510, "police looked"), (0x15d468, "long chases"), (0x12da24, "linked"),
+        (0xea81c, "ticket up"), (0xea820, "warning up"), (0xea824, "picture's time"),
+        (0x14ec30, "tickets"), (0x14ec34, "warnings"), (0x14ec3c, "finish"), (0x13c178, "result")]
 ZONE, CFG, RECS, LEAD, RIVAL, GRID = 0x15d29c, 0x15d2bc, 0x15d490, 0x15d48c, 0x13c270, 0x12dca0
 BY_ROAD, BY_RACE, TOP = 0x13c298, 0x13c274, 0x14ec44
 TOP_G = D.GLOBALS.index((0x14ea80 + 0x1c4, 4))     # top_speed[0] in drive_test_global
@@ -60,6 +66,17 @@ def pieces(name):
                 (40, W(pedal=BRAKE)), (40, W(63, GAS)), (30, W(0, GAS)), (100, W(pedal=GAS))]
     if name == "wait":
         return [(250, W(pedal=BRAKE)), (350, W(pedal=GAS))]
+    # past the police at speed, then stopped for it; a longer chase; stopped twice
+    if name == "chase":
+        return [(850, W(pedal=GAS)), (150, W(pedal=BRAKE)), (250, W(pedal=COAST))]
+    if name == "long":
+        return [(1100, W(pedal=GAS)), (150, W(pedal=BRAKE)), (300, W(pedal=COAST))]
+    if name == "again":
+        return [(850, W(pedal=GAS)), (150, W(pedal=BRAKE)), (150, W(pedal=COAST)),
+                (1200, W(pedal=GAS)), (150, W(pedal=BRAKE)), (300, W(pedal=COAST))]
+    if name == "twice":
+        return [(850, W(pedal=GAS)), (150, W(pedal=BRAKE)), (150, W(pedal=COAST)),
+                (700, W(pedal=GAS)), (150, W(pedal=BRAKE)), (250, W(pedal=COAST))]
     raise ValueError(name)
 
 
@@ -79,6 +96,10 @@ VARIANTS = [("as is", {}, {}),
             # the road given two lanes the other way (CY1 has none): the traffic placed
             # coming too (both sides' node bytes +4 patched)
             ("two-way", {}, {}),
+            # every pull-over a ticket (the warning's time 0): the second ends the race
+            ("tickets only", {0x15d2d8: 0}, {}),
+            # one ticket already: the next ends the race (arrested)
+            ("arrest", {0x15d2d8: 0, 0x14ec30: 1}, {}),
             ("before the start", {0x145c94: 250}, {}),
             # the player catching a slow opponent and passing it
             ("caught up", {0x145c94: 250}, {}, {0x170: 0x4000}),
@@ -110,18 +131,21 @@ RUNS = [("gas", "as is"), ("weave", "as is"), ("wait", "as is"), ("gas", "single
         ("weave", "ahead"), ("wait", "behind"), ("gas", "behind"), ("wait", "behind fast"),
         ("gas", "thrown"), ("wait", "thrown"), ("gas", "on its roof"), ("wait", "rolling"),
         ("wait", "both thrown"), ("wait", "both thrown roof"),
-        ("weave", "caught up later"), ("gas", "two-way"), ("weave", "two-way"), ("wait", "two-way")]
+        ("weave", "caught up later"), ("gas", "two-way"), ("weave", "two-way"), ("wait", "two-way"),
+        ("chase", "as is"), ("long", "as is"), ("twice", "as is"), ("twice", "tickets only"),
+        ("chase", "two-way"), ("again", "tickets only"), ("long", "arrest"), ("chase", "arrest")]
 
 
 def lib():
     import subprocess
-    out = "build/opponent_test.so"
+    out = "build/opponent_test_%d.so" % os.getpid()    # (several runs at once)
     subprocess.check_call(["cc", "-O1", "-g", "-fwrapv", "-shared", "-fPIC", "-o", out] +
                           ["port/src/" + f for f in SOURCES] +
                           ["tools/drive_test.c", "tools/timing_test.c", "tools/opponent_test.c", "tools/collide_test.c",
                            "-Iport/src"] +
                           subprocess.check_output(["sdl2-config", "--cflags", "--libs"]).decode().split())
     L = ctypes.CDLL(os.path.abspath(out))
+    os.unlink(out)
     P = ctypes.POINTER
     L.opp_test_var.restype = P(ctypes.c_int)
     L.opp_test_zone.restype = P(ctypes.c_short)
@@ -171,7 +195,10 @@ PORTED = [(0x7b34c, 0x7bf35), (0x7b178, 0x7b34a), (0x7cf04, 0x7cf68), (0x7cf98, 
           # the traffic waiting, placed and placed again
           (0x7e0c8, 0x7e209), (0x77d3c, 0x77de8), (0x77de8, 0x77e4c), (0x77c78, 0x77ca3),
           (0x77c20, 0x77c76), (0x7cac8, 0x7ccbf), (0x7c5b4, 0x7c7e5), (0x7c7e8, 0x7c938),
-          (0x7ccc0, 0x7cf01), (0x7c294, 0x7c3f6), (0x7c3f8, 0x7c4d3), (0x7c4d4, 0x7c5b4)]
+          (0x7ccc0, 0x7cf01), (0x7c294, 0x7c3f6), (0x7c3f8, 0x7c4d3), (0x7c4d4, 0x7c5b4),
+          # the police: its coming, the chase, the pull-over, the player's wait
+          (0x79500, 0x79727), (0x79728, 0x79b5f), (0x7aeb8, 0x7b12f), (0x1eb54, 0x1ebf0),
+          (0x7ea20, 0x7ea86)]
 
 
 def run(L, F, OF, path, scr, var, coverage=False, full=False):
@@ -206,11 +233,14 @@ def run(L, F, OF, path, scr, var, coverage=False, full=False):
     # the race cut down to the two (or the whole field: the police car stays parked,
     # its coming and going left out on both sides)
     if not full:
+        wr(s, 0x15d2f0, 0)          # (no police coming: settings +0x34)
         wr(s, 0x12da38, 2)
         s.write(BY_ROAD, struct.pack("<2i", 0, 1))
         s.write(BY_RACE, struct.pack("<2i", 0, 1))
     s.call(0x518c0)
     placed = [0]
+    pol = {"came": None, "chase": 0, "caught": 0}
+    f = lambda a, o: struct.unpack("<i", bytes(mu.mem_read(a + o, 4)))[0]
 
     def count_placed(mu, addr, size, u):
         placed[0] += 1
@@ -299,6 +329,7 @@ def run(L, F, OF, path, scr, var, coverage=False, full=False):
     # the opponent's globals
     for k, (a, nm) in enumerate(VARS):
         L.opp_test_var(k)[0] = rd(s, a)
+    L.opp_test_odds()
     z = L.opp_test_zone()
     for i, v in enumerate(struct.unpack("<12h", s.read(ZONE, 24))):
         z[i] = v
@@ -431,17 +462,26 @@ def run(L, F, OF, path, scr, var, coverage=False, full=False):
             if diff:
                 return "step %d (word %#x, steps %d, kinds %s, met %d, touched %d): %s" % (
                     n, w, st, kinds, met[0x1c6a4], met[0x2afb8], ", ".join(diff[:12]))
+            if full and n_cars > 2:
+                pc = bytes(mu.mem_read(cars[2] + 0x174, 4))
+                if pc[0] & 8 and bytes(mu.mem_read(cars[2] + 0x51a, 1))[0] & 4 and pol["came"] is None:
+                    pol["came"] = (n, f(cars[2], 0x48))
+                pol["chase"] += 1 if rd(s, 0xf74a8) else 0
+                pol["caught"] += 1 if bytes(mu.mem_read(cars[0] + 0x176, 1))[0] & 1 else 0
             wr(s, 0x145c94, st + 2)
             clock = s.i32(0xed100) + 3
             wr(s, 0xed100, clock)
             L.drive_test_global(13, 1, clock)
             n += 1
-    f = lambda a, o: struct.unpack("<i", bytes(mu.mem_read(a + o, 4)))[0]
     touched = ", %d times near, %d touching, %d hard" % (met[0x1c6a4], met[0x2afb8], met[0x1e591]) \
         if met[0x1c6a4] else ""
     if full:
         on = sum(1 for a in cars[3:] if f(a, 0x512) != 6)
         touched += ", %d placings, %d traffic cars on the road" % (placed[0], on)
+        if pol["came"]:
+            touched += "; the police out at step %d, node %d, %d steps chasing, %d caught, " \
+                "%d warnings, %d tickets, result %d" % (pol["came"] + (pol["chase"], pol["caught"],
+                rd(s, 0x14ec34), rd(s, 0x14ec30), rd(s, 0x13c178)))
     return "equal, %d steps (the player at node %d, the opponent at %d, %.1f m/s, lane place %.2f m%s)" % (
         n, f(cars[0], 0x48), f(opp, 0x48), f(opp, 0x15c) / 65536, f(opp, 0x80) / 65536, touched)
 
@@ -467,7 +507,7 @@ def main():
         print("%s %s" % (os.path.basename(p), r))
     for p in paths:
         for scr, var in RUNS:
-            if only and var not in only:
+            if only and var not in only and "%s %s" % (scr, var) not in only:
                 continue
             r = run(L, F, OF, p, scr, V[var], coverage, full)
             bad += not r.startswith("equal")

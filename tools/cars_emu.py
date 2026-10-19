@@ -9,6 +9,8 @@ walls 0x59294, the 3D roadside objects 0x66738 and the racers' markers 0x66b98 (
 shadows 0x8a094 are in). Writes build/shots/cars_<snapshot>_{orig,port,diff}.png.
 
     build/venv/bin/python tools/cars_emu.py cy1 build/snap/e3.bin [...]
+    CARS_POLICE=8,3 ...: the police car (never in view in the snapshots) put 8 m ahead and
+    3 m to the side of the player's car first
 """
 import ctypes, os, struct, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -54,11 +56,13 @@ class RaceCar(ctypes.Structure):
 
 def lib():
     import subprocess
-    out = "build/cars_test.so"
+    out = "build/cars_test_%d.so" % os.getpid()        # (several runs at once)
     subprocess.check_call(["cc", "-O1", "-g", "-shared", "-fPIC", "-o", out] +
                           ["port/src/" + f for f in SOURCES] + ["tools/timing_test.c", "tools/collide_test.c", "-Iport/src"] +
                           subprocess.check_output(["sdl2-config", "--cflags", "--libs"]).decode().split())
-    return ctypes.CDLL(os.path.abspath(out))
+    L = ctypes.CDLL(os.path.abspath(out))
+    os.unlink(out)
+    return L
 
 
 def original(s, n, node):
@@ -130,8 +134,35 @@ def port(s, name, L, n, node, cars):
     return bytes(fbuf)
 
 
+def police_in_view(s, along, across):
+    """a test (CARS_POLICE=along,across in metres): the police car (car 2, never in the
+    snapshots' view) put on the road ahead of the player's car, turned as it is, drawn
+    in place of the first traffic car in the order"""
+    addrs = [s.u32(0x13c24c + 4 * k) for k in range(s.i32(0x12da38))]
+    pl, pc = addrs[0], addrs[2]
+    g = lambda a, o: struct.unpack("<i", s.raw(a + o, 4))[0]
+    fwd = [g(pl, 0xa4 + 4 * j) for j in range(3)]
+    side = [g(pl, 0x8c + 4 * j) for j in range(3)]
+    at = [g(pl, 4 * j) + int(along * fwd[j]) + int(across * side[j]) for j in range(3)]
+    s.mu.mem_write(pc, struct.pack("<3i", *at))
+    for o in [0xc, 0x10, 0x14, 0x20] + [0x24 + 4 * i for i in range(9)] + [0x351, 0x365, 0x369, 0x39d]:
+        s.mu.mem_write(pc + o, struct.pack("<i", g(pl, o)))
+    node = g(pl, 0x48) + int(along / 4)
+    for o in (0x48, 0x341, 0x345):
+        s.mu.mem_write(pc + o, struct.pack("<i", node))
+    cam_node = struct.unpack("<i", s.raw(s.u32(0x143df4) + 0x38, 4))[0]
+    s.write(0x14e5d0 + node - cam_node, b"\x01")
+    n = s.i32(0x13c220)
+    for i in range(n):
+        if s.u32(0x13c224 + 4 * i) not in addrs[:2]:
+            s.write(0x13c224 + 4 * i, struct.pack("<I", pc))
+            break
+
+
 def load_cars(s, name, L):
     """the port's cars as the snapshot's, their pictures in the race's colours"""
+    if os.environ.get("CARS_POLICE"):
+        police_in_view(s, *[float(v) for v in os.environ["CARS_POLICE"].split(",")])
     addrs = [s.u32(0x13c24c + 4 * k) for k in range(s.i32(0x12da38))]
     racepal_emu.race_track(s, name, L)
     cars = []

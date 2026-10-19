@@ -1571,7 +1571,7 @@ the window and the horizon **`road_draw` `0x5a4f0(N = 0x136618, S = the camera's
   player). Cars with `+0x174` & 8 are **police**: `police_pull_over` `0x79728`. Cars with
   `+0x174` & 4: `ai_car_engine` `0x79e28` (past the finish they pull to the side; the gear
   from the speed against the table at `+0x308`, the engine's revs `+0x3c1` eased by 1/8).
-- **`police_pull_over` `0x79728`**: (for a police car chasing, `+0x175` & 4) once it has
+- **`police_pull_over` `0x79728`** (in full: §4.17): (for a police car chasing, `+0x175` & 4) once it has
   caught the player (the player's `+0x176` & 1, set when the police car is more than two
   nodes ahead, or level and both slower than 3) and both are stopped (speeds `+0x15c` /
   `+0x70` under 1), the player gets **a warning** (`0x14ec34` + 1, `hud_warning_on` `0x2d2c8`) if the chase's
@@ -2242,8 +2242,7 @@ settings read from the program equal to the snapshots' blocks. With two cars, th
 several cars in the lanes (`0x78c88` 241 of 618 instructions run, `0x7850c` 24 of 106,
 `0x78660`, `0x7e548`, `0x7e5e4` none) wait for the traffic to be checked. `--race cy1` races one
 opponent (`RENFS_SEED=n` for its random numbers). The traffic's coming and going: §4.16.
-Not yet: the police's coming (`0x79500`), the police (`0x79728`, `0x786d4`'s police branch,
-`chase_drop` `0x781ac`), EXPLODE's push (`0x78370`), the horns and engines' sounds.
+The police: §4.17. Not yet: EXPLODE's push (`0x78370`), the horns and engines' sounds.
 
 ### 4.14 Cars meeting cars (2026-10-19)
 
@@ -2438,18 +2437,100 @@ body's halves the model's / 2, `+0xbc`, `+0x84`, the radius `0x2c2d8`); so the r
 
 **Ported (`port/src/opponent.c`, `crash.c`, `car.c`, `race.c`): equal to the original.**
 `tools/opponent_emu.py --full`: the whole field of the snapshot (9 cars, the police car
-parked: its coming `0x79500` and pulling over `0x79728` left out on both sides), every
+parked; its coming and chase since added, §4.17), every
 car stepped by its kind (6 = `0x7e0c8`) and compared every step, the counts `0x15d480`,
 `0x15d154/8`, `0x12da9e`, `0xf74a8` too; 419 runs (the 34 settings and 3 "two-way")
 on all 11 snapshots, up to 26 placings in a run. **CY1 is one-way** (every node's byte 4 =
 0x02: no lanes the other way), so all its traffic goes the racers' way; the "two-way"
 settings give every node two lanes each way (byte 4 = 0x22, in the snapshot and the
 port alike) to run the coming side too (`place_at`'s 0x7cbe2.., `place_speed`'s 0x7c576..).
-Never run yet: `place_racer_grid` (the rival a traffic car) and `0x77d3c`'s police branch.
+Never run yet: `place_racer_grid` (the rival a traffic car).
 In `--race cy1` the six traffic cars wait off the road, come on ahead of the racers from
 about 25 s (at most 4 at a time), and go back to wait when they fall out of reach
 (`build/shots/traffic_beside.png`, `traffic_passing.png`, `traffic_ahead.png`). Not yet:
-the police's coming (`0x79500`), the chase, the horns.
+the horns. The police: §4.17.
+
+### 4.17 The police (2026-10-20)
+
+The police car is car 2 (`+0x174` & 8; `0x13c254`), with the police on (`0x12dd08`,
+`0x12da34`). **At the start** it is a computer's car like the traffic (kind 3, part 7); its
+first step (`car_move_on`, progress < 2) places it behind the player's car (node − 18, on a
+one-way road), not to wait, and `place_flags` takes it out of the race (part & ~4: not
+driven, not in the tick, not drawn). The snapshots hold it so, at node 2.
+
+- **`police_come` `0x79500`** (in `traffic_police_tick` after the lead, unless the traffic
+  is off, `0x12da28` & 4): only with settings +0x34 (`0x15d2f0`, the traffic on the road:
+  0 in a time trial and a circuit's head to head) and not over a link (`0x12da24` = 1).
+  Past an open road's finish (`0x13c164`) `chase_drop(1)`. When the player's node passes
+  `0xf7510` (the last looked at) and the police car is off the road, the nodes from
+  `0xf7510` + 0x32 to the player's + 0x31 (below the head's short at +6 × 4) are looked
+  at: the first marked for the police (node `+0x1a` & 1) is tried by EA's random numbers
+  (`0xeab70`): bits 8..14 of the next > `0xf7500`[(+0x1a & 0x18) >> 3] (32, 64, 96, 128
+  in 128) and nothing more until the player moves on; else the police car is placed there
+  (`place_at`, wait 0) at the road's edge the mark names (& 2 the left: half its width
+  in from the left edge, else from the right), facing the racers' way unless the left of
+  a two-way road; `+0x176` & 0x87, its stretch the player's, the chase bits off,
+  `0xf74a8` 0, part | 4, and parked (`+0x176` | 2: its target speed 0, `0x786d4`'s end)
+  unless the mark has 4. `0xf7510` = the player's node. CY1's marks: nodes 170 (0xd), 379,
+  682, 920, 1008 (0xb, the only parked one), 1112, 1333, 1450.
+- **The chase** (`police_pull_over` `0x79728`, in the tick for a police car before its lane
+  scores; edx the lane 0..7, ebx the scores): `0xf74a8` (**chasing**) starts when the
+  police car is within 5 nodes of the player's and the player is faster than the section's
+  limit (`0xf74a0` byte 1), the ticks `0x15d4b8` (4 a tick) then from 0. While chasing
+  and not yet on it: `+0x175` | 4 if it is behind the player and going the racers' way,
+  else | 0x20 (it turns first); its parking dropped once the player is past. The player's
+  `+0x175` | 4 while it chases (0x24), | 8 within 10 nodes (the radar, the map's dot). A
+  chasing police car (`+0x175` & 4) behind the player sets its own `+0x176` | 8; more than
+  2 nodes ahead, or level with both slower than 3, it has **caught** the player
+  (`+0x176` | 1 on the player's car: its steering `0x1c800` turns it towards the police).
+  Chasing or caught, its lane scores lean to the right edge (s0 + 0x2e, s2 ∓ 0x2e by the
+  lanes, `0x2e0000`) unless a roadside object is at its node or the next two
+  (`car_object_at_node` `0x1eb54`: the car's place in the placements walked, not onto the
+  last nor back onto the first). Its target speed (`0x786d4`): the leader's + settings
+  +0x18, and the player's `+0x70` when 4 nodes ahead, or level (−2..3) in the first 900
+  ticks with the player over the chase limit (byte 2).
+- **Pulled over**: with the chase on (`+0x175` & 4), the player not thrown about, both
+  under 1 m/s and caught: a **warning** if the ticks are under settings +0x1c (400), else
+  a **ticket** (`0x14ec34` / `0x14ec30` + 0x1d2 · slot + 1 while racing, `hud_warning_on`
+  `0x2d2c8` / `hud_ticket_on` `0x2d290`: `0xea820` / `0xea81c` 1, `0xea824` −1000); the
+  player's body `+0x84` = settings +0x24 / +0x28 (60 steps each, 1 × 60 in the stores) and
+  kind 1 (through its `+0x88`, its own pointer; the crash's sound after it tests kind 4
+  and never plays); the police car's `+0x175` & ~4, `+0x176` & ~8, the player's `+0x176`
+  & ~1, `0xf74a8` = `0x15d4b8` = 0; `0x7c030` (the chase dropped, the cars put back: the
+  police car placed again behind, out of the race); `player_pull_aside` `0x7aeb8` (the lane
+  ≥ 0: always the right): moved across to half a lane past the right lanes (at most the
+  edge less half its width; the left's mirror image), turned with the road (+0x16, +0x12
+  wrapped and negated, +0x14 << 10), stopped. **The second ticket** while racing:
+  `0x13c178` = `0x13c17c` = 4 (arrested), the finish `0x14ec3c` and `0x14ec40` 0.
+  `0x15d468` + 1 for each chase still on as the ticks pass +0x1c (only counted).
+- **`drive_player_wait` `0x7ea20`** (kind 1): `+0x84` counted down; at 0 kind 2,
+  `hud_ticket_off` `0x2d2e4` (if one was up, `0xea824` = the step counter; both off), the
+  clutch 0, the gear −1, the automatic in neutral (`+0x3e9` 2 unless by hand), `0xf6b70` 1.
+- **`police_come`'s twin in `0x77d3c`**: a police car fallen out of the racers' reach is
+  placed again ahead once (`+0x176` bits 4..6 count it: (`+0x174` dword >> 20) + 1); the
+  second time `chase_drop(1)` and it stays.
+- **The picture** (`0x31684` in the seat, `0x314e4` outside, while `0xea81c` or `0xea820`):
+  `load_ticket_picture` `0x30424` instead of the dashboard (and the view): once,
+  `SIMDATA/MISC/` + `TICKET`/`WARN` (`TICKEG`/`GWARN` with kilometres, `0x15d140`) + `D`
+  racing / `R` the replay + `H` 640x480 / `L` (`0x12c308`) + `.qfs`, the race's palette read
+  back (`0x12ba30`), its `!pal` set at 0..253 (6 bits); its "scrn" (320x200) drawn at its
+  place every frame. The race's frame still runs underneath: while it is up the police
+  car (slot 2, `+0x176` & 0xc) swaps palette entries 0xfa..0xfd between `0xf6de0` and
+  `0xf6dec` every 16 steps (`0x66971`, `0xf6ff0`, `0x14e61c`) instead of the racers'
+  marks, over the picture's own colours there. Once both are off (`ticket_picture_off`
+  `0x306e8`) the file is let go, the race's palette set back (unless the race is over)
+  and the dashboard drawn again.
+
+**Ported (`port/src/opponent.c`, `drive.c`, `hud.c`, `cardraw.c`, `race.c`): equal to the
+original.** `tools/opponent_emu.py --full` now runs `0x79500` and `0x79728` on both sides
+(the player's kind 1 too) and compares the counts (`0xf7510`, `0x15d468`, `0xea81c/20/24`,
+the tickets, warnings, finish and `0x13c178`): all 495 runs on all 11 snapshots equal (45 settings, among them chases with a stop, a long one, two stops, every stop a ticket and one ticket already: 9 warnings, 32 tickets, 5 arrests). The police drawn in view
+(`CARS_POLICE=8,3 tools/cars_emu.py`: car 2 moved ahead in the snapshot and put in the
+order and `0x14e5d0`) pixel for pixel on all 11. In `--race cy1` (`RENFS_SEED=6`, the
+throttle held, then the brake) the police comes out at node 170, chases, pulls up and
+gives a ticket (`build/shots/police_*.png`). Not yet: the view from the police car
+(camera mode 7) and the camera sent back to the player as it is placed, the siren and
+the horns, the arrest's film (`fe_cop_ticket_movie`), the replay's palette (`0x55ee0`).
 
 ## 5. The original in DOSBox (2026-10-19)
 

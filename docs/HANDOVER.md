@@ -278,9 +278,23 @@ Ghidra project and `build/decomp`, one command). The git history was started aga
   police car parked) and compares every car every step: 419 runs on all 11
   snapshots, the coming side through a "two-way" setting (every node given lanes both
   ways). `--race cy1` has the traffic (`build/shots/traffic_beside.png`,
-  `traffic_passing.png`, `traffic_ahead.png`). The police car waits out of sight. Fixed
-  on the way: the race's top speeds are kept for all 9 cars (the ninth wrote past the
-  port's table), and the rival's size is its PDN's.
+  `traffic_passing.png`, `traffic_ahead.png`). Fixed on the way: the race's top speeds
+  are kept for all 9 cars (the ninth wrote past the port's table), and the rival's size
+  is its PDN's.
+
+- **The police** (`port/src/opponent.c`, `hud.c`, `cardraw.c`, NOTES §4.17): the police
+  car parked behind the grid comes out ahead at the road's police marks (`0x79500`, by
+  chance), chases a player who speeds past within 5 nodes, catches up and pulls over
+  with the player (`0x79728`): a warning for a short chase, else a ticket, the player
+  pulled to the right and held (kind 1, `0x7ea20`) while the full-screen picture shows
+  (`TICKETDL`/`WARNDL`, `0x30424`), the police lights flashing in the palette under it;
+  the second ticket ends the race (arrested, result 4). **Equal**: `opponent_emu.py
+  --full` with both routines on (all 495 runs: 9 warnings, 32 tickets, 5 arrests); the police car drawn in view pixel for
+  pixel (`CARS_POLICE=8,3 tools/cars_emu.py`). `RENFS_SEED=6 --race cy1` with the
+  throttle held then the brake gives a ticket (`build/shots/police_*.png`). Fixed on the
+  way: the race's step counter never reached the road's drawing (the animated objects
+  stood still in `--race`). Not yet: the view from the police car (camera 7), the siren,
+  the arrest's film.
 
 **Progress page for Danik**: https://claude.ai/artifact/VZdxTpYC3oLXYeBVJpoDoM (every step,
 its percent done and weight). Update its steps file after each finished step.
@@ -309,10 +323,10 @@ races 320x200 / 320x240; commit locally as the work goes.
    the racers' markers, the dashboard, the map and the mirror in it, and the player's car
    drives and crashes (equal step for step), and the status bar's numbers and the race's
    timing, the camera outside and the crash's smoke, the opponent's driving, and cars
-   meeting cars, the roadside objects knocked over, and the traffic. Next: the police
-   (its coming `0x79500`, the chase and pulling over `0x79728`, `0x786d4`'s police
-   branch, `0x77d3c`'s police branch, the camera mode 7), the sounds, the race's keys
-   (`race_keys` `0x47c88`: the cameras, the watched car).
+   meeting cars, the roadside objects knocked over, the traffic and the police. Next:
+   the sounds (the engines, the horns, the siren, the crashes: `0x80a60`, `0x53214`..),
+   the race's keys (`race_keys` `0x47c88`: the cameras, among them 6 and 7 from the car
+   ahead and the police car, the watched car).
    Open: who writes `0x136618` (28 sections drawn: a detail setting?). The walls `0x59294`
    and the circuits' sky ring `0x4ace8` can be checked on CY1 memory with made-up input,
    or on snapshots of another track (`tools/nfsdos.py`).

@@ -33,8 +33,18 @@ typedef struct {
     int sides[2];              /* 0x15d154, 0x15d158: traffic cars placed coming the
                                   other way, and going the racers' way */
     int rival_car;             /* 0x12da9e: the rival's car (9: a traffic car) */
-    int chase_off;             /* 0xf74a8: (the police's; cleared as a police car is
-                                  placed) */
+    int chasing;               /* 0xf74a8: the police chasing the player's car (it sped
+                                  past within 5 nodes of the police car) */
+    int come_node;             /* 0xf7510: the player's node when the police's coming
+                                  was last looked at */
+    int come_odds[4];          /* 0xf7500: a police spot's chance in 128 by its kind
+                                  (the node's +0x1a & 0x18) */
+    int long_chases;           /* 0x15d468: chases that ran past the warning's time */
+    int linked;                /* 0x12da24: 1 a race over a link (no police coming) */
+    int ticket_up, warning_up; /* 0xea81c, 0xea820: the ticket's or warning's picture
+                                  shown (the race's view replaced) */
+    int msg_time;              /* 0xea824: -1000 as one is given, the step counter as it
+                                  goes */
     int wander;                /* 0xf74f0: 1 in this many steps the traffic picks another
                                   place in its lane (0x28) */
     int bend_drop;             /* 0x15d47c: the last bend's turn (7e64c) */
@@ -77,6 +87,10 @@ int opponent_near_players(const race_car *c);
 /* traffic_police_tick 0x7a040: every fourth step, the cars refreshed and the target
    speeds and lanes chosen */
 void opponent_tick(void);
+/* drive_player_wait 0x7ea20: a step of a player's car pulled over by the police (kind
+   1): it stands while the ticket or warning is shown, then is driven again (kind 2),
+   in neutral */
+void opponent_player_wait(race_car *c);
 /* 0x786d4's part for the computer's cars: its target speed (+0x160) */
 void opponent_target_speed(race_car *c);
 /* 0x7dbd8's tail: a computer's car sometimes picks another place in its lane */

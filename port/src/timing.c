@@ -85,10 +85,11 @@ void timing_start(void)
         g_racers = g_field;
         g_timing.humans = g_humans;
     }
-    /* 0x685e4: each racer's results cleared (the record's other words, the best times
-       and the tickets, come with the race's end) */
+    /* 0x685e4: each racer's results cleared (the record's other words, the best times,
+       come with the race's end) */
     for (p = 0; p < g_racers && p < DRIVE_PLAYERS; p++) {
         g_timing.finish[p] = 0;
+        g_timing.tickets[p] = g_timing.warnings[p] = 0;
         g_timing.place[p] = 0;
         g_drive.top_speed[p] = 0;
         for (k = 0; k < DRIVE_LAPS; k++)

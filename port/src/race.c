@@ -156,7 +156,7 @@ int race_test(const char *name)
     race_camera cam;
     road_window win;
     const view_window *w;
-    int i, eye, horizon, redline, near;
+    int i, k, eye, horizon, redline, near;
     hud_car driver;
     hud_map_state map;
     unsigned start;
@@ -212,8 +212,9 @@ int race_test(const char *name)
     /* the computer's cars (car_setup 0x51200; their size the PDN's or the model's,
        0x512e8, as car_load left it): driven by the computer (kind 3), a metre along
        until their first step: the opponent's puts it on the road from the grid, the
-       traffic's sends each car off the road to wait (kind 6). The police car (car 2)
-       waits out of sight for now (its coming and going: with the police) */
+       traffic's sends each car off the road to wait (kind 6), the police car's (car 2)
+       puts it behind the player's, off the race (part without 4) until it comes out
+       ahead (0x79500) */
     for (i = 1; i < RACE_CARS; i++) {
         cars[i].slot = i;
         cars[i].state = 3;
@@ -223,7 +224,6 @@ int race_test(const char *name)
             cars[i].bits[0] |= 4;
     }
     cars[2].bits[0] |= 8;
-    cars[2].state = 6;
     eye = S32(cars[0].spec, 0x36c);         /* the driver's eyes above the road */
     horizon = S32(cars[0].spec, 0x370);     /* where the horizon is in the view */
     redline = S32(cars[0].spec, 0xac);      /* the engine's red line */
@@ -281,7 +281,6 @@ int race_test(const char *name)
     memcpy(g_car_marks, marks, RACE_CARS);
     for (i = 0; i < RACE_CARS; i++)
         cars[i].part = 7;      /* (+0x51a: driven, their finish checked, meeting the others) */
-    cars[2].part = 3;          /* (the police car's, until it comes: 0x7c3f8) */
     /* the race's timing (race_start 0x506dc): the settings' laps (CONFIG.DAT +0xb1,
        0x12dd14), the race length's times (0x12dd24) */
     g_timing.lap_limit = config_word(0xb1);
@@ -385,6 +384,8 @@ int race_test(const char *name)
            screen through its windows (0x31684), or from outside the HUD's lists (0x314e4) */
         raster_window(g_hud_view.pix, g_hud_view.w, win.x, win.y, win.x + win.w, win.y + win.h);
         sky_draw(cam.yaw, m, &win, 0);
+        g_car_ticket = g_opp.ticket_up || g_opp.warning_up;
+        g_road_steps = g_drive.steps;
         road_objects_start();
         road_draw(DRAWN, cam.node, near, &win);
         g_hud.steps = g_drive.steps;
@@ -398,7 +399,10 @@ int race_test(const char *name)
         memcpy(map.places, g_timing.places, sizeof map.places);
         map.driver = cam.mode == 0;
         hud_map(&map);
-        if (cam.mode == 0) {
+        k = hud_ticket(g_opp.ticket_up, g_opp.warning_up, g_timing.result);
+        if (k == 1)
+            ;                  /* the police's ticket or warning instead */
+        else if (cam.mode == 0) {
             /* back in the driver's seat: the whole dashboard again (0x143e68, 0x2d284) */
             if (!in_seat)
                 hud_redraw_due();
@@ -406,7 +410,8 @@ int race_test(const char *name)
         } else
             hud_outside_frame(&driver, redraw, cam.ahead->layout);
         in_seat = cam.mode == 0;
-        g_view_redraw = 0;
+        /* (after the ticket, the screen round the view drawn again: 0xeaaa8) */
+        g_view_redraw = k == 2;
         video_retrace();
     }
 

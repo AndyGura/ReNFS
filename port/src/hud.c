@@ -374,6 +374,60 @@ void hud_redraw_due(void)
     g_redraw = 1;
 }
 
+/* ---- the police's ticket or warning (0x30424, 0x306e8) -------------------------------- */
+
+static fsh_file g_ticket;
+static int g_ticket_on;
+static unsigned char g_ticket_saved[768];      /* 0x12ba30: the race's palette */
+
+int hud_ticket(int ticket, int warning, int over)
+{
+    shape s;
+
+    if (!ticket && !warning) {
+        if (!g_ticket_on)
+            return 0;
+        /* 0x306e8: the picture let go, the race's colours back (unless the race is over)
+           and the dashboard drawn again */
+        fsh_free(&g_ticket);
+        g_ticket_on = 0;
+        if (!over)
+            video_palette(g_ticket_saved, 0, 0xfe);
+        hud_redraw_due();
+        return 2;
+    }
+    if (!g_ticket_on) {
+        char path[48];
+
+        /* 0x30424: SIMDATA/MISC's TICKET or WARN (TICKEG, GWARN in kilometres), D
+           racing or R the replay, L the low detail's 320x200 */
+        snprintf(path, sizeof path, "SIMDATA/MISC/%s%c%c.QFS",
+                 ticket ? (g_hud.kmh ? "TICKEG" : "TICKET") : (g_hud.kmh ? "GWARN" : "WARN"),
+                 g_hud.running ? 'D' : 'R', 'L');
+        if (!fsh_load(&g_ticket, path)) {
+            fprintf(stderr, "renfs: %s is missing\n", path);
+            return 0;
+        }
+        g_ticket_on = 1;
+        video_get_palette(g_ticket_saved, 0, 256);
+        /* its colours over the race's, but the last two (setpalette 0, 0xfe); (in the
+           replay through 0x55ee0: not yet) */
+        if (g_hud.running && fsh_find(&g_ticket, "!pal", &s)) {
+            unsigned char p8[768];
+            int k;
+
+            for (k = 0; k < 3 * 0xfe; k++)
+                p8[k] = (unsigned char)((s.head[0x10 + k] & 0x3f) << 2);
+            video_palette(p8, 0, 0xfe);
+        }
+    }
+    window_set(&g_hud_screen);
+    clip_set(0, g_win.w, 0, g_win.h);                  /* 0x2d314 */
+    if (fsh_find(&g_ticket, "scrn", &s))
+        blit_own(s.head, COPY);
+    return 1;
+}
+
 static int u16(const unsigned char *p)
 {
     return p[0] | p[1] << 8;
@@ -769,8 +823,7 @@ void hud_frame(const hud_car *c)
     /* the wheel's pictures turned left: steering left, or right on a mirrored track */
     int left = g_hud.mirrored ? c->steer >= 0 : c->steer < 0;
 
-    /* (0x13c17c: nothing; the tickets 0xea81c, 0xea820: 0x30424; 0x306e8: the
-       dashboard's pictures loaded again: not yet) */
+    /* (0x13c17c: nothing; the police's ticket or warning instead: hud_ticket) */
     if (g_redraw)
         hud_redraw();
     window_set(&g_hud_screen);
@@ -885,8 +938,8 @@ static void small_tach(const hud_car *c)
 
 void hud_outside_frame(const hud_car *c, int redraw, int layout)
 {
-    /* (0x13c17c: nothing; the tickets 0xea81c, 0xea820; 0x306e8; the background again
-       after them, 0xeaaa8: not yet) */
+    /* (0x13c17c: nothing; the police's ticket or warning instead, and the background
+       again after them, 0xeaaa8: hud_ticket) */
     if (redraw) {
         /* the dial into the view's picture, then all of it to the screen */
         window_set(&g_hud_view);

@@ -586,7 +586,7 @@ static void place_flags(race_car *c)
     if (c->bits[1] & 0x20)
         c->bits[1] = (c->bits[1] & 0xdb) | 4;
     else if (POLICE(c))
-        g_opp.chase_off = 0;
+        g_opp.chasing = 0;
     if (POLICE(c) && !(c->bits[1] & 4))
         c->part &= ~4;
 }
@@ -702,12 +702,25 @@ static void place(race_car *c, int wait)
 }
 
 /* 0x77d3c: a traffic car out of the racers' reach placed again ahead of a racer: in its
-   stretch, else the next one's, else back to waiting off the road. (A police car's
-   return: with the police) */
+   stretch, else the next one's, else back to waiting off the road. A police car left
+   behind is placed again ahead of the player once (counted in +0x176's bits 4..6); the
+   second time its chase is dropped and it stays where it is */
 static void place_again(race_car *c)
 {
-    if (g_field > 2 || POLICE(c))
+    if (g_field > 2)
         return;
+    if (POLICE(c)) {
+        int n = (c->bits[2] >> 4) + 1;
+
+        if (n >= 2) {
+            opponent_chase_drop(1);
+            return;
+        }
+        c->bits[2] = (unsigned char)((c->bits[2] & 0x8f) | n << 4);
+        g_cars[2]->zone = g_cars[0]->zone;
+        place(c, 0);
+        return;
+    }
     while (c->zone < 2) {
         place(c, 0);
         if (!opponent_near(c->node))
@@ -761,6 +774,240 @@ void opponent_wait(race_car *c)
     g_opp.waiting--;
     c->state = 3;
     place_again(c);
+}
+
+/* ---- the police (NOTES §4.8) ---------------------------------------------------------- */
+
+/* 0x79500, every fourth step with the traffic on: the police car brought out ahead of
+   the player's car. Past an open road's finish its chase is dropped. While the police
+   car is not on the road (part & 4), each node the player's car has newly reached is
+   looked at 50 nodes on: at a node marked for the police (+0x1a & 1), by a chance of
+   its kind's odds in 128 (else nothing more till the player moves on), the police car
+   is placed there standing by the road's edge the mark names (& 2 the left), facing
+   the racers' way unless that is the left of a two-way road; parked (+0x176 & 2) unless
+   the mark says it drives off (& 4) */
+static void police_come(void)
+{
+    race_car *pl = g_cars[0], *pc = g_cars[2];
+    int at = pl->node, n;
+
+    if (!CFG(0x34) || g_opp.linked == 1)
+        return;
+    if (at > g_drive.last_node)
+        opponent_chase_drop(1);
+    if (at <= g_opp.come_node)
+        return;
+    for (n = g_opp.come_node + 0x32; !(pc->part & 4) && n <= at + 0x31; n++) {
+        const unsigned char *nd = node_ptr(n);
+        int across, side;
+
+        if (n >= (short)(g_track.head[6] | g_track.head[7] << 8) * 4 || !(nd[0x1a] & 1))
+            continue;
+        if ((int)((rnd() >> 8) & 0x7f) > g_opp.come_odds[(nd[0x1a] & 0x18) >> 3])
+            break;
+        pc->bits[2] &= 0xf7;
+        if (nd[0x1a] & 2)
+            across = pc->body.half[0] - (int)((unsigned)nd[2] << 13);
+        else
+            across = (int)((unsigned)nd[3] << 13) - pc->body.half[0];
+        side = !((node_ptr(0)[4] >> 4 & 15) && (nd[0x1a] & 2));
+        pc->bits[2] &= 0x8f;
+        pc->zone = pl->zone;
+        pc->bits[1] &= ~0x24;
+        pc->bits[2] &= ~0x08;
+        g_opp.chasing = 0;
+        place_at(pc, n, side, across, 0);
+        pc->part |= 4;
+        if (!(node_ptr(n)[0x1a] & 4))
+            pc->bits[2] |= 2;
+        break;
+    }
+    g_opp.come_node = at;
+}
+
+/* 0x1eb54: a roadside object placed at the node? The car's place in the TRI's
+   placements (+0x4ea its node, +0x4ee its index) walked there (not onto the last one,
+   nor back onto the first) */
+static int object_at(race_car *c, int node)
+{
+    const unsigned char *pl = g_track.placements;
+#define PLACED(i) rec32(pl, (i) * 16)
+
+    if (node >= c->obj_node) {
+        while (PLACED(c->obj_index + 1) != -1) {
+            if (node == c->obj_node)
+                return 1;
+            c->obj_node = PLACED(++c->obj_index);
+            if (node < c->obj_node)
+                return 0;
+        }
+        return 0;
+    }
+    while (c->obj_index) {
+        if (node == c->obj_node)
+            return 1;
+        c->obj_node = PLACED(--c->obj_index);
+        if (node > c->obj_node)
+            return 0;
+    }
+    return 0;
+#undef PLACED
+}
+
+/* 0x7aeb8: a player's car pulled over: stood still at the road's edge (right: half a lane
+   past the right's lanes, short of the edge by half its width; else the left's), turned
+   with the road */
+static void pull_aside(race_car *c, int right)
+{
+    const unsigned char *nd = node_ptr(c->node);
+    vec3 rel = { c->pos.x - c->road_at.x, c->pos.y - c->road_at.y, c->pos.z - c->road_at.z };
+    vec3 s = c->road_side;
+    int x, lim, w, a;
+
+    if (right) {
+        w = lane_width(nd[4] & 15, nd[1] >> 3) << 8;
+        x = (nd[4] & 15) * w + half(w);
+        lim = (int)((unsigned)nd[3] << 13) - c->body.half[0];
+        if (x > lim)
+            x = lim;
+    } else {
+        w = lane_width(nd[4] & 15, nd[1] >> 3) << 8;
+        x = -w * (nd[4] >> 4 & 15) - half(w);
+        lim = c->body.half[0] - (int)((unsigned)nd[2] << 13);
+        if (x < lim)
+            x = lim;
+    }
+    x -= p8(rel.x, s.x) + p8(rel.y, s.y) + p8(rel.z, s.z);
+    memcpy(c->turn, &c->road_side, sizeof c->turn);
+    c->yaw_rate = 0;
+    c->yaw = (int)((unsigned)(node_i32(c->node, 0x16) >> 16) << 10);
+    a = (int)((unsigned)(node_i32(c->node, 0x12) >> 16) << 10);
+    if (a > 0x800000)
+        a -= 0x1000000;
+    else if (a < -0x800000)
+        a += 0x1000000;
+    c->pitch = -a;
+    c->roll = (int)((unsigned)(node_i32(c->node, 0x14) >> 16) << 10);
+    c->speed = c->side_speed = 0;
+    c->vel.x = c->vel.y = c->vel.z = 0;
+    c->pos.x += p8(s.x, x);
+    c->pos.y += p8(s.y, x);
+    c->pos.z += p8(s.z, x);
+}
+
+/* 0x7c030: the cars put back as after a player's crash, a chase dropped first */
+static void put_back_all(void)
+{
+    if (g_drive.chase)
+        opponent_chase_drop(1);
+    opponent_put_back();
+}
+
+/* police_pull_over 0x79728, every fourth step for a police car on the road, before its
+   lane is chosen (l, the scores s): the chase. Once it has caught the player's car
+   (+0x176 & 1: more than 2 nodes ahead of it, or level and both slower than 3) and both
+   stand, the player gets a warning if the chase was short (the ticks under the
+   settings' +0x1c), else a ticket, waits (kind 1) and is pulled aside; the cars are put
+   back. The second ticket ends the race (arrested). Chasing or caught, it pulls over to
+   the right where no roadside object is near. Within 10 nodes it is near (the
+   player's +0x175 & 8: the radar); within 5 with the player faster than the road's
+   limit, the chase starts */
+static void police_pull_over(race_car *c, int l, int *s)
+{
+    race_car *pl = g_cars[0];
+    int at = pl->node, d = c->node - at, lim = CFG(0x1c), ad;
+
+    if (d < 0 && (c->bits[1] & 0x24) && !(c->bits[2] & 8))
+        c->bits[2] |= 8;
+    if (lim <= g_opp.ticks && g_opp.ticks - 4 < lim && (c->bits[1] & 0x24) && g_drive.state == 1)
+        g_opp.long_chases++;
+    if ((c->bits[1] & 4) && !pl->crashing) {
+        if (c->road_speed < 0x10000 && pl->speed_abs < 0x10000 && (pl->bits[2] & 1)) {
+            int p = pl->slot;
+
+            if (lim > g_opp.ticks) {
+                if (g_drive.state == 1)
+                    g_timing.warnings[p]++;
+                g_opp.warning_up = 1;
+                g_opp.msg_time = -1000;
+                pl->body.honks = CFG(0x24);
+            } else {
+                if (g_drive.state == 1)
+                    g_timing.tickets[p]++;
+                g_opp.ticket_up = 1;
+                g_opp.msg_time = -1000;
+                pl->body.honks = CFG(0x28);
+            }
+            /* (then the crash's sound if the car watched is thrown about: it was just
+               made to wait, so never) */
+            pl->state = 1;
+            c->bits[1] &= ~4;
+            c->bits[2] &= ~8;
+            pl->bits[2] &= 0xfe;
+            g_opp.chasing = 0;
+            g_opp.ticks = 0;
+            put_back_all();
+            pull_aside(pl, l >= 0);
+            if (g_timing.tickets[p] > 1 && g_drive.state == 1) {
+                g_timing.result = 4;
+                g_timing.finish[p] = 0;
+            }
+        } else if (d > 2 || (d >= 0 && pl->speed_abs < 0x30000 && c->road_speed < 0x30000))
+            pl->bits[2] |= 1;
+    }
+    if ((c->bits[1] & 0x80) || (pl->bits[2] & 1)) {
+        int n = c->node, blocked, left, right;
+        const unsigned char *nd;
+
+        blocked = object_at(c, n) || object_at(c, n + 1) || object_at(c, n + 2);
+        nd = node_ptr(n);
+        left = nd[4] >> 4 & 15;
+        right = nd[4] & 15;
+        if (!left && right > 2 * l && !blocked) {
+            s[0] += 0x2e0000;
+            if (2 * l + 1 == right)
+                s[2] += 0x2e0000;
+            else
+                s[2] -= 0x2e0000;
+        } else if (!blocked) {
+            s[0] -= 0x2e0000;
+            s[2] += 0x2e0000;
+        }
+    }
+    ad = iabs(d);
+    if (c->bits[1] & 0x24)
+        pl->bits[1] |= 4;
+    if (ad < 10 && !(c->bits[1] & 0x80)) {
+        pl->bits[1] |= 8;
+        if (ad < 5 && !g_opp.chasing && limit_at(at, 1) < pl->road_speed) {
+            g_opp.ticks = 0;
+            g_opp.chasing = 1;
+        }
+        if (g_opp.chasing && c->node < at && (c->bits[2] & 2))
+            c->bits[2] &= 0xfd;
+        if (g_opp.chasing && !(c->bits[1] & 4)) {
+            if (!(c->bits[1] & 0x10) && c->node < at)
+                c->bits[1] |= 4;
+            else
+                c->bits[1] |= 0x20;
+        }
+    }
+}
+
+void opponent_player_wait(race_car *c)
+{
+    if (--c->body.honks > 0)
+        return;
+    c->state = 2;
+    /* (0x2d2e4: the picture taken down) */
+    if (g_opp.ticket_up || g_opp.warning_up)
+        g_opp.msg_time = g_drive.steps;
+    g_opp.ticket_up = g_opp.warning_up = 0;
+    c->clutch = 0;
+    c->gear = -1;
+    if (c->gearbox)
+        c->gearbox = 2;
+    g_crash.respawned = 1;
 }
 
 /* ---- a step (drive_opponent 0x7b34c) -------------------------------------------------- */
@@ -928,7 +1175,7 @@ void opponent_chase_drop(int p)
         pc->bits[1] &= 0xdb;
         pc->bits[2] &= 0x87;
     }
-    g_opp.chase_off = 0;
+    g_opp.chasing = 0;
 }
 
 /* 0x7c030's loop: a player's car put back on the road after its crash puts back the
@@ -950,7 +1197,7 @@ void opponent_put_back(void)
         far = !opponent_near(c->node);
         c->bits[1] &= 0xdb;
         c->bits[2] &= 0xf7;
-        g_opp.chase_off = 0;
+        g_opp.chasing = 0;
         k = c->state;
         if (k != 5 && k != 4 && !(c->bits[0] & 8) && !far)
             continue;
@@ -1109,7 +1356,16 @@ void opponent_target_speed(race_car *c)
 
         if (v > c->speed_to)
             c->speed_to = v;
-        /* (a police car on a chase follows the player's car: not yet) */
+        /* a police car on a chase: well ahead of the player's car, or level with it
+           early in the chase while the player is faster than the road's chase limit,
+           it keeps to the player's speed */
+        if (POLICE(c) && (c->bits[1] & 4)) {
+            int d = c->progress - g_cars[0]->progress;
+
+            if (d >= 4 || (d >= -2 && g_opp.ticks < 900
+                           && limit_at(c->node, 2) < g_cars[0]->road_speed))
+                c->speed_to = g_cars[0]->speed_abs;
+        }
     } else {
         int v = by_grip(c, limit_at(c->node, 2));
 
@@ -1444,7 +1700,8 @@ void opponent_tick(void)
                 g_opp.lead_index = i;
             }
     }
-    /* (the traffic's coming and going, 0x79500: not yet) */
+    if (!(g_drive.options & 4))
+        police_come();
     memset(counts, 0, sizeof counts);
     /* each car's lanes taken */
     for (i = 0; i < g_ncars; i++) {
@@ -1500,7 +1757,8 @@ void opponent_tick(void)
                      && !edge(n, l))
                 s[1] = 0x460000;
         }
-        /* (a police car's lanes, 0x79728: not yet) */
+        if (POLICE(c))
+            police_pull_over(c, l, s);
         if (RACER(c))
             racer_engine(c, l, s);
         /* alone in its lane on a straight road: it keeps to it */
@@ -1653,7 +1911,7 @@ static int driver_set(void)
 
 void opponent_start(unsigned seed)
 {
-    int set = driver_set(), i;
+    int set = driver_set(), i, k;
 
     settings();
     memset(g_opp.rec, 0, sizeof g_opp.rec);
@@ -1677,7 +1935,13 @@ void opponent_start(unsigned seed)
     g_opp.waiting = 0;
     g_opp.sides[0] = 0;
     g_opp.sides[1] = g_opp.traffic;
-    g_opp.chase_off = 0;
+    g_opp.chasing = 0;
+    g_opp.come_node = 0;
+    g_opp.long_chases = 0;
+    for (k = 0; k < 4; k++)
+        g_opp.come_odds[k] = exe_i32(0xf7500 + 4 * k);
+    /* (the pictures' flags: cleared as the race's screen is set up, 0x31c7d) */
+    g_opp.ticket_up = g_opp.warning_up = 0;
     if (g_race_type == 0 || (g_race_type == 1 && g_track.loop))
         CFG(0x34) = 0;
     /* 0x38c10 */

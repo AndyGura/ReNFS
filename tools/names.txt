@@ -208,7 +208,7 @@
 0x1e314 car_car_impact
 0x1ebf4 car_objects_collide
 0x1cd40 car_set_drive_kind
-0x1eb54 car_node_in_list
+0x1eb54 car_object_at_node
 0x7a040 traffic_police_tick
 0x79728 police_pull_over
 0x79e28 ai_car_engine
@@ -670,3 +670,7 @@
 0x7c294 place_on_road
 0x7c3f8 place_flags
 0x7c4d4 place_speed
+0x79500 police_come
+0x7aeb8 player_pull_aside
+0x2d2e4 hud_ticket_off
+0x306e8 ticket_picture_off

@@ -4,6 +4,7 @@
 #include "exe.h"
 #include "polyfill.h"
 #include "racepal.h"
+#include "roaddraw.h"
 #include "smoke.h"
 #include "track.h"
 #include "video.h"
@@ -19,6 +20,7 @@ int g_race_type;
 int g_field;
 int g_humans;
 unsigned char g_car_marks[RACE_CARS_MAX];
+int g_car_ticket;
 unsigned char g_cars_seen[CARS_SEEN];
 unsigned char g_cars_behind[CARS_BEHIND];
 const race_camera *g_camera;
@@ -185,9 +187,30 @@ static void car_models(race_car *c, const int m[9])
         model_draw(&c->far_m, c->far_m.count, c->far_m.list);
         return;
     }
-    /* (with 0xea81c or 0xea820 set, never in these races, the police car's lights
-       flash in 0xfa.. instead) */
-    if (g_car_marks[c->slot] && c->slot < g_racers) {
+    if (g_car_ticket) {
+        /* while the police's ticket or warning is shown, the police car (slot 2) that
+           chased flashes its lights instead: the program's four colours at 0xfa, one
+           set or the other, swapped every 16 steps (0xf6ff0, 0x14e61c) */
+        static int flash = -1, flash_at;
+
+        if (c->slot == 2 && (c->bits[2] & 0xc)) {
+            if (flash < 0)
+                flash = exe_i32(0xf6ff0);
+            if (g_road_steps - flash_at > 0xf) {
+                flash = 1 - flash;
+                flash_at = g_road_steps;
+            }
+            {
+                const unsigned char *rgb = exe_at(flash ? 0xf6de0 : 0xf6dec, 12);
+                unsigned char p8[12];
+                int k;
+
+                for (k = 0; k < 12; k++)
+                    p8[k] = (unsigned char)(rgb[k] << 2);
+                video_palette(p8, 0xfa, 4);
+            }
+        }
+    } else if (g_car_marks[c->slot] && c->slot < g_racers) {
         const unsigned char *rgb = exe_at((c->braking > 10 ? 0xf6f83 : 0xf6f5c) + 3 * c->number, 3);
         unsigned char p8[3] = {(unsigned char)(rgb[0] << 2), (unsigned char)(rgb[1] << 2),
                                (unsigned char)(rgb[2] << 2)};

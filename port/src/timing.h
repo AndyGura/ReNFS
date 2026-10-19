@@ -19,6 +19,9 @@ typedef struct {
     int finish[DRIVE_PLAYERS]; /* 0x14ec3c + 0x1d2 a player: the steps less 300 as it
                                   finished, -999 turned back, 0 still racing */
     int place[DRIVE_PLAYERS];  /* 0x14ec4a: its place */
+    int tickets[DRIVE_PLAYERS];/* 0x14ec30 + 0x1d2 a player: the police's tickets (the
+                                  second ends the race) */
+    int warnings[DRIVE_PLAYERS];/* 0x14ec34: and warnings */
     int split_at[TIMING_SPLITS];       /* 0x14e62c: how far along (+0x4c) each split is */
     int mine[TIMING_SPLITS];   /* 0x14e79c: the steps as the player passed each */
     int theirs[TIMING_SPLITS]; /* 0x14e904: the rival's, or in a time trial the time
@@ -32,8 +35,8 @@ typedef struct {
     int by_road[TIMING_CARS];  /* 0x13c298: the cars (g_cars' indices) by node, then
                                   across */
     int by_race[TIMING_CARS];  /* 0x13c274: by how far along the race, the leader last */
-    int result;                /* 0x13c178 (and 0x13c17c): 1 finished, 0x10 everyone
-                                  turned back */
+    int result;                /* 0x13c178 (and 0x13c17c): 1 finished, 4 arrested (the
+                                  second ticket), 0x10 everyone turned back */
     int stopped;               /* 0x145c90: a human finished and stopped (two players) */
     int switched;              /* 0xede80: the camera turned to the other player */
     int place_shown;           /* 0x12b8c8: the place the status bar works out */
