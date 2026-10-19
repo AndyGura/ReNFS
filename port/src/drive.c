@@ -68,12 +68,6 @@ static void turn2(int x, int y, int a, int *out_x, int *out_y)
     *out_y = mulr(s, x) + mulr(c, y);
 }
 
-/* 0x3e7ec: the angle of (x, y), 0x1000000 a turn */
-static int angle_of(int x, int y)
-{
-    return (int)((unsigned)ea_atan2(y, x) << 8);
-}
-
 void drive_surfaces(void)
 {
     static const int base[4][4] = {

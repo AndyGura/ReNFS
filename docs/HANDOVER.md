@@ -207,8 +207,7 @@ Ghidra project and `build/decomp`, one command). The git history was started aga
   Found on the way: the game runs the x87 at double precision (0x127f); Unicorn starts
   at single, `snap_emu.py` now sets it. A hard hit is rare driving CY1 (the hardest
   seen 19 m/s across, 24 needed): `RENFS_THROW=200:48,0,32` shows one
-  (`build/shots/crash_tumble.png`, `crash_back.png`). The camera's outside crash view
-  (`0x6324c`) and the smoke's drawing are not in yet: the tumble is seen from the seat.
+  (`build/shots/crash_tumble.png`, `crash_back.png`).
   **The status bar's numbers and the race's timing** (`hud.c` `bar_numbers`, `timing.c`;
   NOTES §4.11, §4.12): after the start the speed, gear, place, time, the split against
   the rival (or the time to beat in a time trial) and the miles left or the lap; each
@@ -217,11 +216,23 @@ Ghidra project and `build/decomp`, one command). The git history was started aga
   143 runs** (`tools/timing_emu.py`, 13 kinds of race on all 11 snapshots) and the bar
   pixel for pixel in 27 cases on all 11 (`tools/dash_emu.py`). `--race cy1` ends at the
   finish line (no results screen yet).
+  **The camera outside the car and the crash's smoke** (`camera.c`, `hud.c`
+  `hud_outside_*`, `smoke.c`; NOTES §4.7, §4.10, §4.11): the car upside down or across
+  the road turns the camera to the crash view (mode 13) for at least 60 steps, then back
+  to the seat; the other outside modes (2..5, 8..12) too, the screen round the view (its
+  tiles, border, status bar, small rev counter with its needle, map), and the smoke
+  puffs added to the picture once the tumbling car slows. **Equal**: the camera step for
+  step in 1280 steps outside on each of the 11 snapshots (`tools/camera_emu.py`), the
+  outside screen pixel for pixel in 7 frames on each (`tools/dash_emu.py`), the smoke in
+  88 rounds (`tools/smoke_emu.py`), its table and pictures (`tools/racepal_emu.py`).
+  `RENFS_THROW=200:48,0,32 port/build/renfs --race cy1` shows it all
+  (`build/shots/smoke560.ppm`).
   Not yet: the gear gate (`0x2e4f0`, map off), the
   HUD's keys (`0x2f644`), the map at 640x480, the replay's buttons (`0x5c5d0`), the doubled BAMF lists (detail),
   one-colour polygons (`0xaa990`), the police lights, the circuits' sky ring (`0x4ace8`),
   the roadside walls (`0x59294`, other tracks than the cities), 3D roadside models
-  (`0x66738`), the camera's crash view, the opponents' and traffic's driving, the race's setup from
+  (`0x66738`), the cameras from the car ahead and the police car (modes 6, 7), the dust
+  (`smo1`.., `dir1`..), the opponents' and traffic's driving, the race's setup from
   the front end.
 
 **Progress page for Danik**: https://claude.ai/artifact/VZdxTpYC3oLXYeBVJpoDoM (every step,
@@ -251,7 +262,7 @@ races 320x200 / 320x240; commit locally as the work goes.
    port now makes a first frame of its own (`--race cy1`), the cars, their shadows,
    the racers' markers, the dashboard, the map and the mirror in it, and the player's car
    drives and crashes (equal step for step), and the status bar's numbers and the race's
-   timing. Next: the camera's crash view (`0x6324c`) and the smoke (`0x66d08`), then the opponents'
+   timing, the camera outside and the crash's smoke. Next: the opponents'
    driving (`drive_opponent` `0x7b34c`), the traffic, cars meeting cars, the sounds.
    Open: who writes `0x136618` (28 sections drawn: a detail setting?). The walls `0x59294`
    and the circuits' sky ring `0x4ace8` can be checked on CY1 memory with made-up input,

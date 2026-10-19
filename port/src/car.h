@@ -141,6 +141,8 @@ typedef struct {
     /* what the race's timing needs (timing.c) */
     unsigned char part;        /* +0x51a: 4 a racer (its finish checked), 2 it meets
                                   the other cars */
+    int smoke_point;           /* +0x616: its near model's point "smok", where the smoke
+                                  is drawn from (0x65f8b) */
 } race_car;
 
 /* the car's place on the starting grid (0x7c938): grid its slot (0x12dca0[player]),

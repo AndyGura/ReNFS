@@ -15,6 +15,7 @@
 #include "raster.h"
 #include "timing.h"
 #include "track.h"
+#include "trackfam.h"
 #include "video.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -48,6 +49,14 @@ static int g_split_drawn;            /* 0x12b8e0: the split (its place shared wi
                                         laps and miles) */
 static int g_lap_shown;              /* 0x12b928 */
 static int g_mile_shown[2];          /* 0x12b91c, 0x12b920: whole and tenths */
+/* the views from outside: the HUD's lists of what of the view reaches the screen, by the
+   view's size and the detail (MASKLO.MMB, 0x145a28; the .B<s><n> files leave out the map's
+   box too, 0x145a58), and the small rev counter (0x145788 its centre, 0x145790 its
+   needle's reach; the needle last drawn 0xeaa98: its end, then its start) */
+static unsigned char *g_mmb, *g_mask_b[12];
+static const unsigned char *g_lists[2][12];
+static int g_tach_c[2], g_tach_r[2];
+int g_hud_small_needle[4];
 
 /* the window drawn into (0xf889c): a picture and its clip */
 /* a times b, 16.16, rounded by the last bit out */
@@ -187,17 +196,59 @@ int hud_load(void)
     g_redraw = 1;
     g_bar_black = 1;
     g_map_back_taken = 0;
+
+    /* the views from outside (load_cockpit_mask 0x5f7c8 and 0x5f240) */
+    {
+        const unsigned char *t = named(&g_mask, "tach");
+        int hw, hh, k;
+        long len;
+
+        if (!t)
+            return 0;
+        hw = s16(t + 4) / 2;
+        hh = s16(t + 6) / 2;
+        g_tach_c[0] = hw + s16(t + 0xc);
+        g_tach_c[1] = hh + s16(t + 0xe);
+        g_tach_r[0] = hw - hw / 4 - hw / 16;
+        g_tach_r[1] = hh - hh / 4 - hh / 16;
+        for (k = 0; k < 4; k++)
+            g_hud_small_needle[k] = exe_i32(0xeaa98 + 4 * k);
+        g_mmb = file_load("SIMDATA/MISC/MASKLO.MMB", &len);
+        if (ww_count(g_mmb) < 12) {
+            fprintf(stderr, "renfs: SIMDATA/MISC/MASKLO.MMB is missing\n");
+            return 0;
+        }
+        for (k = 0; k < 12; k++) {
+            char path[64];
+
+            g_lists[0][k] = ww_entry(g_mmb, k);
+            snprintf(path, sizeof path, "SIMDATA/MISC/MASKLO.B%d%d", k / 4, k % 4);
+            if (!(g_mask_b[k] = file_load(path, &len))) {
+                fprintf(stderr, "renfs: %s is missing\n", path);
+                return 0;
+            }
+            g_lists[1][k] = g_mask_b[k];
+        }
+    }
     return g_hud_map_back.pix && g_hud_view.pix && g_hud_map.pix && g_hud_mirror.pix;
 }
 
 void hud_free(void)
 {
+    int i;
+
     fsh_free(&g_mask);
     free(g_hud_map_back.pix);
     free(g_hud_view.pix);
     free(g_hud_map.pix);
     free(g_hud_mirror.pix);
     g_hud_map_back.pix = g_hud_view.pix = g_hud_map.pix = g_hud_mirror.pix = 0;
+    free(g_mmb);
+    g_mmb = 0;
+    for (i = 0; i < 12; i++) {
+        free(g_mask_b[i]);
+        g_mask_b[i] = 0;
+    }
 }
 
 /* the HUD's digits by the program's tables of names: grey (0xf6c84: gry0 .. gry9, gryb,
@@ -755,6 +806,106 @@ void hud_frame(const hud_car *c)
     if (g_hud.steps > g_bar_at)
         status_bar();
     bar_numbers(c);
+    if (g_hud.map && g_hud_map.pix)
+        blit_pixels(g_hud_map.pix, g_hud_map.w, g_hud_map.h, 0x103, 0x7e, COPY);
+    /* (0x5c5d0: the replay's buttons, not yet) */
+}
+
+/* a picture by its centre (0x812bc: less its +8, +0xa), copied */
+static void blit_centred(const unsigned char *head, int x, int y)
+{
+    blit(head, x - s16(head + 8), y - s16(head + 0xa), COPY);
+}
+
+void hud_outside_screen(const int box[4])
+{
+    const unsigned char *tile = named(&g_mask, "0000"), *top = named(&g_mask, "b00t");
+    const unsigned char *left = named(&g_mask, "b00l"), *right = named(&g_mask, "b00r");
+    const unsigned char *bottom = named(&g_mask, "b00b");
+    int w = s16(tile + 4), h = s16(tile + 6), tw = s16(top + 4), lh = s16(left + 6);
+    int x0 = box[0], y0 = box[1], x1 = box[2] + x0 - 1, y1 = y0 + box[3] - 1, i, j, x, y;
+
+    window_set(&g_hud_view);
+    /* the tiles, two across in turn, from row 13 (their names 0xeaa20: 0000 .. 0003) */
+    for (i = 0; i < g_hud_view.w / w; i++)
+        for (j = 0; j < g_hud_view.h / h; j++)
+            blit(named(&g_mask, (const char *)exe_at((unsigned)exe_i32(0xeaa20 + 4 * ((i & 1) + 2 * j)), 4)),
+                 i * w, 0xd + j * h, COPY);
+    status_bar();
+    /* the border: its top and bottom, its sides, the sides' last pieces, the corners */
+    for (x = x0; x < x1; x += tw) {
+        blit_centred(top, x, y0);
+        blit_centred(bottom, x, y1);
+    }
+    for (y = y0; y < y1 - lh; y += lh) {
+        blit_centred(left, x0, y);
+        blit_centred(right, x1, y);
+    }
+    y = y1 + 1 - lh;
+    blit_centred(left, x0, s16(left + 0xa) + y);
+    blit_centred(right, x1, s16(right + 0xa) + y);
+    blit_centred(named(&g_mask, "b000"), x0, y0);
+    blit_centred(named(&g_mask, "b001"), x1, y0);
+    blit_centred(named(&g_mask, "b002"), x1, y1);
+    blit_centred(named(&g_mask, "b003"), x0, y1);
+    blit_own(named(&g_mask, "tach"), SEE_THROUGH);
+    numbers_reset();
+}
+
+/* the small rev counter's needle (0x31168): a quarter of the way out from its centre to
+   its end, on the 1024-a-turn table from 0x1a9 round by 600 at the red line; the dial
+   put back under the old one first, in a box round each of its halves */
+static void small_tach(const hud_car *c)
+{
+    const unsigned char *dial = named(&g_mask, "tach");
+    int r = c->rpm < c->redline + 0x3d4 ? c->rpm : c->redline + 0x3d4;
+    int a = r * 600 / c->redline + 0x1a9;
+    int ex = g_tach_c[0] + mulr(g_tach_r[0], fix_cos(a));
+    int ey = g_tach_c[1] + mulr(g_tach_r[1], fix_sin(a));
+    int sx = (g_tach_c[0] + (g_tach_c[0] + ex) / 2) / 2;
+    int sy = (g_tach_c[1] + (g_tach_c[1] + ey) / 2) / 2;
+    int *o = g_hud_small_needle, mx = (o[0] + o[2]) / 2, my = (o[1] + o[3]) / 2;
+
+    window_set(&g_hud_screen);
+    clip_set((mx < o[0] ? mx : o[0]) - 2, (mx > o[0] ? mx : o[0]) + 2,
+             (my < o[1] ? my : o[1]) - 2, (my > o[1] ? my : o[1]) + 2);
+    blit_own(dial, SEE_THROUGH);
+    clip_set((mx < o[2] ? mx : o[2]) - 2, (mx > o[2] ? mx : o[2]) + 2,
+             (my < o[3] ? my : o[3]) - 2, (my > o[3] ? my : o[3]) + 2);
+    blit_own(dial, SEE_THROUGH);
+    clip_set(0, g_win.w, 0, g_win.h);
+    poly_wide_line(sx << 16, sy << 16, ex << 16, ey << 16, g_needle_colour,
+                   (const unsigned char (*)[256])g_needle_blend, 0x10000, 0x10000,
+                   g_hud_screen.w, g_hud_screen.h);
+    o[0] = ex;
+    o[1] = ey;
+    o[2] = sx;
+    o[3] = sy;
+}
+
+void hud_outside_frame(const hud_car *c, int redraw, int layout)
+{
+    /* (0x13c17c: nothing; the tickets 0xea81c, 0xea820; 0x306e8; the background again
+       after them, 0xeaaa8: not yet) */
+    if (redraw) {
+        /* the dial into the view's picture, then all of it to the screen */
+        window_set(&g_hud_view);
+        blit_own(named(&g_mask, "tach"), SEE_THROUGH);
+        window_set(&g_hud_screen);
+        clip_set(0, g_win.w, 0, g_win.h);          /* 0x2d314 */
+        blit_pixels(g_hud_view.pix, g_hud_view.w, g_hud_view.h, 0, 0, COPY);
+    } else {
+        /* (0x12d9d9 = 3, the detail with every other line: another way, not yet) */
+        window_set(&g_hud_screen);
+        bamf_copy(&g_hud_view, g_lists[g_hud.map != 0][(layout > 1 ? layout - 1 : 0) * 4
+                                                        + (g_hud.detail & 3)]);
+    }
+    /* 0x2f644: the status bar again some steps after the start's lights (the keys: not
+       yet) */
+    if (g_hud.steps > g_bar_at)
+        status_bar();
+    bar_numbers(c);
+    small_tach(c);
     if (g_hud.map && g_hud_map.pix)
         blit_pixels(g_hud_map.pix, g_hud_map.w, g_hud_map.h, 0x103, 0x7e, COPY);
     /* (0x5c5d0: the replay's buttons, not yet) */

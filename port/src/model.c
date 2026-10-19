@@ -119,6 +119,16 @@ int model_group(const model *md, const char *name, int *count, unsigned **list)
     return -1;
 }
 
+int model_find_point(const model *md, const char *name)
+{
+    const unsigned char *p = field(md, 0x58);
+    int i, n = (int)u32(md->orip + 0x54);
+    for (i = 0; i < n; i++, p += 12)
+        if (same_name(p, name, 8))
+            return (int)u32(p + 8);
+    return -1;
+}
+
 void model_mirror(model *md)
 {
     unsigned char *p = field(md, 0x28);

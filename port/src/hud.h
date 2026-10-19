@@ -78,6 +78,8 @@ extern hud_picture g_hud_map_back;   /* 0xf4580 */
 extern hud_picture g_hud_view;       /* 0xf4578: the 3D view, painted off the screen */
 extern hud_picture g_hud_mirror;     /* 0xf457c: the mirror's view, between the
                                         dashboard's places 0 and 1 (0x5ad44) */
+extern int g_hud_small_needle[4];  /* 0xeaa98: the small rev counter's needle as last drawn,
+                                       its end then its start */
 extern hud_picture g_hud_map;        /* 0xf4584: the map */
 
 /* the HUD's pictures (load_cockpit_mask 0x5f7c8: SIMDATA/MISC/MASKLO.FSH, MASKLOG.FSH
@@ -97,5 +99,14 @@ void hud_frame(const hud_car *c);
 void hud_map(const hud_map_state *m);
 /* the mirror's picture turned round, left for right (0x96240), once it is painted */
 void hud_mirror_flip(void);
+
+/* the views from outside the car (camera modes 2 ..): the background of tiles, the
+   status bar, a border round the view's box (x, y, w, h) and the small rev counter,
+   drawn into the view's picture when the view changes (0x3081c) */
+void hud_outside_screen(const int box[4]);
+/* each frame from outside (0x314e4): the view's picture to the screen, whole after a
+   change, else through the HUD's list for the view's layout (0x30b64); the status bar's
+   numbers, the small rev counter's needle (0x31168), the map */
+void hud_outside_frame(const hud_car *c, int redraw, int layout);
 
 #endif

@@ -40,6 +40,9 @@ void model_set_texture(model *md, int i, const unsigned char *shape);
    index table (sorted in place, as the original does); -1 if none */
 int model_group(const model *md, const char *name, int *count, unsigned **list);
 /* every polygon's 0x200 turned over (the mirrored tracks, 0x65874) */
+/* a named point (0x97afa: the model's +0x54 records of 12 bytes, an 8-letter name then
+   the point); -1 if none */
+int model_find_point(const model *md, const char *name);
 void model_mirror(model *md);
 
 /* the model turned by m and its origin at pos in the view (0x957ec, 0x9803e), its points

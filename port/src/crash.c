@@ -48,7 +48,7 @@ static vec3 cross8(const vec3 *a, const vec3 *b)
 
 /* (a << 16) / b, in the original's two divisions (the whole part, then the rest's); the
    original stops with a division error on 0 */
-static int fixdiv(int a, int b)
+int fix_div(int a, int b)
 {
     if (!b)
         return 0;
@@ -56,14 +56,14 @@ static int fixdiv(int a, int b)
 }
 
 /* 0x3e7ec: the angle of (x, y), 0x1000000 a turn */
-static int angle_of(int x, int y)
+int angle_of(int x, int y)
 {
     return (int)((unsigned)ea_atan2(y, x) << 8);
 }
 
 /* 0x3e784: the square root of n by Newton's steps from guess, until a step changes it by
    less than 1 << (16 - iters) */
-static int fix_sqrt(int n, int iters, int guess)
+int fix_sqrt(int n, int iters, int guess)
 {
     int sh = 16 - iters, x = guess, old;
 
@@ -75,7 +75,7 @@ static int fix_sqrt(int n, int iters, int guess)
         sh = 16;
     do {
         old = x;
-        x = (int)(((unsigned)x + (unsigned)fixdiv(n, x)) >> 1);
+        x = (int)(((unsigned)x + (unsigned)fix_div(n, x)) >> 1);
     } while ((unsigned)(old - x) >> sh);
     return x;
 }
@@ -150,7 +150,7 @@ static void normalize(vec3 *v)
 
     if (!len)
         return;
-    inv = fixdiv(0x10000, len) >> 8;
+    inv = fix_div(0x10000, len) >> 8;
     v->x = (int)((unsigned)(v->x >> 8) * (unsigned)inv);
     v->y = (int)((unsigned)(v->y >> 8) * (unsigned)inv);
     v->z = (int)((unsigned)(v->z >> 8) * (unsigned)inv);
@@ -363,7 +363,7 @@ static void impulse(car_body *b, const vec3 *c, const vec3 *v, const vec3 *n)
     r.z = c->z - b->pos.z;
     rn = cross8(&r, n);
     den = (b->inv_mass >> 1) + (mulr(len3_sq(&rn), b->inv_inertia) >> 1);
-    j = mulr(fixdiv(-(vn + dot8(&b->spin, &rn)), den), exe_i32(0xea684));
+    j = mulr(fix_div(-(vn + dot8(&b->spin, &rn)), den), exe_i32(0xea684));
     if (t.x || t.y || t.z) {
         int s = dot8(&t, n) >> 8, q;
 
@@ -393,7 +393,7 @@ static void impulse(car_body *b, const vec3 *c, const vec3 *v, const vec3 *n)
     f1.z += mulr(fi, d.z);
     k = dot8(&f1, &t);
     if (k > len)
-        f = mulr(f, fixdiv(len, k));
+        f = mulr(f, fix_div(len, k));
     t.x = mulr(f, t.x);
     t.y = mulr(f, t.y);
     t.z = mulr(f, t.z);
@@ -838,7 +838,7 @@ void crash_step(race_car *c)
                 if (i == c->player || !o)
                     continue;
                 if (o->road_speed > 0x90000 && o->node <= c->node
-                    && fixdiv((int)((unsigned)((c->node - o->node) * 6) << 16), o->road_speed)
+                    && fix_div((int)((unsigned)((c->node - o->node) * 6) << 16), o->road_speed)
                        < 0x10000)
                     b->wait = 1;
             }

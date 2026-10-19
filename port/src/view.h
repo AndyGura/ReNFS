@@ -25,11 +25,16 @@ typedef struct {
     const view_window *win;    /* +0x1c */
     int lens_h;                /* its layout's (+0x18, 0xe8b10 + 52 × +8) +0x20: the
                                   height the mirror's horizon is set by */
+    int layout;                /* +8: its layout (0xe8b10 + 0x16c × resolution + 52 × it) */
+    int box[4];                /* the layout's +0x24 ..: the box round it on the screen, x y
+                                  w h (the border of the views outside, 0x3081c) */
 } view_rec;
 
 /* what the frame is drawn from (the camera record [0x143df4], 0x129ecc) */
 typedef struct {
     int mode;                  /* +0: 0, 1 the driver's eyes (camera.c) .. 13 */
+    int wanted;                /* +4: the mode asked for (camera_set_car) */
+    int frames;                /* +0xc: updates left of a move */
     vec3 pos;                  /* +0x10: in the world, 16.16 */
     vec3 off;                  /* +0x2c: the eye from the car, turned with it */
     int node;                  /* +0x38: its road node */
@@ -38,7 +43,8 @@ typedef struct {
     int tilt[3];               /* +0x5c ..: added to the car's pitch, yaw, roll */
     vec3 eye;                  /* +0x6c: the eye in the car */
     int mirror_on;             /* +0x68: the mirror is drawn */
-    int yaw_follow;            /* +0x78 */
+    int yaw_follow;            /* +0x78: the yaw it turns towards */
+    vec3 step;                 /* +0x7c: the eye's move each update */
     view_rec *ahead, *mirror;  /* +0x88, +0x8c */
     const race_car *car;       /* +0x90: the car followed */
     int m[9];                  /* +0x94: the world into the view ahead */
@@ -48,6 +54,9 @@ typedef struct {
 extern view_window g_windows[2][VIEW_WINDOWS];  /* 0xe85c0: 320x200, 640x480 */
 extern int g_view_res;                          /* 0x143e2c: 0 320x200, 1 640x480 */
 extern view_rec g_view_ahead, g_view_mirror;    /* 0xe8de8, 0xe8e28 */
+extern view_rec g_view_outside;                 /* 0xe8e08: the cameras outside the car */
+extern int g_view_redraw;      /* 0x143e00: the view changed, the screen round it drawn
+                                  again (0x14210) */
 extern const view_rec *g_view_now;              /* 0x143dfc */
 
 /* the windows as the program has them, fitted to the player's car (0x14630's end,
@@ -55,6 +64,9 @@ extern const view_rec *g_view_now;              /* 0x143dfc */
 void view_init(int res, int car, int horizon);
 /* a view in window `mode` (0x14154): the sky's tables, the lens, the reciprocals */
 void view_setup(view_rec *v, int mode);
+/* the view a camera mode's kind (its settings' +0) looks through: 0 the driver's, 1
+   outside (0xe8de8 + 32 · kind) */
+view_rec *view_of_kind(int kind);
 /* the camera's two matrices from its angles (0x5868c), squashed by the current view's
    window and turned over for the mirrored tracks (g_road_mirror) */
 void view_matrix(race_camera *c);

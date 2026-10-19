@@ -12,6 +12,7 @@
 #include "exe.h"
 #include "files.h"
 #include "racepal.h"
+#include "smoke.h"
 #include "road.h"
 #include "roaddraw.h"
 #include "sky.h"
@@ -83,7 +84,7 @@ static void race_throw(race_car *player, int st)
    flags from the step counter, the keyboard's word (controls_read 0x49248: both gear
    keys at once hold the engine at full revs), every second step the controls applied,
    then the driving; the counter on by 2 */
-static void race_step(race_car *player)
+static void race_step(race_car *player, race_camera *cam)
 {
     int st = g_drive.steps;
     unsigned w = drive_keyboard(g_road_mirror);
@@ -107,6 +108,10 @@ static void race_step(race_car *player)
     crash_world();
     timing_sort();
     timing_splits();
+    /* the camera: outside while the car watched is upside down or turned across the road
+       (0x6324c), then moved (0x136b0) */
+    camera_check(cam, g_cars[g_drive.viewed]);
+    camera_update(cam);
     g_drive.steps = st + 2;
 }
 
@@ -122,7 +127,7 @@ int race_test(const char *name)
     hud_car driver;
     hud_map_state map;
     unsigned start;
-    int mirror_skip = 0;
+    int mirror_skip = 0, redraw, in_seat = 1;
     unsigned done = 0;
     const char *car = "F512TR";
 
@@ -147,6 +152,8 @@ int race_test(const char *name)
     g_drive.chase = 1;         /* (the police on in these races, 0x12dd08, 0x12da34) */
     g_drive.police = 1;
     memset(&g_crash, 0, sizeof g_crash);
+    if (!smoke_load(&g_crash.smoke))       /* (after cars_create 0x51388) */
+        return 0;
     crash_start();
     drive_default_keys();
     g_view.min_z = exe_i32(0xf7938);
@@ -191,6 +198,7 @@ int race_test(const char *name)
     hud_colours();             /* 0x55abc: the HUD's colours, then the shade table */
     shade_make(0x9999);
     pal_apply_remaps();
+    smoke_table();             /* (0x55fa8's end) */
 
     /* the views and the camera in the driver's seat; the racers on the grid, the player
        in slot 7 (0x12dca0) */
@@ -269,7 +277,7 @@ int race_test(const char *name)
         /* the race's steps: one each three ticks of the clock (the race clock's
            three-cycle, race_timer_tick 0x4c454), the player's car driven */
         while (done < (clock_ticks() - start) / 3) {
-            race_step(&cars[0]);
+            race_step(&cars[0], &cam);
             done++;
         }
         driver.steer = cars[0].steer;
@@ -280,7 +288,6 @@ int race_test(const char *name)
         driver.lap = cars[0].lap;
         driver.node = cars[0].node;
 
-        camera_update(&cam);
         /* the road's points (0x50070): its sections kept, gathered again when the
            camera is on another quarter */
         track_keep_sections(quarter(cam.node));
@@ -309,8 +316,13 @@ int race_test(const char *name)
         win.y = w->y;
         win.w = w->cw;
         win.h = w->ch;
+        /* the view changed: the screen round it into the view's picture first (0x3081c,
+           whatever the view; from the driver's seat the dashboard covers it) */
+        redraw = g_view_redraw;
+        if (redraw)
+            hud_outside_screen(cam.ahead->box);
         /* the view painted off the screen (0xf4578), then the dashboard puts it on the
-           screen through its windows (0x31684) */
+           screen through its windows (0x31684), or from outside the HUD's lists (0x314e4) */
         raster_window(g_hud_view.pix, g_hud_view.w, win.x, win.y, win.x + win.w, win.y + win.h);
         sky_draw(cam.yaw, m, &win, 0);
         road_objects_start();
@@ -324,8 +336,17 @@ int race_test(const char *name)
             map.nodes[i] = (short)cars[i].node;
         map.place = g_timing.place_shown;   /* (the last frame's, as the map comes first) */
         memcpy(map.places, g_timing.places, sizeof map.places);
+        map.driver = cam.mode == 0;
         hud_map(&map);
-        hud_frame(&driver);
+        if (cam.mode == 0) {
+            /* back in the driver's seat: the whole dashboard again (0x143e68, 0x2d284) */
+            if (!in_seat)
+                hud_redraw_due();
+            hud_frame(&driver);
+        } else
+            hud_outside_frame(&driver, redraw, cam.ahead->layout);
+        in_seat = cam.mode == 0;
+        g_view_redraw = 0;
         video_retrace();
     }
 
@@ -334,6 +355,7 @@ int race_test(const char *name)
     for (i = 0; i < RACE_CARS; i++)
         car_free(&cars[i]);
     hud_free();
+    smoke_free();
     dash_free();
     trackfam_free();
     track_free();

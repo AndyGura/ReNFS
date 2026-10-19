@@ -4,6 +4,7 @@
 #include "exe.h"
 #include "polyfill.h"
 #include "racepal.h"
+#include "smoke.h"
 #include "track.h"
 #include "video.h"
 #include <string.h>
@@ -233,22 +234,29 @@ static void car_marker(int x, int y, int slot, int z)
     }
 }
 
-/* where a car's marker goes (0x66fe5): the car's place seen (0x591a4, 1/32 units, put
-   on the near plane if nearer) on the screen, raised by a height that shrinks with the
-   distance */
-static void car_marker_at(const race_car *c)
+/* 0x591a4: the car's place seen (1/32 units) and on the screen (put on the near plane
+   if nearer) */
+static void car_seen_screen(const race_car *c, vec3 *seen, scr2 *s)
 {
-    vec3 d, seen, p;
-    scr2 s;
+    vec3 d, p;
 
     d.x = (c->pos.x - g_camera->pos.x) >> 11;
     d.y = (c->pos.y - g_camera->pos.y) >> 11;
     d.z = (c->pos.z - g_camera->pos.z) >> 11;
-    rotate(&d, g_camera_m, &seen);
-    p = seen;
+    rotate(&d, g_camera_m, seen);
+    p = *seen;
     if (p.z < g_view_now->near)
         move_to_near(&p, g_view_now->near);
-    project(&p, &s);
+    project(&p, s);
+}
+
+static void car_marker_at(const race_car *c)
+{
+    vec3 seen;
+    scr2 s;
+
+    /* its marker (0x66fe5): raised by a height that shrinks with the distance */
+    car_seen_screen(c, &seen, &s);
     if (g_view_res)
         car_marker(s.x, s.y - 0x3800 / seen.z - 15, c->slot, seen.z);
     else
@@ -289,9 +297,26 @@ static void car_draw(race_car *c, int mirror)
         c->far_m.flags &= ~2u;
     }
     car_models(c, r);
-    /* (the player's own car, seen from behind: only with the word 0x15d13a, 0 in a race
-       played; else 0x64a74 on 0x1464d0 when its +0x175 has 2) */
-    if (c->slot != g_player && g_race_type >= 1 && c->slot <= g_field - 1)
+    /* the player's own car: its smoke once it has slowed in a crash (+0x175 & 2), from its
+       model's point "smok" as painted (none from the far model). (With the word 0x15d13a,
+       0 in a race played, it would get a marker instead) */
+    if (c->slot == g_player) {
+        if (c->bits[1] & 2) {
+            int dx = 0, dy = 0;
+
+            if (!c->far && c->smoke_point >= 0) {
+                vec3 seen;
+                scr2 s;
+
+                car_seen_screen(c, &seen, &s);
+                dx = c->near_m.screen[c->smoke_point].x - s.x;
+                dy = c->near_m.screen[c->smoke_point].y - s.y;
+            }
+            smoke_draw(&g_crash.smoke, dx, dy);
+        }
+        return;
+    }
+    if (g_race_type >= 1 && c->slot <= g_field - 1)
         car_marker_at(c);
 }
 

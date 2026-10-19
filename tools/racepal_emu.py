@@ -14,6 +14,7 @@ from snap_emu import Snap
 from camera_emu import Car, lib
 
 U8 = ctypes.c_ubyte
+SMOKE = ctypes.create_string_buffer(0x96c)     # the puffs' block (0x1464d0)
 
 
 class Car2(ctypes.Structure):
@@ -21,6 +22,10 @@ class Car2(ctypes.Structure):
                                ("cfm_len", ctypes.c_long), ("colours", ctypes.c_void_p),
                                ("pics", ctypes.c_void_p * 2), ("pics_pal", ctypes.c_void_p * 2),
                                ("rest", ctypes.c_ubyte * 4096)]   # what drawing keeps (car.h)
+
+
+# where smoke_art's table is (after the file, 16 bytes, and the shape, 48)
+SMOKE_ADD = 16 + 48
 
 
 def race_track(s, name, L):
@@ -39,6 +44,8 @@ def race_palette(s, name, L, cars):
     keep = (ctypes.c_void_p * n)(*cars)
     marks = (U8 * n)()
     L.cars_queue_colours(keep, n, marks)
+    if not L.smoke_load(SMOKE):        # (load_smoke 0x645bc, after cars_create)
+        sys.exit("no smoke")
     car = s.read(0x12b990, 16).split(b"\0")[0]
     number = struct.unpack("<i", s.raw(s.u32(0x13c24c + 4 * s.i32(0x12dd58)) + 0x48a, 4))[0]
     if not L.dash_load(car, number, s.i32(0x12c308)):
@@ -62,6 +69,8 @@ def race_pictures(s, L, keep, marks):
     L.hud_colours()
     L.shade_make(0x9999)
     L.pal_apply_remaps()
+    L.smoke_table()
+
 
 
 def check(path, name, L):
@@ -113,6 +122,13 @@ def check(path, name, L):
     n = struct.unpack("<I", ctypes.string_at(mask + 4, 4))[0]
     print("   the HUD's pictures: %s" % ("equal" if ctypes.string_at(mask, n) == s.raw(s.u32(0x145604), n)
                                          else "differ"))
+    smoke = ctypes.c_void_p.in_dll(L, "g_smoke").value
+    n = struct.unpack("<I", ctypes.string_at(smoke + 4, 4))[0]
+    table = ctypes.string_at(ctypes.addressof(ctypes.c_void_p.in_dll(L, "g_smoke")) + SMOKE_ADD, 0x10000)
+    theirs = s.raw(s.u32(0x1464cc), 0x10000)
+    print("   the smoke's pictures: %s; its table: %s" % (
+        "equal" if ctypes.string_at(smoke, n) == s.raw(s.u32(0xf6dac), n) else "differ",
+        "equal" if table == theirs else "%d of 65536 differ" % sum(x != y for x, y in zip(table, theirs))))
     shade = bytes((U8 * 256).in_dll(L, "g_shade"))
     marks = bytes((U8 * 8).in_dll(L, "g_marker_colour")) + struct.pack("<i", ctypes.c_int.in_dll(L, "g_marker_line").value)
     if marks != s.read(0x13d5e8, 8) + s.read(0x13d5c8, 4):

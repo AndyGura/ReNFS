@@ -7,8 +7,9 @@
 
 view_window g_windows[2][VIEW_WINDOWS];
 int g_view_res;
-view_rec g_view_ahead, g_view_mirror;
+view_rec g_view_ahead, g_view_mirror, g_view_outside;
 const view_rec *g_view_now;
+int g_view_redraw;
 
 static int layout(int rec, int res)
 {
@@ -24,13 +25,26 @@ void view_init(int res, int car, int horizon)
         for (i = 0; i < VIEW_WINDOWS; i++)
             memcpy(&g_windows[r][i], exe_at(0xe85c0 + 0x2a8 * r + 40 * i, 40), 40);
     g_view_ahead.fov = exe_i32(0xe8de8);
+    g_view_outside.fov = exe_i32(0xe8e08);
     g_view_mirror.fov = exe_i32(0xe8e28);
     /* each its layout's (0x14630: 0xe8b10 + 0x16c × resolution + 52 × the record's +8):
        the window (+4, handed to 0x14154) and the lens's height (+0x20) */
     g_view_ahead.mode = exe_i32(layout(0xe8de8, res) + 4);
+    g_view_outside.mode = exe_i32(layout(0xe8e08, res) + 4);
     g_view_mirror.mode = exe_i32(layout(0xe8e28, res) + 4);
     g_view_ahead.lens_h = exe_i32(layout(0xe8de8, res) + 0x20);
+    g_view_outside.lens_h = exe_i32(layout(0xe8e08, res) + 0x20);
     g_view_mirror.lens_h = exe_i32(layout(0xe8e28, res) + 0x20);
+    {
+        view_rec *v[3] = { &g_view_ahead, &g_view_outside, &g_view_mirror };
+        static const int rec[3] = { 0xe8de8, 0xe8e08, 0xe8e28 };
+
+        for (k = 0; k < 3; k++) {
+            v[k]->layout = exe_i32(rec[k] + 8);
+            for (i = 0; i < 4; i++)
+                v[k]->box[i] = exe_i32(layout(rec[k], res) + 0x24 + 4 * i);
+        }
+    }
 
     /* the view's height above the dashboard, the car's own (0x145d0) */
     h = exe_i32(0xe8e4c + 0x90 * res + 12 * car);
@@ -69,6 +83,11 @@ void view_setup(view_rec *v, int mode)
     sky_tables(w->w, v->fov / 2, (short)((v->fov << 8) / 360 * 5), w->squash * w->w / 320);
     lens(w->x + w->dx, w->y + w->dy, w->w, w->h, v->fov);
     view_set_focal(g_view.focal);
+}
+
+view_rec *view_of_kind(int kind)
+{
+    return kind ? &g_view_outside : &g_view_ahead;
 }
 
 /* the turns about each axis (0x58500 x, 0x5855c y, 0x585b8 z), 0x1000000 a turn */

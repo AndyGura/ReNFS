@@ -12,12 +12,13 @@
 
 #define SMOKE_PUFFS 100
 
-/* the smoke a tumbling player's car leaves (0x1464d0; drawn with the cars, 0x66d08: not
-   in the port yet). Its layout is the original's */
+/* the smoke a tumbling player's car leaves (0x1464d0; drawn with the cars, smoke.c). Its
+   layout is the original's */
 typedef struct {
     vec3 pos[SMOKE_PUFFS];     /* +0 */
     int age[SMOKE_PUFFS];      /* +0x4b0: 0 .. 0x10000, -1 none */
-    int spare[SMOKE_PUFFS];    /* +0x640: not used by the crash */
+    int order[SMOKE_PUFFS];    /* +0x640: the puffs as drawn, far first (0..99 at the
+                                  start, sorted again each time) */
     int size[SMOKE_PUFFS];     /* +0x7d0: its drift sideways */
     int index;                 /* +0x960: the next puff's */
     int timer, next;           /* +0x964, +0x968: when the next is let out */
@@ -41,6 +42,13 @@ typedef struct {
 } crash_race;
 
 extern crash_race g_crash;
+
+/* the crash's maths, the camera's too: a / b in 16.16 by two divisions (0 for b = 0,
+   where the original stops); the angle of (x, y), 0x1000000 a turn (0x3e7ec); the
+   square root of n by Newton's steps from guess (0x3e784) */
+int fix_div(int a, int b);
+int angle_of(int x, int y);
+int fix_sqrt(int n, int iters, int guess);
 
 /* the race starts: the refresh due at the first step (0x1ee58), the smoke cleared */
 void crash_start(void);

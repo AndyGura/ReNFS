@@ -210,11 +210,14 @@ The race so far: `raster.c` (the quad and triangle painters), `poly.c` (projecti
 the roadside objects, the mirror's road behind (`tools/mirror_emu.py`, NOTES §4.7); pixel-exact on the snapshots, `tools/roadpic_emu.py`), `model.c`
 (EA's 3D library: ORIP models placed, sorted, painted), `cardraw.c` (the cars as the road
 reaches their rows, their shadows, the racers' markers; pixel-exact, `tools/cars_emu.py`;
-NOTES §4.10), `polyfill.c` (EA's polygon filler `0x8bc71`, lines `0x8bb3c`, the smoothed
+NOTES §4.10), `smoke.c` (the crash's smoke: SMOKE.QFS, the add-table `0x64488`, the
+puffs `0x64a74` stretched by EA's `0x96aa8`; exact, `tools/smoke_emu.py`), `polyfill.c` (EA's polygon filler `0x8bc71`, lines `0x8bb3c`, the smoothed
 wide line `0x8b195`; exact, `tools/polyfill_emu.py`), `hud.c` (the dashboard over the view:
-`0x30094`, `0x31684`, the needles, the map `0x31cb4`; pixel-exact, `tools/dash_emu.py`; NOTES §4.11), `track.c`
+`0x30094`, `0x31684`, the needles, the map `0x31cb4`; from outside `0x3081c`, `0x314e4`, the small rev counter `0x31168`;
+pixel-exact, `tools/dash_emu.py`; NOTES §4.11), `track.c`
 (the TRI and its ring of sections), `trackinfo.c`, `trackfam.c`, `racepal.c`, `sky.c` (the sky, the mirror's horizon), `view.c` (windows, lens,
-matrices), `car.c` (cars' files, the grid), `camera.c` (the driver's eyes), `dash.c`
+matrices), `car.c` (cars' files, the grid), `camera.c` (the driver's eyes; outside, modes 2..5 and 8..13, the crash's view
+`0x6324c`; step for step, `tools/camera_emu.py`), `dash.c`
 (the dashboard's file, colours, places and BAMF lists), `drive.c` (the player's car driven: controls, gearbox, engine, tyres, walls, jumps;
 equal step for step, `tools/drive_emu.py`; NOTES §4.6), `crash.c` (a hard wall hit: the car
 tumbling as a box, landing or put back, its smoke; the 4th-step refresh 0x786d4; equal step

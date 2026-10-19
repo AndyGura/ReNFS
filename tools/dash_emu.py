@@ -329,15 +329,20 @@ def port_map(s, L, picks):
     return got
 
 
-def port(s, name, L):
-    cars, _ = cars_emu.load_cars(s, name, L)
-    L_cars[:] = [ctypes.byref(c) for c in cars]
-    timing_emu.typed(L)
+def timing_put(s, L, cars):
+    """the race's timing and the cars' places as the snapshot has them"""
     n = s.i32(0x12da38)
     timing_emu.state_put(L, timing_emu.original_state(s, n), n)
     for c, a in zip(cars, [s.u32(0x13c24c + 4 * k) for k in range(n)]):
         g = lambda o: struct.unpack("<i", s.raw(a + o, 4))[0]
         L.timing_test_car_set(ctypes.byref(c), g(0x50), g(0x48), g(0x4c))
+
+
+def port(s, name, L):
+    cars, _ = cars_emu.load_cars(s, name, L)
+    L_cars[:] = [ctypes.byref(c) for c in cars]
+    timing_emu.typed(L)
+    timing_put(s, L, cars)
     ctypes.memmove(ctypes.addressof((U8 * 0x5f52).in_dll(L, "g_config")), s.read(0x156c14, 0x5f52), 0x5f52)
     st = Status.in_dll(L, "g_hud")
     for n, a in STATUS:
@@ -352,8 +357,74 @@ def port(s, name, L):
     for n, a in STATUS:          # the numbers' changes undone for the map
         setattr(st, n, s.i32(a) if a else struct.unpack("<h", s.read(0x15d140, 2))[0])
     got += (port_map(s, L, MAP_NODES),)
+    timing_put(s, L, cars)       # and the timing's
+    got += (port_outside(Snap(s.path), L),)
     for c in cars:
         L.car_free(ctypes.byref(c))
+    return got
+
+
+# the views from outside: the camera put in the crash's view (13), the screen round the
+# view drawn (0x3081c), then frames of 0x314e4 (the first a whole copy), the engine's
+# turns of each and the pattern standing in for the road
+OUT_RPMS = [800, 2500, 4000, 6100, 7240, 9999, 300]
+LAYOUT = 1
+
+
+def pattern(k):
+    """the view's 3D window (320 x 160 from row 17) as frame k paints it"""
+    return bytes((x * 7 + y * 3 + k * 11) % 200 + 20 for y in range(160) for x in range(320))
+
+
+def original_outside(path):
+    s = Snap(path)
+    left_out(s)
+    cam, car = s.u32(0x143df4), player(s)
+    s.call(0x13530, eax=cam, edx=car, ebx=13)
+    s.call(0x1486c, eax=cam, edx=0)
+    view = s.u32(0xf4578)
+    s.call(0x8118c, view)
+    s.call(0x14568, eax=LAYOUT, edx=0)
+    s.call(0x3081c)
+    base = struct.unpack("<I", s.raw(view + 0x2c, 4))[0] + 0x10
+    s.mu.mem_write(VGA, bytes([FILL]) * (W * H))
+    got = []
+    for k, rpm in enumerate(OUT_RPMS):
+        s.mu.mem_write(base + 17 * W, pattern(k))
+        s.mu.mem_write(car + 0x3c1, struct.pack("<i", rpm))
+        s.call(0x314e4, eax=car, edx=int(k == 0))
+        got.append(bytes(s.mu.mem_read(VGA, W * H)))
+    return got
+
+
+def port_outside(s, L):
+    w, h, pix = picture(s, 0xf4578)
+    view = Picture.in_dll(L, "g_hud_view")
+    ctypes.memmove(view.pix, pix, w * h)
+    p = Picture.in_dll(L, "g_hud_map")
+    ctypes.memmove(p.pix, picture(s, 0xf4584)[2], p.w * p.h)
+    st = Status.in_dll(L, "g_hud")
+    for n, a in STATUS:
+        setattr(st, n, s.i32(a) if a else struct.unpack("<h", s.read(0x15d140, 2))[0])
+    for k in range(4):
+        (I * 4).in_dll(L, "g_hud_small_needle")[k] = s.i32(0xeaa98 + 4 * k)
+    a = player(s)
+    g = lambda at, o: struct.unpack("<i", s.raw(at + o, 4))[0]
+    viewed = s.i32(0x12dd54)
+    car = HudCar(g(a, 0x18), g(a, 0x48a), g(a, 0x3c1), g(g(a, 0x479), 0xac), g(a, 0x68),
+                 viewed, int(viewed < s.i32(0x12da30)), g(a, 0x15c), g(a, 0x3ed), g(a, 0x47d),
+                 g(a, 0x50), g(a, 0x48))
+    box = (I * 4)(*[struct.unpack("<i", s.read(0xe8b10 + 52 * LAYOUT + 0x24 + 4 * i, 4))[0]
+                    for i in range(4)])
+    L.hud_outside_screen(box)
+    scr = Picture.in_dll(L, "g_hud_screen")
+    ctypes.memset(scr.pix, FILL, W * H)
+    got = []
+    for k, rpm in enumerate(OUT_RPMS):
+        ctypes.memmove(view.pix + 17 * W, pattern(k), 160 * W)
+        car.rpm = rpm
+        L.hud_outside_frame(ctypes.byref(car), int(k == 0), LAYOUT)
+        got.append(ctypes.string_at(scr.pix, W * H))
     return got
 
 
@@ -371,12 +442,14 @@ def main():
         sys.exit("no NFS_DOS.EXE")
     for path in args:
         s = Snap(path)
+        s.path = path
         tag = os.path.splitext(os.path.basename(path))[0]
         pal = palette(s)
         frames = original_frames(path)
         want, want_back = original(s), map_back(s)
         maps = original_map(path, MAP_NODES)
-        got, got_back, got_frames, got_maps = port(s, name, L)
+        outs = original_outside(path)
+        got, got_back, got_frames, got_maps, got_outs = port(s, name, L)
         R.png("build/shots/dash_%s_orig.png" % tag, want, pal)
         R.png("build/shots/dash_%s_port.png" % tag, got, pal)
         diff = [255 if a != b else 0 for a, b in zip(want, got)]
@@ -395,6 +468,12 @@ def main():
             print("  frame %d (%s): %d pixels differ%s" % (
                 k, what, len(d), " (first %d, %d)" % (d[0] % W, d[0] // W) if d else ""))
 
+        for k, (a, b) in enumerate(zip(outs, got_outs)):
+            d = [i for i in range(W * H) if a[i] != b[i]]
+            R.png("build/shots/dash_%s_out%d_orig.png" % (tag, k), a, pal)
+            R.png("build/shots/dash_%s_out%d_port.png" % (tag, k), b, pal)
+            print("  outside %d (rpm %d): %d pixels differ%s" % (
+                k, OUT_RPMS[k], len(d), " (first %d, %d)" % (d[0] % W, d[0] // W) if d else ""))
         w, h, _ = picture(s, 0xf4584)
         for k, (a, b) in enumerate(zip(maps, got_maps)):
             d = [i for i in range(w * h) if a[i] != b[i]]

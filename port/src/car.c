@@ -83,6 +83,7 @@ static int car_models(race_car *c, int id)
         if (c->groups[k].index < 0)
             c->groups[k].count = 0;
     }
+    c->smoke_point = model_find_point(&c->near_m, "smok");
     if (id >= 200) {
         front = model_find_texture(&c->near_m, "frntires");
         rear = model_find_texture(&c->near_m, "rertires");

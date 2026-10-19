@@ -13,7 +13,7 @@ from poly_emu import Vec3
 
 SOURCES = ["camera.c", "car.c", "model.c", "polyfill.c", "dash.c", "hud.c", "config.c", "view.c", "sky.c", "roaddraw.c", "trackinfo.c", "road.c", "poly.c",
            "raster.c", "track.c", "files.c", "exe.c", "trackfam.c", "racepal.c", "font.c", "video.c",
-           "fsh.c", "unpack.c", "crash.c", "drive.c", "cardraw.c", "timing.c"]
+           "fsh.c", "unpack.c", "crash.c", "smoke.c", "drive.c", "cardraw.c", "timing.c"]
 I = ctypes.c_int
 U8 = ctypes.c_ubyte
 
@@ -33,10 +33,23 @@ class Car(ctypes.Structure):
 
 
 class Camera(ctypes.Structure):
-    _fields_ = [("mode", I), ("pos", Vec3), ("off", Vec3), ("node", I), ("flags", I),
-                ("pitch", I), ("yaw", I), ("roll", I), ("tilt", I * 3), ("eye", Vec3),
-                ("mirror_on", I), ("yaw_follow", I), ("ahead", ctypes.c_void_p),
+    _fields_ = [("mode", I), ("wanted", I), ("frames", I), ("pos", Vec3), ("off", Vec3), ("node", I),
+                ("flags", I), ("pitch", I), ("yaw", I), ("roll", I), ("tilt", I * 3), ("eye", Vec3),
+                ("mirror_on", I), ("yaw_follow", I), ("step", Vec3), ("ahead", ctypes.c_void_p),
                 ("mirror", ctypes.c_void_p), ("car", ctypes.POINTER(Car)), ("m", I * 9), ("mm", I * 9)]
+
+
+# the camera record's fields compared, (name, offsets in the original's, the port's)
+CAM_FIELDS = [("mode, wanted, frames", (0, 4, 0xc), lambda k: (k.mode, k.wanted, k.frames)),
+              ("pos", (0x10, 0x14, 0x18), lambda k: (k.pos.x, k.pos.y, k.pos.z)),
+              ("off", (0x2c, 0x30, 0x34), lambda k: (k.off.x, k.off.y, k.off.z)),
+              ("node, flags", (0x38, 0x3c), lambda k: (k.node, k.flags)),
+              ("angles", (0x40, 0x44, 0x48), lambda k: (k.pitch, k.yaw, k.roll)),
+              ("tilt", (0x5c, 0x60, 0x64), lambda k: tuple(k.tilt)),
+              ("mirror", (0x68,), lambda k: (k.mirror_on,)),
+              ("eye", (0x6c, 0x70, 0x74), lambda k: (k.eye.x, k.eye.y, k.eye.z)),
+              ("yaw follow", (0x78,), lambda k: (k.yaw_follow,)),
+              ("step", (0x7c, 0x80, 0x84), lambda k: (k.step.x, k.step.y, k.step.z))]
 
 
 def car_of(s, a):
@@ -124,6 +137,109 @@ def check(path, L, bad, stats):
             bad.append("%s camera %s: the original %s, the port %s" % (name, what, want, got))
 
 
+# the outside cameras run step by step (camera_check_mode 0x6324c, then 0x136b0, as
+# race_update_cars does): (name, the mode set at the start or None, steps, the car's
+# moves); the car goes along the road from its node, tumbling (state 4) in the crash
+VIEWS = [("crash", None, 220), ("crash, put back", None, 160)] + \
+        [("mode %d" % m, m, 90) for m in (2, 3, 4, 5, 8, 9, 10, 11, 12, 13)]
+
+
+def node_xyz(L, n):
+    return [L.node_i32(n, o) for o in (8, 12, 16)]
+
+
+def car_at(L, what, k, n0):
+    """where the car is at step k: (x, y, z, pitch, yaw, roll, node, dist, state)"""
+    n = n0 + k // 2
+    x, y, z = node_xyz(L, n)
+    head = ((L.node_i32(n, 0x16) >> 16) << 10) & 0xffffff
+    across = [0, 0x30000, -0x50000, 0x180000, -0x200000, 0x400000][(k // 15) % 6]
+    hx, hz = node_xyz(L, n + 1)[0] - x, node_xyz(L, n + 1)[2] - z
+    x += across * (hz >> 8) // 0x600 >> 8 << 8 if hz else 0
+    z -= across * (hx >> 8) // 0x600 >> 8 << 8 if hx else 0
+    dist = (k % 2) * 0x30000 + 0x1000 * (k % 7)
+    tumble = what.startswith("crash") and k < (120 if what == "crash" else 70)
+    if tumble:
+        p, yw, r = (k * 0x54321) & 0xffffff, (head + k * 0x123456) & 0xffffff, (k * 0x234567 + 0x400000) & 0xffffff
+        y += (k % 9) * 0x18000
+        return x, y, z, p, yw, r, n, dist, 4
+    wob = [0, 0x10000, -0x30000, 0x80000, -0x140000][(k // 7) % 5]
+    return x, y, z, (k * 0x1000) & 0xffffff if k % 3 else 0, (head + wob) & 0xffffff, 0, n, dist, 2
+
+
+def views(path, L, bad, stats):
+    from cars_emu import RaceCar
+    name = os.path.basename(path)
+    s0 = Snap(path)
+    cam = s0.u32(0x143df4)
+    car = s0.u32(0x13c24c + 4 * s0.i32(0x12dd58))
+    if struct.unpack("<I", s0.raw(cam + 0x90, 4))[0] != car:
+        bad.append("%s: the camera on another car" % name)
+        return
+    spec = struct.unpack("<I", s0.raw(car + 0x479, 4))[0]
+    L.view_init(0, struct.unpack("<i", s0.raw(car + 0x48a, 4))[0],
+                struct.unpack("<i", s0.raw(spec + 0x370, 4))[0])
+    n0 = struct.unpack("<i", s0.raw(car + 0x48, 4))[0] + 30
+    for what, mode, steps in VIEWS:
+        s = Snap(path)
+        g = lambda o: struct.unpack("<i", s.raw(cam + o, 4))[0]
+        gc = lambda o: struct.unpack("<i", s.raw(car + o, 4))[0]
+        rc = RaceCar()
+        rc.body_roll, rc.body_pitch = gc(0x365), gc(0x369)
+        rc.roll_phase, rc.pitch_phase = s.raw(car + 0x427, 1)[0], s.raw(car + 0x428, 1)[0]
+        rc.roll_shake, rc.pitch_shake = gc(0x429), gc(0x42d)
+        rc.player, rc.number = gc(0x47d), gc(0x48a)
+        (ctypes.c_void_p * 2).in_dll(L, "g_cars")[0] = ctypes.addressof(rc)
+        ctypes.c_int.in_dll(L, "g_player").value = 0
+        crash = ctypes.addressof(ctypes.c_int.in_dll(L, "g_crash"))
+        ctypes.c_int.from_address(crash + 32).value = s.i32(0x145c98)
+        ctypes.memmove(ctypes.addressof(ctypes.c_int.in_dll(L, "g_cam_modes")), s.read(0xe80f0, 14 * 0x58),
+                       14 * 0x58)
+        ctypes.c_int.in_dll(L, "g_cam_pitch_bias").value = s.i32(0x12ba20)
+        k = Camera()
+        k.mode, k.wanted, k.frames = g(0), g(4), g(0xc)
+        k.pos = Vec3(g(0x10), g(0x14), g(0x18))
+        k.off = Vec3(g(0x2c), g(0x30), g(0x34))
+        k.node, k.flags = g(0x38), g(0x3c)
+        k.pitch, k.yaw, k.roll = g(0x40), g(0x44), g(0x48)
+        for i in range(3):
+            k.tilt[i] = g(0x5c + 4 * i)
+        k.eye = Vec3(g(0x6c), g(0x70), g(0x74))
+        k.mirror_on, k.yaw_follow = g(0x68), g(0x78)
+        k.step = Vec3(g(0x7c), g(0x80), g(0x84))
+        k.car = ctypes.cast(ctypes.pointer(rc), ctypes.POINTER(Car))
+        ok = True
+        for step in range(steps):
+            x, y, z, p, yw, r, n, dist, state = car_at(L, what, step, n0)
+            for o, v in ((0, x), (4, y), (8, z), (0xc, p), (0x10, yw), (0x14, r), (0x48, n),
+                         (0x39d, dist), (0x512, state)):
+                s.mu.mem_write(car + o, struct.pack("<i", v))
+            rc.pos = Vec3(x, y, z)
+            rc.pitch, rc.yaw, rc.roll, rc.node, rc.dist, rc.state = p, yw, r, n, dist, state
+            if step == 0 and mode is not None:
+                s.call(0x13530, eax=cam, edx=car, ebx=mode)
+                L.camera_set_car(ctypes.byref(k), ctypes.byref(rc), mode)
+            s.call(0x6324c, eax=car)
+            s.call(0x136b0, eax=cam)
+            L.camera_check(ctypes.byref(k), ctypes.byref(rc))
+            L.camera_update(ctypes.byref(k))
+            stats["steps"] += 1
+            for field, offs, port in CAM_FIELDS:
+                want, got = tuple(g(o) for o in offs), port(k)
+                if want != got:
+                    bad.append("%s %s, step %d, camera %s: the original %s, the port %s" % (
+                        name, what, step, field, want, got))
+                    ok = False
+            v = ctypes.c_int.from_address(crash + 32).value
+            if v != s.i32(0x145c98):
+                bad.append("%s %s, step %d, the crash view's wait: the original %d, the port %d" % (
+                    name, what, step, s.i32(0x145c98), v))
+                ok = False
+            stats["modes"].add(g(0))
+            if not ok:
+                break
+
+
 def main():
     name, snaps = sys.argv[1], sys.argv[2:]
     L = lib()
@@ -133,11 +249,12 @@ def main():
     if not L.track_load(name.encode()):
         sys.exit("no track")
     for p in snaps:
-        bad, stats = [], {"follow": 0, "moved": 0}
+        bad, stats = [], {"follow": 0, "moved": 0, "steps": 0, "modes": set()}
         check(p, L, bad, stats)
-        print("%s: the grid, %d node searches (%d moved), the camera: %s" % (
-            os.path.basename(p), stats["follow"], stats["moved"],
-            "all equal" if not bad else "%d differ" % len(bad)))
+        views(p, L, bad, stats)
+        print("%s: the grid, %d node searches (%d moved), the camera, %d steps outside (modes %s): %s" % (
+            os.path.basename(p), stats["follow"], stats["moved"], stats["steps"],
+            sorted(stats["modes"]), "all equal" if not bad else "%d differ" % len(bad)))
         for b in bad[:12]:
             print("  " + b)
 

@@ -1116,7 +1116,7 @@ the start) with tumbles of 48–594 steps, landings and a put-back counted.
   flat or on its side (`0xea5a4`, `0xea5a8`, `0xea5ac`): speeds halved. The smoke
   (`0x1464d0`, 100 puffs: `0x64588` clear, `0x64804` let out, `0x64978` rise and age) once
   the body is slower than 8 m/s (`+0x4a5` bit 2). `0x145c98` = 0x3c: the camera's crash
-  view (`camera_check_mode` `0x6324c`; not in the port).
+  view (`camera_check_mode` `0x6324c`, §4.7); the smoke drawn with the car (§4.10).
 - **The end**: on its wheels and along the road (up · up > 0.966, along · along > 0.7) and
   still → `0x1ceb4` (kind 2 again, `car_set_drive_kind` `0x1cd40`); else the wait runs
   down (faster when still); at 0, unless another racer faster than 9 m/s is less than a
@@ -1135,8 +1135,8 @@ the start) with tumbles of 48–594 steps, landings and a put-back counted.
   Unicorn starts with 0 (single!), so `snap_emu.py` sets 0x127f.
 - **Not ported**: the other cars' crash (`0x1de8a`: `0x7bf94`, stood up `0x7daec`, kind
   5); the other cars put back with the player (`0x7c030`); the sounds (`0x53214`,
-  `0x531dc`, `0x52e40`); the replay's mark; the camera's view; drawing the smoke
-  (`0x66d08`). **Not reached by the runs**: the tunnel's roof, the `0xea5c8` wall branch,
+  `0x531dc`, `0x52e40`); the replay's mark; the dust's pictures (`smo1`..`smo4`,
+  `dir1`..`dir4` of SMOKE.QFS, `0x646f0`). **Not reached by the runs**: the tunnel's roof, the `0xea5c8` wall branch,
   the fast landing (`0x1de73`), the large-vector halving in `0x2c2d8`/`0x2c3d8`/`0x2c490`,
   the smoke's index wrapping.
 - In the port, `RENFS_THROW=s:x,y,z` gives the car a speed at step s to see a crash (a
@@ -1177,6 +1177,33 @@ the start) with tumbles of 48–594 steps, landings and a put-back counted.
   flag from the car's; `+0x78` = the car's yaw; the eye from the mode (so the eye turned is
   the last frame's). The end of every mode: angles = (the car's + tilt) & 0xfffc00, the
   position and angles taken from the next ones; modes > 1 add `0xf6b8c` to the roll.
+- **The modes outside the car** (2026-10-19; `camera.c`, checked by `tools/camera_emu.py`:
+  1280 steps outside on each of the 11 snapshots, modes 2..5, 8..13, the crash thrown
+  and put back, all equal). The table's fields by name: `+0` the view's kind, `+4` the eye,
+  `+0x14` how far ahead the point looked at is, `+0x18` how the eye follows (1 across
+  with the car ×1.5, 2 ×½, 3 round to the car's yaw and turned with the car, 4 round to
+  the road's heading), `+0x2c` a shift, `+0x30` divide (each update 1/shift of the way
+  instead of 1/2^shift, `0x13630`), `+0x3c` the frames a move takes, `+0x40` the mode
+  after it (−1 none), `+0x44` where the eye's z ends it, `+0x48` / `+0x54` the eye to start
+  from when taken from the driver's seat (not in a crash, the player's car upright).
+  Mode 13 (the crash): kind 1 (96°), eye (0, 2.8, −10), the point 12 ahead, follows the
+  road's heading by 1/16 a frame. Mode 10 the way back into the seat (follow 3, then 0),
+  11 into 1. **`0x138e3`..** (modes 2..5, 8, 10..13): the camera put at the car when more
+  than 16 nodes off; the road's way from the nodes 12 either side, weighted by the car's
+  `+0x39d` (0..0x60000 along its node); the point = the car + that way made 1 long
+  (`0x2c1c0`) × ahead; the eye eased and the yaw followed (`0x3e7ec` = `ea_atan2(z, x)` <<
+  8), the eye turned (by the car with follow 3; for mode 13 pitched towards the point;
+  else flat), raised by the slope under the car (halved downhill), held at most 6 above
+  the road (`0x14c9c`: the plane through the node, the next and the across vector, from
+  the **next** node's point) while the car tumbles, and kept inside the road's edges
+  (`+2` / `+3` lanes × 0x2000). Mode 9 is fixed to the car. Modes 6 and 7 (from the car
+  ahead, from the police car) not ported.
+- **`camera_check_mode` `0x6324c`**, each step after the splits (then `camera_update`):
+  `0x145c98` counted down; a mode ≥ 4 that is the one wanted (not 10) stays; the car
+  watched not upright on its road (`0x14de8`) → `0x145c98` = 60 and mode 13 (from 0..3,
+  10, 11); upright again and the 60 steps over → back to the mode wanted (0 by 10, 1 by
+  11). `camera_set_mode` `0x14b00` then sets the view (`0x14210`, the layout for the
+  detail) and `0x143e00` = 1: the screen round the view drawn again (§4.11).
 - `draw_road_sections` `0x5aa84`: the track **from far to near** (a painter's order), a
   section = 4 road nodes (`0x13bb90` the sections' mask); per section 11 points, 3D at
   `0x13b728` (12 bytes each, `0x84` a section) and on the screen at `0x13b9bc` (8 bytes,
@@ -1815,6 +1842,35 @@ fb; `0x13d5c8` the nearest black: `0x55790(r, g, b)`, the entry 0..254 of the 6-
 palette with the least |dr| + |dg| + |db|, the first of equals. (`0x13d5a4`..`0x13d5e4`,
 `0x12b9fc`, `0x12ba08`: the HUD's other colours, the same way.) Equal on all 7 snapshots.
 
+**The crash's smoke** (2026-10-19; `port/src/smoke.c`). `load_smoke` `0x645bc`, in
+`race_main` after `cars_create`: `SIMDATA\MISC\SMOKE.QFS` (`0x156564` + `0xe3b7c`), the
+puff `smok` (`0xf6db0`; 64x64, centre (30, 32)), `smo1`..`smo4` and `dir1`..`dir4` (the
+dust, `0x1464bc`, `0x1460ac`: not used yet), its `!PAL` + 0x10 tinted (`pal_tint`) and
+queued for re-colouring (`0x55e68`); the puffs' order `+0x640` = 0..99. **The table**
+`0x64488`, at the end of `pal_apply_remaps` `0x55fa8`: the palette read back from the card
+(`0x8a328`, 6 bits) made 8 (c·255/63, truncated); 64 KB at `[0x1464cc]`, `0x64360`: entry
+[s][d] = `nearestcolour`(min(255, d + s − s/4) for red, green, blue) (the smoke colour's
+three quarters added); its rows' pointers `0x1460bc` given to EA's `0x94731` (`0xf94cc`).
+**Drawn** at the end of `car_draw` `0x66d08` for the player's car (slot `0x12dd58`) with
+`0x15d13a` = 0, when `+0x175` & 2 (the crash slowed): the offset = the near model's point
+`smok` on the screen (`+0x616` from `0x97afa`: the ORIP's +0x54/+0x58 named points; into
+the instance's `+0x7c`) − the car's place (`0x591a4`), or (0, 0) with `+0x78e` (the far
+model). **`0x64a74(smoke, offset)`**: the 100 puffs (place >> 11) − (camera >> 11) turned
+(`0x94db8`, `0x94e10`), z held to 1..0x7fff; the order sorted again far first (insertion,
+moving each past the nearer, so it stays nearly sorted from frame to frame); projected
+(`0x587a8` = `0x94c80` shift 16); each alive (age ≥ 0) with z > 0x4ccc >> 11: size =
+(`0xf7a30` << 5) / z in 16.16, f = (0x10000 − age) >> 8, ((size >> 9) · ((0x10000 − f² +
+0xccc) >> 8) >> 8) · 0x300 >> 4, the puff at its point + the offset. **EA's stretched
+shape** `0x96f70` → `0x96e40(scale, shape, x, y)`: w = scale · width >> 16, h = |scale| ·
+height >> 16, the corner = (x, y) − the centre × scale (rounded, `imul shrd adc`; a scale
+< 0 mirrors from the right) → `0x96aa8(w, h, shape, x, y)`: out if past the clip, steps
+(width << 16) / w, (height << 16) / h, starting half a step in (w or h < 0 flips), cut to
+the clip, a column table `0x15ed1c` (`0xa6240`), each row by `0x9498d`: **every pixel =
+`0xf94cc`[shape][screen]** (no see-through colour: the table does it), `0x96a10` instead
+for a banked screen (`0xf88c0`). A shape not of the screen's type (`0xf88b5`) is converted
+first (`0x9e734`). **Equal on all 11 snapshots in 88 rounds of made-up puffs
+(`tools/smoke_emu.py`), the table and the re-coloured file too (`tools/racepal_emu.py`).**
+
 **In the port's race (`--race cy1`)**: the two racers on the grid, standing (`+0x351` = the
 grid's yaw), the list made each frame (the step's job), the rows marked, the cars painted
 as the road reaches them. At the standing start the rival is beside the player, out of
@@ -2024,6 +2080,27 @@ grey `0xf6c84` (→ `0x1456b8`), yellow `0xf6cb0` (yel0..9, `yelr` 10, `yeln` 11
 - Mode 2 (the acceleration test, `0x2d8c0`): not ported.
 **Ported (`hud.c` `bar_numbers`): equal pixel for pixel on e3 in 27 cases (speeds,
 gears, places, times, splits both ways, laps, miles, a new best lap; `tools/dash_emu.py`).**
+
+**The views from outside the car** (2026-10-19; `hud.c` `hud_outside_screen`,
+`hud_outside_frame`). When `0x143e00` (the view changed): `0x14568(layout, 0)` and
+**`0x3081c`**, into the view's picture: its four tiles `0000`..`0003` (32x32, names
+`0xeaa20`[(i & 1) + 2j]) over the whole picture from row 13, the status bar (`0x2f2a4`),
+the border round the view's box (layout `+0x24`; `b00t`/`b00b` along, `b00l`/`b00r` down
+and their last pieces, the corners `b000`..`b003`, each drawn centred by `0x812bc`: x −
+its `+8`, y − its `+0xa`), the small rev counter `tach` see-through at its own place, and
+the numbers' caches reset (`0x2d150`). Each frame then **`0x314e4(car, redraw)`**:
+`0x30b64`: with redraw the rev counter put in again and the whole picture copied to the
+screen; else only the view's spans by a BAMF list: `MASKLO.B<l><d>` with the map on, else
+the entries of `MASKLO.MMB`, by (layout − 1, detail); then the keys' bar `0x2f644` (not
+ported), the numbers `0x30d8c`, **the small needle `0x31168`**: the angle = min(rpm, red
+line + 0x3d4) · 600 / red line + 0x1a9, the end = the centre (w/2 + `+0xc`, h/2 + `+0xe`)
++ r · (cos, sin), r = hw − hw/4 − hw/16, the start a quarter of the way out; the old
+needle's two halves (`0xeaa98`..`0xeaaa4`) erased in clip boxes ±2 by drawing the `tach`
+again, the new one by the smoothed line `0x8b195` (widths 1, the needles' record
+`0x12b5f4`); then the map at (0x103, 0x7e) and `0x5c5d0`. Mode 0 again (`0x143e68` = 0):
+the whole dashboard (`0x2d284`). **Equal pixel for pixel on all 11 snapshots in 7 frames
+each (the crash's view, the revs from 300 to 9999; `tools/dash_emu.py`).** Not ported:
+the tickets, `0xeaaa8` (the background drawn again), detail 3, the replay's buttons, 640x480.
 
 ### 4.12 The race's timing (2026-10-19)
 
