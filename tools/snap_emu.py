@@ -19,7 +19,7 @@ addresses used to call them and read their globals are translated here.
 """
 import struct, sys
 from unicorn import Uc, UC_ARCH_X86, UC_MODE_32, UC_HOOK_INTR, UC_HOOK_INSN, UC_HOOK_CODE
-from unicorn.x86_const import (UC_X86_REG_ESP, UC_X86_REG_EAX, UC_X86_REG_EBX, UC_X86_REG_ECX,
+from unicorn.x86_const import (UC_X86_REG_FPCW, UC_X86_REG_ESP, UC_X86_REG_EAX, UC_X86_REG_EBX, UC_X86_REG_ECX,
                                UC_X86_REG_EDX, UC_X86_REG_EIP, UC_X86_INS_IN, UC_X86_INS_OUT,
                                UC_X86_REG_ESI, UC_X86_REG_EDI, UC_X86_REG_EBP)
 
@@ -49,6 +49,9 @@ class Snap:
         mu.mem_write(0, open(path, "rb").read())
         mu.mem_map(STACK - 0x100000, 0x100000)
         mu.mem_map(DONE, 0x1000)
+        # the x87 as the game sets it (Watcom's start-up, 0xa8c95: 0x128b08 = 0x127f,
+        # double precision, rounding to nearest); Unicorn's own 0 is single precision
+        mu.reg_write(UC_X86_REG_FPCW, 0x127f)
         self.io, self.ints = [], []
 
         def on_int(mu, n, _):

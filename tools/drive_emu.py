@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
 """The player's car driven, the original's code against the port's, step by step: on a
 snapshot of a race, the original's chain of a race step for the player's car (every
-second step the controls, 0x10400; then drive_player 0x382d0: car_physics_player 0x408e0,
-car_check_lap 0x5056c, the car on the road 0x38808; then car_road_offset 0x51598) run in
-the emulator, and the port's drive_controls and drive_step from the same car record and
-globals, given the same control words. After every step every field of the car the port
-keeps is compared, and the globals the driving writes. The sounds, the replay's
-highlights, the acceleration test's times and the force feedback are left out on the
-original's side (LEFT_OUT); a hard hit on a wall (the crash, 0x78204) stops a run.
+second step the controls, 0x10400; then its kind's routine: drive_player 0x382d0
+(car_physics_player 0x408e0, car_check_lap 0x5056c, the car on the road 0x38808) or,
+tumbling after a hard hit on a wall, drive_crashed 0x1cfe0; then car_road_offset 0x51598
+and cars_meets_world 0x1c878, its traffic_police_tick 0x7a040 cut down to the player's
+0x786d4) run in the emulator, and the port's drive_controls, drive_step and crash_world
+from the same car record and globals, given the same control words. After every step
+every field of the car the port keeps is compared (its tumbling body too), the globals
+the driving and the crash write and the smoke's block. The sounds, the replay's
+highlights, the acceleration test's times, the force feedback, the police's steering,
+the roadside objects and the cars against each other are left out on the original's side
+(LEFT_OUT).
 
     build/venv/bin/python tools/drive_emu.py [snapshot ..]     (default: all d*, e*, r*)
 """
@@ -15,18 +19,21 @@ import ctypes, glob, os, struct, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from snap_emu import Snap, game, flat
 from unicorn import UC_HOOK_CODE
-from unicorn.x86_const import UC_X86_REG_ESP, UC_X86_REG_EIP
+from unicorn.x86_const import UC_X86_REG_ESP, UC_X86_REG_EIP, UC_X86_REG_EAX
 
 SOURCES = ["drive.c", "cardraw.c", "model.c", "polyfill.c", "camera.c", "car.c", "dash.c", "hud.c",
            "config.c", "view.c", "sky.c", "roaddraw.c", "trackinfo.c", "road.c", "poly.c",
            "raster.c", "track.c", "files.c", "exe.c", "trackfam.c", "racepal.c", "font.c",
            "video.c", "fsh.c", "unpack.c"]
+# (crash.c is compiled into drive_test.c, which reaches its parts)
 # sounds (0x52d2c, 0x52e40, 0x52ea8: two words on the stack each), highlights, the
 # acceleration test's times, speech, force feedback, the wall's sound by the camera,
-# EXPLODE's push
+# EXPLODE's push; the crash's sounds (0x53214, 0x531dc), the police's steering 0x1c800,
+# the roadside objects 0x1ebf4, the cars against each other 0x1c6a4
 LEFT_OUT = {0x52d2c: 2, 0x52e40: 2, 0x52ea8: 2, 0x5c6d4: 0, 0x2d71c: 0, 0x2d778: 0,
-            0x722b4: 0, 0x72438: 0, 0x4d8c0: 0, 0x4d878: 0, 0x7fb58: 0, 0x78c30: 0}
-CRASH = 0x78204
+            0x722b4: 0, 0x72438: 0, 0x4d8c0: 0, 0x4d878: 0, 0x7fb58: 0, 0x78c30: 0,
+            0x53214: 0, 0x531dc: 0, 0x1c800: 0, 0x1ebf4: 0, 0x1c6a4: 0}
+KIND = {2: 0x382d0, 4: 0x1cfe0}
 CAR, SPEC = 0x600, 0x800
 
 # the driving's globals, in drive_test.c's order: (address, size)
@@ -38,6 +45,14 @@ GLOBALS += [(0x12d954 + 4 * p, 4) for p in range(8)] + [(0x12d974 + 12 * p, 4) f
 GLOBALS += [(0x12d978 + 12 * p, 4) for p in range(8)] + [(0x12ccac + 4 * p, 4) for p in range(8)]
 GLOBALS += [(0x14ea80 + 0x1d2 * p + 0x1c4, 4) for p in range(8)]
 WRITTEN = {17: "first_move", 19: "air_shake", 22: "spinning", 32: "top_speed"}
+# the crash's, in drive_test.c's order; the last are only read
+CRASH_GLOBALS = [(0xea5d0, "hit_wait"), (0xea5d4, "hit_level"), (0xea66c, "impulse"),
+                 (0xea670, "depth"), (0x12b4c4, "point_vel.x"), (0x12b4c8, "point_vel.y"),
+                 (0x12b4cc, "point_vel.z"), (0x129fac, "refresh"), (0x145c98, "view"),
+                 (0xf6b70, "respawned"), (0xea700, "restart"), (0xf6dd8, "random")]
+CRASH_IN = [0x12dd08, 0x12da34, 0x12da2c, 0x12da38]
+CRASHES = [0x14ec38 + 0x1d2 * p for p in range(8)]
+SMOKE, SMOKE_LEN = 0x1464d0, 0x96c
 
 # control words: steering bits 0..5 (32 straight, 0 full left, 63 full right), pedals
 # 6..11 (30 neither, 0 the throttle, 63 the brake), 12..15 (1 up, 2 down, 4 horn, 8 the
@@ -87,6 +102,10 @@ def pieces(name):
                                        (44, 52), (32, 2), (20, 8), (60, 0), (32, 45), (5, 25)]):
             seq.append((22 + 3 * k, word(st, pd)))
         return seq
+    if name == "tumble":
+        return [(450, word(pedal=COAST)), (120, word(pedal=GAS))]
+    if name == "tumble gas":
+        return [(300, word(pedal=GAS)), (150, word(40, GAS)), (100, word(pedal=GAS))]
     raise ValueError(name)
 
 
@@ -109,7 +128,15 @@ VARIANTS = [("as is", {}, {}, {}),
             ("jump", {}, {0x58: 0x80000}, {}),
             ("jump soft", {0x12da28: 0x20}, {0x58: 0xa0000}, {}),
             ("rally jump", {0x12dd2c: 1}, {0x58: 0x90000, 0x14: 0xff0000}, {}),
-            ("nitro", {0x12cca0: 1}, {}, {})]
+            ("nitro", {0x12cca0: 1}, {}, {}),
+            # thrown at the walls: hard hits, the crash
+            ("thrown right", {}, {0x54: 0x300000, 0x5c: 0x200000}, {}),
+            ("thrown left", {}, {0x54: -0x300000, 0x5c: 0x280000}, {}),
+            ("thrown spinning", {}, {0x54: 0x380000, 0x5c: 0x380000, 0x74: 0x300000}, {}),
+            ("thrown up", {}, {0x54: -0x380000, 0x58: 0xc0000, 0x5c: 0x300000}, {}),
+            ("thrown rally", {0x12dd2c: 1}, {0x54: 0x400000, 0x5c: 0x300000}, {}),
+            ("thrown manual", {}, {0x3e9: 0, 0x54: -0x380000, 0x5c: 0x300000}, {}),
+            ("thrown circuit", {0x12da12: 4}, {0x54: 0x380000, 0x5c: 0x100000}, {})]
 # keys held through a run (the original's table 0xf7ac8 + scan code): N and B, NITRO's
 KEYS = {"nitro": [0x31, 0x30]}
 V = {v[0]: k for k, v in enumerate(VARIANTS)}
@@ -119,7 +146,10 @@ RUNS = [("gas", "as is"), ("weave", "as is"), ("handbrake", "as is"), ("weave", 
         ("joy", "joystick"), ("joy", "abs tcs"), ("gas", "past finish"), ("weave", "revving"),
         ("weave", "segment 2"), ("gas", "two players"), ("gas", "top speed 16"),
         ("weave", "rolled"), ("gas", "jump"), ("weave", "jump soft"), ("weave", "rally jump"),
-        ("reverse", "rally"), ("joy", "rally"), ("gas", "nitro"), ("weave", "nitro")]
+        ("reverse", "rally"), ("joy", "rally"), ("gas", "nitro"), ("weave", "nitro"),
+        ("tumble", "thrown right"), ("tumble", "thrown left"), ("tumble", "thrown spinning"),
+        ("tumble", "thrown up"), ("tumble", "thrown rally"), ("tumble", "thrown manual"),
+        ("tumble", "thrown circuit"), ("tumble gas", "thrown right"), ("tumble gas", "thrown left")]
 
 
 def lib():
@@ -152,14 +182,21 @@ def wr(s, a, n, v):
 # the ported routines, for --coverage: (first, last instruction + 1)
 PORTED = [(0x10010, 0x10428), (0x483e4, 0x48b80), (0x5162c, 0x51690), (0x3e918, 0x3e9c4),
           (0x3e9c4, 0x41a2b), (0x188a0, 0x18a50), (0x38434, 0x384ba), (0x38548, 0x38c0f),
-          (0x5056c, 0x506da), (0x51598, 0x5162b)]
+          (0x5056c, 0x506da), (0x51598, 0x5162b),
+          # the crash's
+          (0x3fed4, 0x4008a), (0x78204, 0x7836e), (0x1cb14, 0x1cbb0), (0x1cbb0, 0x1cd3d),
+          (0x1cd40, 0x1ceb2), (0x1ceb4, 0x1cfdf), (0x1cfe0, 0x1e314), (0x2a334, 0x2a917),
+          (0x2a918, 0x2afb7), (0x2c25c, 0x2c2d6), (0x2c2d8, 0x2c3d7), (0x2c3d8, 0x2c48d),
+          (0x2c490, 0x2c584), (0x2c584, 0x2c71c), (0x2c894, 0x2c91f), (0x2c9c0, 0x2ca92),
+          (0x2cb78, 0x2cc5d), (0x3e784, 0x3e7e9), (0x3e7fc, 0x3e845), (0x64588, 0x645b9),
+          (0x64804, 0x64977), (0x64978, 0x64a73), (0x7dbd8, 0x7dd45), (0x786d4, 0x788b5),
+          (0x78a19, 0x78a7f), (0x7b130, 0x7b175), (0x1e6cc, 0x1e719), (0x1c878, 0x1c8d4)]
 HIT = set()
 
 
 def run(L, F, path, scr, var, coverage=False):
     s = Snap(path)
     mu = s.mu
-    crashed = []
     if coverage:
         for lo, hi in PORTED:
             mu.hook_add(UC_HOOK_CODE, lambda mu, a, n, u: HIT.add(flat(a)), None, begin=game(lo), end=game(hi) - 1)
@@ -171,11 +208,19 @@ def run(L, F, path, scr, var, coverage=False):
         mu.reg_write(UC_X86_REG_EIP, ret)
     for at, k in LEFT_OUT.items():
         mu.hook_add(UC_HOOK_CODE, hook, k, begin=game(at), end=game(at))
-    mu.hook_add(UC_HOOK_CODE, lambda mu, a, n, u: crashed.append(1), None, begin=game(CRASH), end=game(CRASH))
+    car = s.u32(0x13c24c + 4 * s.i32(0x12dd58))
+
+    def refresh(mu, addr, size, u):
+        # traffic_police_tick cut down to the player's car (0x786d4), as the port has it
+        if s.i32(0xf74ac) == 0:
+            mu.reg_write(UC_X86_REG_EAX, car)
+            mu.reg_write(UC_X86_REG_EIP, game(0x786d4))
+        else:
+            hook(mu, addr, size, 0)
+    mu.hook_add(UC_HOOK_CODE, refresh, None, begin=game(0x7a040), end=game(0x7a040))
     vname, gset, cset, sset = VARIANTS[var]
     for a, v in gset.items():
         wr(s, a, 4, v)
-    car = s.u32(0x13c24c + 4 * s.i32(0x12dd58))
     for o, v in cset.items():
         mu.mem_write(car + o, struct.pack("<i", v))
     # the surfaces for the track's kind, the original's and the port's
@@ -188,11 +233,19 @@ def run(L, F, path, scr, var, coverage=False):
         s.write(0xf7ac8 + k, b"\1")
     L.drive_test_global(23, 1, 1 if vname in KEYS else 0)
     L.drive_surfaces()
+    for k, (a, nm) in enumerate(CRASH_GLOBALS):
+        L.crash_test_global(k, 1, rd(s, a, 4))
+    for k, a in enumerate(CRASH_IN + CRASHES):
+        L.crash_test_global(len(CRASH_GLOBALS) + k, 1, rd(s, a, 4))
+    smoke = ctypes.create_string_buffer(bytes(s.read(SMOKE, SMOKE_LEN)), SMOKE_LEN)
+    L.crash_test_smoke(smoke, 1)
     mine = (ctypes.c_int * 16).in_dll(L, "g_surfaces")
     theirs = struct.unpack("<16i", s.read(0x12cc00, 64))
     if list(mine)[:12] != list(theirs)[:12]:
         return "surfaces differ: %s / %s" % (list(mine)[:12], theirs[:12])
     raw = bytes(mu.mem_read(car, CAR))
+    if struct.unpack("<I", raw[0xc0:0xc4])[0] != car + 0xc4:
+        return "the body is not at +0xc4"
     spec_at = struct.unpack("<I", raw[0x479:0x47d])[0]
     for o, v in sset.items():
         mu.mem_write(spec_at + o, struct.pack("<i", v))
@@ -212,7 +265,7 @@ def run(L, F, path, scr, var, coverage=False):
             L.drive_test_in(o, bytes(mu.mem_read(a, CAR)), spec)
             others.append(o)
         L.drive_test_car(k, o)
-    n = 0
+    n = tumbling = 0
     for steps, w in script(scr):
         for _ in range(steps):
             st = s.i32(0x145c94)
@@ -225,11 +278,15 @@ def run(L, F, path, scr, var, coverage=False):
             if fl & 4:
                 s.call(0x10400, eax=car)
                 L.drive_controls(rc)
-            s.call(0x382d0, eax=car)
+            kind = struct.unpack("<i", bytes(mu.mem_read(car + 0x512, 4)))[0]
+            if kind not in KIND:
+                return "step %d: kind %d, not in the port" % (n, kind)
+            tumbling += kind == 4
+            s.call(KIND[kind], eax=car)
             s.call(0x51598, eax=car)
+            s.call(0x1c878)
             L.drive_step(rc)
-            if crashed:
-                return "step %d: a hard hit on a wall (the crash), stopped" % n
+            L.crash_world()
             theirs = bytes(mu.mem_read(car, CAR))
             out.raw = theirs
             L.drive_test_out(rc, out)
@@ -244,8 +301,20 @@ def run(L, F, path, scr, var, coverage=False):
                 b = L.drive_test_global(k + (player if k == 32 else 0), 0, 0)
                 if a != b:
                     diff.append("%s %d/%d" % (nm, a, b))
+            for k, (a, nm) in enumerate(CRASH_GLOBALS):
+                if rd(s, a, 4) != L.crash_test_global(k, 0, 0):
+                    diff.append("%s %d/%d" % (nm, rd(s, a, 4), L.crash_test_global(k, 0, 0)))
+            k = len(CRASH_GLOBALS) + len(CRASH_IN) + player
+            if rd(s, CRASHES[player], 4) != L.crash_test_global(k, 0, 0):
+                diff.append("crashes %d/%d" % (rd(s, CRASHES[player], 4), L.crash_test_global(k, 0, 0)))
+            L.crash_test_smoke(smoke, 0)
+            theirs_smoke = bytes(s.read(SMOKE, SMOKE_LEN))
+            if smoke.raw != theirs_smoke:
+                at = next(i for i in range(SMOKE_LEN) if smoke.raw[i] != theirs_smoke[i])
+                diff.append("smoke from +%#x (%s / %s)" % (at, theirs_smoke[at - at % 4:at - at % 4 + 16].hex(),
+                                                            smoke.raw[at - at % 4:at - at % 4 + 16].hex()))
             if diff:
-                return "step %d (word %#x, steps %d): %s" % (n, w, st, ", ".join(diff[:12]))
+                return "step %d (word %#x, steps %d, kind %d): %s" % (n, w, st, kind, ", ".join(diff[:12]))
             wr(s, 0x145c94, 4, st + 2)
             # the 100 Hz clock, three ticks a step
             clock = s.i32(0xed100) + 3
@@ -253,8 +322,9 @@ def run(L, F, path, scr, var, coverage=False):
             L.drive_test_global(13, 1, clock)
             n += 1
     f = lambda o: struct.unpack("<i", bytes(mu.mem_read(car + o, 4)))[0]
-    return "equal, %d steps (to node %d, %.1f m/s, gear %d, %d rpm)" % (
-        n, f(0x48), f(0x68) / 65536, f(0x3ed), f(0x3c1))
+    crash = ", %d tumbling, %d crashes" % (tumbling, rd(s, CRASHES[player], 4)) if tumbling else ""
+    return "equal, %d steps (to node %d, %.1f m/s, gear %d, %d rpm%s)" % (
+        n, f(0x48), f(0x68) / 65536, f(0x3ed), f(0x3c1), crash)
 
 
 def report_coverage():

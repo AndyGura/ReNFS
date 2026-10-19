@@ -1,5 +1,6 @@
 /* The race's cars (NOTES §4.6). */
 #include "car.h"
+#include "crash.h"
 #include "track.h"
 #include "trackfam.h"
 #include "racepal.h"
@@ -116,6 +117,8 @@ static void car_size(race_car *c, const char *name)
         int h = (int)(u[4] | u[5] << 8 | u[6] << 16 | (unsigned)u[7] << 24);
         int l = (int)(u[8] | u[9] << 8 | u[10] << 16 | (unsigned)u[11] << 24);
 
+        if (n >= 20)
+            crash_body_setup(c, u);
         if (w && h && l) {
             c->half_len = l * 2;
             c->half_wid = w * 2;

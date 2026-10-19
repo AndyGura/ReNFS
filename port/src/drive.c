@@ -4,6 +4,7 @@
    >> here), each as the machine code does. */
 #include "drive.h"
 #include "cardraw.h"
+#include "crash.h"
 #include "exe.h"
 #include "track.h"
 #include "files.h"
@@ -953,10 +954,29 @@ static void wall_hit(race_car *c, int h, int v, int side, int kind, int bounce)
         a -= 0x1000000;
     if ((!g_drive.rally && v >= 0x180000 && c->speed_abs > 0x230000)
         || (g_drive.rally && v >= 0x220000 && c->speed_abs > 0x2d0000)) {
-        /* 0x78204: the hit's push turned into the tumbling body's (+0xc4), and the
-           car to the crash (0x1cb14); not in the port yet */
-        (void)kind;
-        g_drive.crashed++;
+        /* the crash: the hit's push into the body's turn, by how square the car met the
+           wall (a) and how much faster than 6 m/s (up to 14), the wall's kind deciding
+           which way it rolls */
+        int s = v - 0x60000, t, q;
+
+        t = a < 0x800000 ? a / 8 : 0x1000000 - (0x1000000 - a) / 8;
+        if (t > 0x800000)
+            t -= 0x1000000;
+        if (s > 0xe0000)
+            s = 0xe0000;
+        q = (b >> 16) * s / 64;
+        if (t > 0)
+            t = s - q;
+        else {
+            t = q - s;
+            s = -s;
+        }
+        if (kind == 0) {
+            t = -t;
+        } else
+            q = -q;
+        if (s)
+            crash_hard_hit(c, s / 4, t, q * 3 / 4);
         return;
     }
     if (iabs(b) < 0x130000 && c->speed > 0
@@ -1332,7 +1352,7 @@ static void tilt_to_road(race_car *c, int dp, int dr)
 /* 0x38808: gravity; on the road the car lies on its slope and its speed up follows it;
    off it, in the air, it noses over; a landing after a long jump is hard. The slope's
    pull along the car (+0x3e1) for the next step */
-static void on_road(race_car *c)
+void drive_on_road(race_car *c, int place)
 {
     int g = (c->dt >> 2) * 0x9cf5c >> 14, y, keep;
 
@@ -1341,6 +1361,13 @@ static void on_road(race_car *c)
     if (!(g_drive.options & 0x20))
         c->vel.y -= g / 2;
     y = ((c->vel.y / 4 + c->vel.y) >> 12) * (c->dt >> 4) + c->pos.y;
+    if (!place) {
+        c->pos.y = c->ground.y;
+        c->vel.y = 0;
+        c->push_fwd = 0;
+        c->push_side = 0;
+        return;
+    }
     if (y - 0x40 > c->ground.y) {
         keep = y;
         if (y - c->ground.y < 0x4000) {
@@ -1410,15 +1437,15 @@ static void on_road(race_car *c)
 /* car_check_lap 0x5056c: the node the car is on followed; on a circuit, a lap counted
    crossing the line forwards (its time kept), taken back crossing it backwards; how
    far along the race it is (+0x4c) */
-static void check_lap(race_car *c)
+int drive_check_lap(race_car *c)
 {
-    int was = c->node, n = c->node;
+    int was = c->node, n = c->node, moved;
 
-    track_follow(&c->pos, &n);
+    moved = track_follow(&c->pos, &n);
     c->node = n;
     if (!g_track.loop) {
         c->progress = n;
-        return;
+        return moved;
     }
     if (was > g_drive.last_node - 2 && n < 2) {
         if (c->player < DRIVE_PLAYERS && c->lap >= 0 && c->lap < DRIVE_LAPS)
@@ -1428,6 +1455,7 @@ static void check_lap(race_car *c)
     } else if (was < 2 && g_drive.last_node - 2 < n)
         c->lap--;
     c->progress = (c->lap - 1) * g_track.length * 4 + c->node;
+    return moved;
 }
 
 /* car_road_offset 0x51598: how far the car is to the side of its node's point */
@@ -1441,9 +1469,13 @@ static void road_offset(race_car *c)
 
 void drive_step(race_car *c)
 {
-    physics(c);
-    check_lap(c);
-    on_road(c);
+    if (c->state == 4)
+        crash_step(c);
+    else {
+        physics(c);
+        drive_check_lap(c);
+        drive_on_road(c, 1);
+    }
     road_offset(c);
 }
 

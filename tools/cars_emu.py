@@ -25,7 +25,7 @@ from setup_check import Fam
 I, U8, P = ctypes.c_int, ctypes.c_ubyte, ctypes.c_void_p
 SOURCES = ["cardraw.c", "model.c", "polyfill.c", "camera.c", "car.c", "dash.c", "hud.c", "config.c", "view.c", "sky.c", "roaddraw.c",
            "trackinfo.c", "road.c", "poly.c", "raster.c", "track.c", "files.c", "exe.c", "trackfam.c",
-           "racepal.c", "font.c", "video.c", "fsh.c", "unpack.c"]
+           "racepal.c", "font.c", "video.c", "fsh.c", "unpack.c", "crash.c", "drive.c"]
 LEFT_OUT = {0x59294: 3, 0x66738: 0}
 
 
@@ -46,8 +46,10 @@ class RaceCar(ctypes.Structure):
         ("pics", P * 2), ("pics_pal", P * 2),
         ("state", I), ("slot", I), ("draw_node", I), ("mirror_node", I), ("own_turn", I), ("turn", I * 9),
         ("yaw_drawn", I), ("half_len", I), ("half_wid", I), ("braking", I), ("bits", U8 * 3),
-        ("seen", Vec3), ("far", I), ("shadow", Vec3), ("along", Vec3), ("across", Vec3),
-        ("near_m", Model), ("far_m", Model), ("groups", Group * 4)]
+        ("ground", Vec3), ("seen", Vec3), ("far", I), ("shadow", Vec3), ("along", Vec3), ("across", Vec3),
+        ("near_m", Model), ("far_m", Model), ("groups", Group * 4),
+        # the rest of race_car (driving, the crash): room for what car_load writes there
+        ("rest", U8 * 4096)]
 
 
 def lib():

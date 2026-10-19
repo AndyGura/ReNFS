@@ -6,6 +6,20 @@
 #include "poly.h"
 #include "model.h"
 
+/* the car thrown about after a hard hit (+0xc4, made by 0x2c920; crash.c): a box with
+   its own turn and spin. Its coordinates are the car's with z turned round */
+typedef struct {
+    int m[9];                  /* +0: its turn; rows its axes across, up and along */
+    vec3 pos, vel;             /* +0x24, +0x30 */
+    vec3 spin;                 /* +0x3c: its turning, radians a second about an axis */
+    int mass, inertia;         /* +0x60, +0x64: the PDN's +0x10, +0xc */
+    int inv_mass, inv_inertia; /* +0x68, +0x6c: 1 over them */
+    int radius;                /* +0x70: the length of half */
+    int half[3];               /* +0x74: half its width, height and length (the PDN's first
+                                  three words) */
+    int wait;                  /* +0x80: steps until it is put back on the road */
+} car_body;
+
 typedef struct {
     vec3 pos;                  /* +0: in the world, 16.16 (y up) */
     int pitch, yaw, roll;      /* +0xc, +0x10, +0x14: 0x1000000 a turn */
@@ -27,7 +41,9 @@ typedef struct {
     const unsigned char *pics_pal[2]; /* +0x522, +0x65a: their palettes ("!PAL"), tinted */
 
     /* what drawing it needs (cardraw.c) */
-    int state;                 /* +0x512: 6 off the road (not drawn) */
+    int state;                 /* +0x512: how it is driven (the routine 0x13c1b8 holds):
+                                  2 the player's, 4 thrown about (crash.c), 6 off the road
+                                  (not drawn) */
     int slot;                  /* +0x516: its place in the race's tables */
     int draw_node;             /* +0x341: the node it is drawn at (0x51fa3, 0x678a4) */
     int mirror_node;           /* +0x345: the same in the mirror (0x51fa3, 0x677f8) */
@@ -108,6 +124,19 @@ typedef struct {
     int auto_steer;            /* +0x502 */
     int dt;                    /* +0x506: a step, 16.16 seconds (1/30) */
     int rate;                  /* +0x50a: steps a second (30) */
+
+    /* what the crash needs (crash.c, NOTES §4.6) */
+    int road_off;              /* +0x80: how far to the side of its node's point (each
+                                  fourth step, 0x786d4) */
+    int reach;                 /* +0x84: how far its body reaches across the road */
+    vec3 road_side, road_up, road_fwd; /* +0x8c, +0x98, +0xa4: the road's axes at its
+                                  node (0x7dbd8) */
+    vec3 road_at;              /* +0xb0: its node's point */
+    int height;                /* +0xbc: half its height (the body's) */
+    car_body body;             /* +0xc4 (+0xc0 points to it) */
+    int road_speed;            /* +0x15c: its speed along the road (each fourth step) */
+    int crashing;              /* +0x4f2: thrown about after a hard hit, until it is put
+                                  back on the road */
 } race_car;
 
 /* the car's place on the starting grid (0x7c938): grid its slot (0x12dca0[player]),

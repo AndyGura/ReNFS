@@ -962,7 +962,7 @@ race_from_menu 0x3770c (from fe_main_menu)
   | 1 | `drive_player_wait` `0x7ea20` | counts down, then kind 2 | `police_pull_over` `0x79728`, `0x7e64c` |
   | 2 | `drive_player` `0x382d0` → `car_physics_player` `0x408e0` (4.4 KB) | the player | `load_car_pbs` |
   | 3 | `drive_opponent` `0x7b34c` (3 KB) | a computer's car | `load_car_pbs`, `0x51200`, kinds 5, 6 |
-  | 4 | `drive_crashed` `0x1cfe0` | after a crash? | `0x1ca9c`, `0x1cb14`, `car_car_impact` `0x1e314` |
+  | 4 | `drive_crashed` `0x1cfe0` | the crash: the car tumbling as a box (below) | `0x1ca9c`, `0x1cb14`, `car_car_impact` `0x1e314` |
   | 5 | `drive_kind5` `0x7d9e4` | slows by `0x13333` a step (`0x23333` with flag 4), runs the opponent's routine | `car_set_drive_kind` `0x1cd40` |
   | 6 | `drive_opponent_wait` `0x7e0c8` | held at (8, 200 + 10n, 8), counts down, then kind 3 | `0x7ccc0` |
 
@@ -1049,8 +1049,10 @@ into the walls, the handbrake, the manual box, reverse, the joystick) all equal.
   node and the next: the grip changes with the slope's change. Not the heading +0x16
   (the first port's mistake: the runs parted at step 287).
 - **The wall** `0x3fed4`: a glancing touch turns the car off it; a hard one goes to
-  `0x78204` → `0x1cb14`, the crash (driving kind 4, the tumbling body `+0xc0` → `+0xc4`).
-  **Not ported yet**: the port counts it (`g_drive.crashed`).
+  `0x78204` → `0x1cb14`, the crash (driving kind 4, the tumbling body at `+0xc4`; below).
+  The hard hit: across the wall ≥ 24 m/s (`0x180000`, 40 in the rally) and `+0x70` over
+  35 m/s; s = v − 6 (at most 14), a = s/4 about the up axis, b (the hit's side) and
+  q = (`+0x5c`'s whole part) · s / 64 · 3/4 across, signs by the wall's side.
 - **`car_on_road` `0x38808`**: gravity g = (dt >> 2) · 0x9cf5c >> 14, and g / 2 more
   unless the options word `0x12da28` (the settings' `0x15d12a`) has 0x20 — softer
   landings after a long jump, except on "tr6" (strcmp `0x83f40` with the track's name
@@ -1077,10 +1079,68 @@ into the walls, the handbrake, the manual box, reverse, the joystick) all equal.
   (+0x64a / +0x64e; not ported, every racer's PDN has them).
 - `0x8bb7c` is EA's arctangent: atan(x = the first stack argument, y = the second), 1024
   a turn from the y axis (`ea_atan_1024`, `exe.c`).
-- **Not yet**: the crash; a circuit's laps counted (CY1 is open); the acceleration test's
+- **Not yet**: a circuit's laps counted (CY1 is open); the acceleration test's
   figures; force feedback and the sounds (`0x52d2c`, `0x52e40`, `0x52ea8`); the replay
   marks (`0x5c6d4`) and the race's greatest values (`0x2d71c`); the police and the other
   cars pushing (`+0x3d9`..). `0x3ecc1` is never reached.
+
+#### The crash (2026-10-19)
+
+A hard wall hit throws the player's car about as a box until it lands on its wheels or,
+its wait over, is put back on the road. Ported in `crash.c`; checked by
+`tools/drive_emu.py` (the original's code in Unicorn, step for step, every field, the
+crash globals, the smoke): **396 runs equal on all 11 snapshots**, 9 of them thrown at the
+walls (`thrown right/left/spinning/up/rally/manual/circuit`, the car's world speed set at
+the start) with tumbles of 48–594 steps, landings and a put-back counted.
+
+- **The body** (`+0xc4`, `0x84` bytes): the turn `m[9]` (rows: across, up, along; z
+  flipped against the car's), the place (lifted to the box's middle), the speed, the spin
+  (radians a second, 16.16), the mass, the turn's resistance, their inverses, the radius,
+  the half sizes (x, y, z), and the wait (steps). Set from the PDN by `0x2c920` (called from
+  `car_apply_pdn` `0x1e9cc`); the car's half height `+0xbc` and reach `+0x84` with it.
+- **The start**: `car_hard_hit` `0x78204` (car, a, b, s) → `car_crash` `0x1cb14`: the
+  body from the car (`0x1cbb0`), `+0x4f2` = 1, kind 4, the smoke cleared, wait 300; then
+  the hit as a spin s·across + b·along − a·up. A police chase is dropped (`0x781ac`).
+- **A step** (`drive_crashed` `0x1cfe0`): the lap check (a new node → the road's frame
+  `0x7dbd8`: across, up, along, the node's point); the body moved (`0x2c9c0`: a 64th
+  slower, gravity `0x53b6` a step, turned by its spin through `0x2c894`, a turn about an
+  axis); three contacts (`0x2a334`): the nearer wall (the node's +2 / +3 lanes × 0x2000,
+  plus `0xea5c8` or `0xea5cc` by whether that side has lanes or the node is kind 5), a
+  tunnel's roof (node kind 4, 7 m up), the road. A contact finds the box's deepest corner,
+  pushes it out along the surface's normal (`0x2a918`: restitution `0xea684`, friction
+  `0xea688`; **its second cross product reads a vector it has already overwritten**, kept
+  in the port) and, with `0xea678`, lifts it out by the energy. `0xea66c` the push,
+  `0xea670` the depth, `0x12b4c4` the corner's speed.
+- The player's car meanwhile: its angles the body's (`0x2cb78`), the pedals off, the revs
+  down 200 a step, the gearbox out of gear (the automatic in neutral). Nearly still and
+  flat or on its side (`0xea5a4`, `0xea5a8`, `0xea5ac`): speeds halved. The smoke
+  (`0x1464d0`, 100 puffs: `0x64588` clear, `0x64804` let out, `0x64978` rise and age) once
+  the body is slower than 8 m/s (`+0x4a5` bit 2). `0x145c98` = 0x3c: the camera's crash
+  view (`camera_check_mode` `0x6324c`; not in the port).
+- **The end**: on its wheels and along the road (up · up > 0.966, along · along > 0.7) and
+  still → `0x1ceb4` (kind 2 again, `car_set_drive_kind` `0x1cd40`); else the wait runs
+  down (faster when still); at 0, unless another racer faster than 9 m/s is less than a
+  second behind, `0x1d8a8` puts it back: the middle of the node's first lane, upright along
+  the road, still, in neutral; `0xf6b70` = 1, `0xea700` = 0x1e, and **a crash counted**
+  (results +0x1bc, `0x14ec38` + 0x1d2 · player) when `0x13c168` = 1 (a race).
+- The tail of every step: the tyres' screech from the corner's speed, the hit's sound
+  level (`0xea5d4`, held 10 steps by `0xea5d0`), the car's place from the body, the turn
+  squared up every 4th step (`0x2c584`).
+- **`cars_meet_world` `0x1c878`**, the part the port has: the hit's timers, and every 4th
+  step `traffic_police_tick` `0x7a040` → `0x786d4` for the players' cars: the road's frame,
+  the place across `+0x80`, the reach `+0x84`, the speed along the road `+0x15c`
+  (`0x7b130`, `0x1e6cc`), the flags `&0xbe1c | 0x1e0`.
+- **The x87 at double precision**: the game sets the control word 0x127f at start-up
+  (`0xa8c95` loads `0x128b08`). `0x3e7fc` (1/x) gives other last bits at single precision:
+  Unicorn starts with 0 (single!), so `snap_emu.py` sets 0x127f.
+- **Not ported**: the other cars' crash (`0x1de8a`: `0x7bf94`, stood up `0x7daec`, kind
+  5); the other cars put back with the player (`0x7c030`); the sounds (`0x53214`,
+  `0x531dc`, `0x52e40`); the replay's mark; the camera's view; drawing the smoke
+  (`0x66d08`). **Not reached by the runs**: the tunnel's roof, the `0xea5c8` wall branch,
+  the fast landing (`0x1de73`), the large-vector halving in `0x2c2d8`/`0x2c3d8`/`0x2c490`,
+  the smoke's index wrapping.
+- In the port, `RENFS_THROW=s:x,y,z` gives the car a speed at step s to see a crash (a
+  hard hit is rare driving CY1 normally: the hardest seen 19 m/s across).
 
 ### 4.7 Drawing a frame
 

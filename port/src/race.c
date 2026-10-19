@@ -5,6 +5,7 @@
 #include "car.h"
 #include "cardraw.h"
 #include "config.h"
+#include "crash.h"
 #include "dash.h"
 #include "drive.h"
 #include "hud.h"
@@ -62,6 +63,21 @@ static int S32(const unsigned char *p, int at)
     return (int)(p[at] | p[at + 1] << 8 | p[at + 2] << 16 | (unsigned)p[at + 3] << 24);
 }
 
+/* RENFS_THROW="<step>:<x>,<y>,<z>": a test, the player's car given that speed in metres a
+   second (east, up, north) at that step, as drive_emu's "thrown" runs do, to see a crash */
+static void race_throw(race_car *player, int st)
+{
+    const char *e = getenv("RENFS_THROW");
+    double x, y, z;
+    int at;
+
+    if (e && sscanf(e, "%d:%lf,%lf,%lf", &at, &x, &y, &z) == 4 && st == at * 2) {
+        player->vel.x = (int)(x * 65536);
+        player->vel.y = (int)(y * 65536);
+        player->vel.z = (int)(z * 65536);
+    }
+}
+
 /* a race step for the player's car (race_step 0x6348c, race_update_cars 0x519d8): the
    flags from the step counter, the keyboard's word (controls_read 0x49248: both gear
    keys at once hold the engine at full revs), every second step the controls applied,
@@ -79,9 +95,11 @@ static void race_step(race_car *player)
     /* NITRO's keys: N with a shift or B */
     g_drive.nitro_keys = key_down(0x31) && (key_down(0x2a) || key_down(0x36) || key_down(0x30));
     g_drive.clock = (int)clock_ticks();
+    race_throw(player, st);
     if (g_drive.flags & 4)
         drive_controls(player);
     drive_step(player);
+    crash_world();
     g_drive.steps = st + 2;
 }
 
@@ -117,6 +135,10 @@ int race_test(const char *name)
     g_drive.last_node = g_track.loop ? g_track.length * 4
         : (short)(g_track.head[6] | g_track.head[7] << 8) * 4 - 0xb5;
     snprintf(g_drive.track, sizeof g_drive.track, "%s", name);
+    g_drive.chase = 1;         /* (the police on in these races, 0x12dd08, 0x12da34) */
+    g_drive.police = 1;
+    memset(&g_crash, 0, sizeof g_crash);
+    crash_start();
     drive_default_keys();
     g_view.min_z = exe_i32(0xf7938);
     g_view.far_shift = *exe_at(0xf6aa4, 1);

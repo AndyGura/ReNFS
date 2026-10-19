@@ -131,6 +131,7 @@ The original in DOSBox: `nfs-dos`, `tools/nfsdos.py` (unseen, keys, memory; NOTE
 Cars drawn: `cars_at_node` `0x6837c` → `0x66d08` → `0x66880` (NOTES §4.10); their
 pictures re-coloured by `0x65020` through a colour map `0xf9520` that keeps what the last
 re-colouring left. Snapshots e1..e5: a 320x200 race, `NFS_DOS_DIR=$PWD/build/dosnfs`.
+The x87 runs at double precision (CW 0x127f): Unicorn must be set so (NOTES §4.6, the crash).
 Main menu `0x42c30` (NOTES §4.2): the choices in CONFIG.DAT (+0x6d type, +0x91 opponent,
 +0x95 track, +0x9b car, +0x5f50 unlocks); typed codes SKCART EARALLYE CASINOVILLE
 CONCEPTCAR ROCKYROAD TURBO NITRO EXPLODE (`0x46e94`), End held = no mercy. Options
@@ -190,6 +191,7 @@ space up down left right tab y n j f1-f4 bksp del click rclick m<x>,<y>, t<text>
 k<letter> held; `<from>-<to>:<key>` holds a key through those retraces, several at
 once; for `--shot` tests);
 `RENFS_SHOTRAW=f`: `--shot` also writes the palette numbers (comparing by entry);
+`RENFS_THROW=s:x,y,z`: the car given a speed at race step s (to see a crash);
 `RENFS_CONFIG=f`: a CONFIG.DAT for the test (the original's, `nfsdos.py mem:156c14:5f52:f`).
 Sound: SDL's device at 44.1 kHz 16-bit stereo, each stream converted by an
 `SDL_AudioStream` and added in the callback. Movies: the sound read ahead (half a second
@@ -212,7 +214,9 @@ wide line `0x8b195`; exact, `tools/polyfill_emu.py`), `hud.c` (the dashboard ove
 (the TRI and its ring of sections), `trackinfo.c`, `trackfam.c`, `racepal.c`, `sky.c` (the sky, the mirror's horizon), `view.c` (windows, lens,
 matrices), `car.c` (cars' files, the grid), `camera.c` (the driver's eyes), `dash.c`
 (the dashboard's file, colours, places and BAMF lists), `drive.c` (the player's car driven: controls, gearbox, engine, tyres, walls, jumps;
-equal step for step, `tools/drive_emu.py`; NOTES §4.6), `race.c` (`--race`: the loading
+equal step for step, `tools/drive_emu.py`; NOTES §4.6), `crash.c` (a hard wall hit: the car
+tumbling as a box, landing or put back, its smoke; the 4th-step refresh 0x786d4; equal step
+for step, drive_emu), `race.c` (`--race`: the loading
 and the frame, a step every 3 ticks),
 `exe.c`: **the game's fixed tables are read from the CD's `NFS_DOS.EXE`** at the
 original's addresses (checked by a sum of the image), never copied into the port. The menus' look is checked against the

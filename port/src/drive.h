@@ -50,8 +50,8 @@ typedef struct {
     int keys[8];               /* the controls' keys (0x12d92c ..): left, right, faster,
                                   brake, gear up, gear down, handbrake, horn; PC scan
                                   codes */
-    int crashed;               /* a hard hit on a wall: the crash (0x1cb14, the car to state
-                                  4, tumbling) is not in the port yet; counted here */
+    int chase;                 /* 0x12dd08: the police chase in this race */
+    int police;                /* 0x12da34: 1 with a police car (the chase's flags) */
 } drive_race;
 
 extern drive_race g_drive;
@@ -77,7 +77,14 @@ unsigned drive_keyboard(int mirrored);
 
 /* every second step (flag 4): the control word applied (0x10400) */
 void drive_controls(race_car *c);
-/* every step: drive_player 0x382d0, then car_road_offset 0x51598 */
+/* every step: the car's kind's routine (0x13c1b8: 2 drive_player 0x382d0, 4 the crash's
+   drive_crashed 0x1cfe0), then car_road_offset 0x51598 */
 void drive_step(race_car *c);
+
+/* car_check_lap 0x5056c (crash.c's too): 1 if the car is on another node */
+int drive_check_lap(race_car *c);
+/* 0x38808: the car on the road under it; place 0 (a car put back after a crash) only
+   sets it on the road, standing */
+void drive_on_road(race_car *c, int place);
 
 #endif

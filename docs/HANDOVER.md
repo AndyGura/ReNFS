@@ -198,14 +198,23 @@ Ghidra project and `build/decomp`, one command). The git history was started aga
   step in 297 runs** on the 11 snapshots (`tools/drive_emu.py`: gas, weaving into the
   walls, handbrake, manual, reverse, ABS/TCS, rally, circuit, drag strip, joystick,
   revving, two players, jumps, NITRO). `--race cy1` drives: arrows, A / Z the gears,
-  space the handbrake (`build/shots/drive_strip.png`). A hard hit on a wall (the crash,
-  `0x1cb14`) is only counted so far.
+  space the handbrake (`build/shots/drive_strip.png`).
+  **The crash** (`crash.c`; NOTES §4.6 "The crash"): a hard wall hit throws the car about
+  as a box (its own turn and spin, bouncing off the walls and the road) until it lands
+  on its wheels or is put back in the first lane, a crash counted; the smoke's puffs
+  moved (not drawn yet); the every-4th-step refresh of the car's place on the road.
+  **Equal step for step in 396 runs** (drive_emu, 9 of them thrown at the walls).
+  Found on the way: the game runs the x87 at double precision (0x127f); Unicorn starts
+  at single, `snap_emu.py` now sets it. A hard hit is rare driving CY1 (the hardest
+  seen 19 m/s across, 24 needed): `RENFS_THROW=200:48,0,32` shows one
+  (`build/shots/crash_tumble.png`, `crash_back.png`). The camera's outside crash view
+  (`0x6324c`) and the smoke's drawing are not in yet: the tumble is seen from the seat.
   Not yet: the status bar's numbers after the start (`0x30d8c`: speed, gear, place,
   time, laps; they wait for the race's timing), the gear gate (`0x2e4f0`, map off), the
   HUD's keys (`0x2f644`), the map at 640x480, the replay's buttons (`0x5c5d0`), the doubled BAMF lists (detail),
   one-colour polygons (`0xaa990`), the police lights, the circuits' sky ring (`0x4ace8`),
   the roadside walls (`0x59294`, other tracks than the cities), 3D roadside models
-  (`0x66738`), the crash, the opponents' and traffic's driving, the race's setup from
+  (`0x66738`), the camera's crash view, the opponents' and traffic's driving, the race's setup from
   the front end.
 
 **Progress page for Danik**: https://claude.ai/artifact/VZdxTpYC3oLXYeBVJpoDoM (every step,
@@ -234,8 +243,8 @@ races 320x200 / 320x240; commit locally as the work goes.
    (2026-10-19): **the race next**, the remaining menus later. In the race, the
    port now makes a first frame of its own (`--race cy1`), the cars, their shadows,
    the racers' markers, the dashboard, the map and the mirror in it, and the player's car
-   drives (equal step for step). Next: the crash (`0x78204` → `0x1cb14`, driving kind 4,
-   the tumbling body), the status bar's numbers (the race's timing), then the opponents'
+   drives and crashes (equal step for step). Next: the status bar's numbers (the race's
+   timing), the camera's crash view (`0x6324c`) and the smoke (`0x66d08`), then the opponents'
    driving (`drive_opponent` `0x7b34c`), the traffic, cars meeting cars, the sounds.
    Open: who writes `0x136618` (28 sections drawn: a detail setting?). The walls `0x59294`
    and the circuits' sky ring `0x4ace8` can be checked on CY1 memory with made-up input,
