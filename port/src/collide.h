@@ -17,6 +17,8 @@ extern collide_race g_collide;
 
 /* the random numbers' state as the program starts (the image's) */
 void collide_init(void);
+/* 0x91e04: EA's next random number (the sound library draws from them too) */
+unsigned collide_rand(void);
 /* 0x1c878's loop: the police's catch (0x1c800), each car against those just ahead */
 void collide_world(void);
 

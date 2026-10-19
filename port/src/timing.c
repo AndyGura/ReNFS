@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include "timing.h"
+#include "racesnd.h"
 #include "cardraw.h"
 #include "config.h"
 #include "exe.h"
@@ -184,14 +185,15 @@ void timing_step(void)
             int j;
 
             /* two players, the first in and stopped: the view goes to the one still
-               racing (the camera itself turned, 0x13530 with mode 3, and its sound: not
-               yet) */
+               racing, its engine heard (0x53214; the camera itself turned, 0x13530
+               with mode 3: not yet) */
             g_timing.stopped = 1;
             if (!g_timing.switched)
                 for (j = 0; j < g_humans; j++)
                     if (!g_timing.finish[j]) {
                         g_drive.viewed = j;
                         g_timing.switched = 1;
+                        rsnd_engine_on();
                         break;
                     }
         }

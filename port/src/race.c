@@ -14,6 +14,8 @@
 #include "files.h"
 #include "racepal.h"
 #include "smoke.h"
+#include "racesnd.h"
+#include "sndlib.h"
 #include "road.h"
 #include "roaddraw.h"
 #include "sky.h"
@@ -145,6 +147,10 @@ static void race_step(race_car *player, race_camera *cam)
        (0x6324c), then moved (0x136b0) */
     camera_check(cam, g_cars[g_drive.viewed]);
     camera_update(cam);
+    /* the sounds, heard from where the camera now is (the voices that played to their
+       end freed first, as the mixer frees them) */
+    snd_time(clock_ticks());
+    rsnd_step();
     g_drive.steps = st + 2;
 }
 
@@ -293,6 +299,21 @@ int race_test(const char *name)
         g_opp.grid[i] = 7 - i;
     g_opp.traffic = RACE_CARS - RACERS - 1;    /* (0x12da3c: the cars after the police) */
     g_opp.rival_car = cars[1].number;          /* (0x12da9e) */
+    /* the sounds (race_main 0x6363b, before the random numbers are seeded): the settings'
+       volumes and stereo (0x12da53's record; none without a sound card, 0x529f4), the
+       banks (0x52774), the engine started silent (0x52670) and heard (0x53214); voice 0
+       held for the race's music */
+    rsnd_init();
+    g_rsnd.present = !getenv("RENFS_NOSOUND");
+    g_rsnd.sfx = g_rsnd.present ? config_word(CFG_SFX_VOLUME) : 0;
+    g_rsnd.music = g_rsnd.present ? config_word(0x75) : 0;
+    g_rsnd.mono = config_word(0x71) == 2;
+    snd_init(g_rsnd.present);
+    if (g_rsnd.sfx && g_rsnd.music)
+        snd_hold(0, 101, g_rsnd.music);
+    snd_time(clock_ticks());
+    rsnd_load(cars[0].number, cars[1].number, g_drive.kind);
+    rsnd_engine_on();
     opponent_start(getenv("RENFS_SEED") ? (unsigned)strtoul(getenv("RENFS_SEED"), 0, 0)
                                         : (unsigned)time(0));
     g_camera = &cam;
@@ -415,6 +436,7 @@ int race_test(const char *name)
         video_retrace();
     }
 
+    rsnd_free();               /* (0x52a70) */
     g_road_paint.cars = g_road_paint.cars_behind = 0;
     g_ncars = 0;
     for (i = 0; i < RACE_CARS; i++)

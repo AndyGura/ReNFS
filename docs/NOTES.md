@@ -2532,6 +2532,125 @@ gives a ticket (`build/shots/police_*.png`). Not yet: the view from the police c
 (camera mode 7) and the camera sent back to the player as it is placed, the siren and
 the horns, the arrest's film (`fe_cop_ticket_movie`), the replay's palette (`0x55ee0`).
 
+### 4.18 The race's sounds (2026-10-20)
+
+**EA's sound library** (the voices, the banks; all its routines take registers):
+
+- 16 voice records at `0x160fa4`, 0x28 bytes: +0 the sound's record, +4 its +8 less 1, +0xa
+  its +0x1c (1: one of a pair n, n+1), +0xb kind (1 a bank's sound, 2 a stream: voice 0
+  holds the race's music, priority 101), +0xc cents, +0x10 the bend it started at, +0x11
+  the record's +0x17 (semitones a bend of 0x40 moves), +0x12 index, +0x13 priority, +0x16
+  playing, +0x17 the sound's number (0xff none), +0x24 volume, +0x25 the record's volume,
+  +0x26 level = master (`0xf99e6`, 127) · record's · asked / 0x3f01 (`0x9ea7d`), +0x27 pan.
+  `0x9eaae` frees one (+0x16 0, +4 −1, +0 0, +0x17 0xff, +0x18 0, pan 0x40, both
+  volumes 0x7f).
+- **The banks** (`snd_bank_add` `0x958f5`, `snd_bank_remove` `0x959b4`; at most 5,
+  `0xf950c`): a BNK's 128 offsets into one table of 128 sounds (`0x161224`); a sound
+  already there fails the bank. Adding turns the record's +4 and its header's +0x18 into
+  pointers. The record (0x48): +0 the voices it may take (a mask), +4 the EACS header,
+  +0xc a pitch spread, +0x10 cents, +0x14 priority, +0x17 reach, +0x18 pan, +0x19 volume,
+  +0x1a a volume spread (signed), +0x1c 1 a pair, +0x1d a pan spread.
+- **`snd_play` `0x95a7a`** (eax n, edx pan or −1 the record's, ebx volume, ecx bend):
+  `snd_voice_find` `0x98bf5` (a free voice the mask allows from `0xf973c` on, else the
+  first whose priority ≤ the sound's, unsigned; `0xf973c` = it + 1); EA's random numbers
+  (`0x91e04`, the collisions' generator) in this order: the pitch if +0x10 or +0xc
+  (`((r >> 16) · s) >> 15` logical, less s), the volume if +0x1a (clamped 0..127), the
+  pan if −1 and +0x1d (a first draw only decides > 0x7f → 0x7f, else a second + 0x40).
+  The pitch `(bend − 0x40) · reach · 100 / 64` + cents; the frequency `0xa062c`
+  (rate · table `0x9eaec`[x − top] >> shift, x = cents + 0x2000, top from 0x40d0 down by
+  0x4b0 an octave); the sides `0xa1fbb`/`0xa203a` (pan over 0x7f mirrored; under 0x40
+  left 0x7f right 2p; above, left (0x7f − p) · 0x7e / 0x3e; each × level / 127). A pair
+  (`0xa20a8`): two voices, the volume split near the edges by `0x12412c` {150, 140, 130,
+  120, 110}; returns the second << 16 | the first.
+- `snd_set_volume` `0x8169b`, `snd_set_pan` `0x8171b` (0..0xff), `snd_set_bend`
+  `0x8179e` (kind 1 only, not stored): only on a playing voice. `snd_idle` `0x8193c`: 0
+  playing, 1 not, −8 no voice. `snd_stop` `0x81814`. A voice played to its end is freed
+  by the mixer (the timer's interrupt); the game never waits for it.
+- The mixer's own records (`0x9ff4c` starts one, `0xa007f` its sides, `0xa00b9` its rate,
+  `0xa005e` stops it) are the port's `audio.c`. `0x9eaae` and `0x8ca7b` start with
+  `push ds; call 0x94710` (DOS/4GW's data selector, as the interrupt needs it) and end
+  with `pop ds`: Unicorn steps over both (`snap_emu.py`), it cannot load a selector.
+
+**The game's channels** (`0x13c2dc`: 16 pairs of voice and sound, −1 none):
+7 the engine on the throttle (sound 1; the channel is `0xee352` >> 16), 1 off it (2), 5
+the road's noise (0x29), 4 the front tyres, the one-off hits and a computer's horn, 0xc
+the rear tyres, 2 and 3 the two cars heard loudest, 0xe the player's horn (3), 9 the siren
+(0x62), 0xb under a bridge or in a tunnel (0x3e; 0x3d on Transtropolis) and the siren's
+echo (100), 0xf the rally's stones (0x50). The settings (`0x12da53` + 0x4b · player): +0x14
+the sound's volume (CONFIG +0x79), +0x18 the music's (+0x75), +0x1c stereo (+0x71, 2 mono:
+every angle 0), +0x20 a card (`0x15d132`; without one, `0x529f4` sets both volumes 0).
+
+- `channel_play` `0x52ecc` (ch, sound, bend, volume, pan): nothing without the sound's
+  volume; all 0 muted (`0xeded0`); bend, volume, pan ≤ 0x7f. The channel's own sound is
+  moved (volume · sfx / 127, bend, pan); another is started, unless it is a one-off (0x20
+  .. 0x25, and the stones 0x50, always started anew) or the channel's last was a one-off
+  still playing. `channel_level` `0x53084`: the volume through the curve `0xedf50`
+  (129 words), the pan from an angle (`0x52ac8`: 0 ahead the middle, a quarter turn
+  either way an edge). `near` (`0x7fb2c`): 127 at 0 down to 0 at 0x200000.
+- `channel_event` `0x52d2c` (ch, kind, sub, how, dist, angle; not at the pause, state 3):
+  ch −1 a one-off on channel 4 (`0x52c38`: 0xd the gear's clunk 0x20; 4,1 a landing 0x25;
+  2,9 along a wall 0x23; 2,10 an object knocked over 0x21; 2,1 a body thrown about by
+  how hard 0x24/0x22/0x23/0x21; two cars 0x24/0x22/0x21 above 0x6e/0x3c), at near(dist);
+  else stopped when how ≤ 0, or the channel's sound by the kind (`0x52b10`: tyres 4,1 on
+  the road, 4,8 off it, 2,1 a body), its bend how >> 16 (ch 4) or kept from its start
+  (`0xeded8`), the volume near (ch 4: how · near >> 7). The wrappers: `0x52e40` how × 20,
+  `0x52e80` how >> 4, `0x52ea8` and `0x52e1c` as it is.
+- **The engine on and off**: `0x52670` at the start (sounds 1, 2, 0x29 silent on 7, 1, 5);
+  `0x53214` (sound 1 on 7 again if it is not, 0x29 on 5 always, `0xeded4` 1) when the car
+  heard lands from a crash (`0x1ceb4`, then again in `0x1cd40`: twice), as the two-player
+  view turns to the other player, at the start, and from the race keys; `0x531dc` (7, 5,
+  4, 3 stopped, `0xeded4` 0) as the car heard crashes (`0x1cb14`), spins out (`0x1ca9c`)
+  or is thrown by a hard hit (`0x1e314`). The police's two calls (`0x798b2`, `0x7ea19`)
+  test kind 4 just after setting kind 1: never.
+- **The events**: a car meeting a car hard enough to shake the views (`0x1c6a4`: heard
+  from the car that is not the one heard, 2,2, the hit × 20); a body touching the road or
+  a wall (`0x1e1e7`, its mass under 8: 4,1 or 2,1 by how upright, × 20); a wall's scrape
+  (`0x40564`, the watched player's car, a wall of kind 0, across faster than 6 m/s: from
+  the seat at 0xd70000 / 0x280000 by the side, dist 1); an object knocked over within
+  −8..9 nodes of the camera (`0x1ef94`); the gear's clunk from the seat as the shown gear
+  reaches 0xb with the clutch in (`0x40cc3`); the player's landing (`0x38b44`, |vel.y|).
+- **`horn_want` `0x80a60`** (slot, kind): only when no horn sounds (`0xf7778` 0): a racer's
+  slot → car 1, pitch 1; else that car and kind; `0xf7778` = rand_below(15) + 5 (EA's
+  random numbers: **the game's, with the sound off too**; it only counts down in
+  `0x80974`, which runs with the sound on). Called from `0x79b60` (a racer stuck behind a
+  player, after a few tries, kind 0; and a racer 5 nodes behind a driving player or 2
+  behind the first car, above 15 m/s) and `0x7ad0f` (the traffic coming the other way,
+  random byte < 0x23, moving, the radar quiet, its PDN's horn +0x469).
+- **Each step** (`race_update_cars` after the camera and `key_get`, not at the pause, with
+  the sound's volume): `0x80974` (the horn: where, Doppler `0x7ff88`, on channel 4 at
+  `0x7fa80`[car]'s sound and `0x7faa8`[kind]'s pitch; stopped after), `0x7fef8` (the
+  engine `0x53338` of the car heard: from the seat angle 0 dist 1, else where `0x7fb58`),
+  `0x7fcbc` (its tyres and horn), `0x7fe88` (two players: the other's horn, 999 steps),
+  `0x800a0` (the radar `0xea814` from the police within 64 nodes, halved when it is
+  behind, its light `0x12b9f8` flashing every 4th step; the siren within 0x400000 with
+  its pitch Doppler-shifted, its echo under a bridge every 3 steps; the two cars heard
+  loudest, near · their speed against the camera's (`0x8001c`) / 64, kept on the channel
+  they had: their engine Doppler-shifted (`0xf7798`[slot] + the shift), or their tyres
+  while they slide).
+- `engine_sound` `0x53338`: the radar's beep (`0x530b0`, sound 0x61, spaced by
+  `0x52560`[radar] {1, 20, 15, 10, 5, 3, 1}); under a bridge/tunnel (node flags 3/4) the
+  echo up by 5 to 0x7a, down by 5 after; the road's noise by 2 · speed (+0x14 on the
+  node's flag 0, + a quarter off the road; pitch 0x5e, 0x40 or 0x18; the rally's stones
+  and gravel by three random draws a step on track 5), × 6/10 heard from outside; the
+  revs of the car watched against the player's red line + 2000 as the pitch; the throttle
+  eased (half way up, an eighth down) mixing the two engine loops through the curve,
+  times (revs + 0x14) · (near + 1) / 128; the player's horn's volume with them.
+- Distances are EA's approximations (the larger plus a quarter of the smaller, in 2D then
+  with the height); angles from the camera's yaw (made positive in place: `0x7fb58`
+  writes it back).
+
+**Ported (`port/src/sndlib.c`, `racesnd.c`, `audio.c`'s voices): equal to the original.**
+`tools/opponent_emu.py --full --sound` runs the original's whole sound path (the library
+and the device's records in Unicorn, no voice ever ending) and the port's from the
+snapshot's state (the banks loaded from the CD and compared record by record, the voices,
+the channels, the camera) and compares every step the 16 voice records, the 16 channels,
+the 39 sound globals, the radar, the camera's yaw, the cars' Doppler fields (+0x3a1,
++0x3ad) and EA's random numbers: all 45 settings on all 11 snapshots equal. Without
+`--sound` the horns' random numbers are still compared (`0x80a60` runs on both sides).
+In the port a voice's end is worked out from the clock (`snd_time`), not by the mixer, so
+that the game's side stays deterministic. Not yet: the race's music (voice 0 is held
+for it), the speech, the race keys' calls (`0x47c88`: the camera's changes, the pause).
+
 ## 5. The original in DOSBox (2026-10-19)
 
 - The game for DOSBox is a COPY of the installed game in `~/dosgames/nfs` (`NFSSE/` +

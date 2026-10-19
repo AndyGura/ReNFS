@@ -77,5 +77,5 @@ void collide_test_size(const race_car *c, int *out)
 
 unsigned collide_test_rand(void)
 {
-    return ea_rand();
+    return collide_rand();
 }

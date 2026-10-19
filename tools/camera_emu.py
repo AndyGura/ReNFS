@@ -13,7 +13,8 @@ from poly_emu import Vec3
 
 SOURCES = ["camera.c", "car.c", "model.c", "polyfill.c", "dash.c", "hud.c", "config.c", "view.c", "sky.c", "roaddraw.c", "trackinfo.c", "road.c", "poly.c",
            "raster.c", "track.c", "files.c", "exe.c", "trackfam.c", "racepal.c", "font.c", "video.c",
-           "fsh.c", "unpack.c", "crash.c", "smoke.c", "drive.c", "cardraw.c", "timing.c", "opponent.c", "collide.c"]
+           "fsh.c", "unpack.c", "crash.c", "smoke.c", "drive.c", "cardraw.c", "timing.c", "opponent.c", "collide.c",
+           "sndlib.c", "racesnd.c", "audio.c"]
 I = ctypes.c_int
 U8 = ctypes.c_ubyte
 

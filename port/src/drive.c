@@ -6,6 +6,7 @@
 #include "cardraw.h"
 #include "crash.h"
 #include "opponent.h"
+#include "racesnd.h"
 #include "exe.h"
 #include "track.h"
 #include "files.h"
@@ -980,7 +981,8 @@ static void wall_hit(race_car *c, int h, int v, int side, int kind, int bounce)
 }
 
 /* 0x40230: the road's edges: past a lane's edge the surface is the verge's (the node's
-   +6 nibbles), past the wall (+2, +3) the car is put back and bounced off it */
+   +6 nibbles), past the wall (+2, +3) the car is put back and bounced off it; the
+   watched car's scrape heard off a wall of kind 0 (from the seat, to that side) */
 static void road_edges(race_car *c)
 {
     const unsigned char *n = node_ptr(c->node);
@@ -1021,6 +1023,15 @@ static void road_edges(race_car *c)
         c->pos.z += dz;
         turn2(c->vel.x, c->vel.z, -h, &across, &along);
         v = iabs(across);
+        if (!kind && v > 0x60000 && g_drive.viewed == c->player) {
+            int angle, dist;
+            if (g_camera->mode <= 1) {
+                angle = off > 0 ? 0xd70000 : 0x280000;
+                dist = 1;
+            } else
+                rsnd_where(g_cars[g_drive.viewed], &angle, &dist);
+            rsnd_hit(2, 9, v * 20, dist, angle);
+        }
         if (v < 0x180000)
             across = across > 0x20000 ? 0x20000 : across < -0x20000 ? -0x20000 : across;
         else
@@ -1153,8 +1164,15 @@ static void physics(race_car *c)
         c->gear_before = c->gear_now;
         c->gear_now = c->gear;
     }
-    if (c->gear_shown > 0 && (c->gear_shown > 12 || c->shift_wait < 1))
-        c->gear_shown--;
+    if (c->gear_shown > 0) {
+        if (c->gear_shown > 12 || c->shift_wait < 1)
+            c->gear_shown--;
+        /* the gear's clunk, for the watched car from the driver's seat as the clutch
+           bites */
+        if (g_drive.viewed == c->player && c->gear_shown == 0xb && g_camera->mode == 0
+            && c->shift_wait < 1)
+            rsnd_hit(0xd, 0, 0, 1, 0xf00000);
+    }
 
     drag_side_f = drag(c, c->side_speed, 0);
     drag_fwd = drag(c, c->speed, 1);
@@ -1412,7 +1430,9 @@ void drive_on_road(race_car *c, int place)
             c->air_steps++;
         else
             c->air_steps = 0;
-        /* (-1: the landing's sound, 0x52ea8) */
+        /* -1: the player's landing heard (0x52ea8), by how fast it came down */
+        if (c->air_steps == -1 && c->player == g_player)
+            rsnd_hit(4, 1, iabs(c->vel.y), 1, 0);
         if (!c->on_ground && c->gear != -1)
             c->clutch = 1;
         c->on_ground = 1;

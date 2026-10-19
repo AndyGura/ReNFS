@@ -8,6 +8,7 @@
 #include "crash.h"
 #include "drive.h"
 #include "exe.h"
+#include "racesnd.h"
 #include "road.h"
 #include "timing.h"
 #include "track.h"
@@ -84,7 +85,7 @@ void collide_init(void)
 
 /* 0x91e04: the words from the fifth down added up with their carries into the next, the
    last counted up (its carry running up through them) */
-static unsigned ea_rand(void)
+unsigned collide_rand(void)
 {
     unsigned *s = g_collide.random, a = s[5], cf = 0;
     unsigned long long t;
@@ -106,7 +107,7 @@ static unsigned ea_rand(void)
 /* 0x52580: 0 .. n - 1 */
 static int rand_below(int n)
 {
-    return (int)((ea_rand() & 0xffff) * (unsigned)n) >> 16;
+    return (int)((collide_rand() & 0xffff) * (unsigned)n) >> 16;
 }
 
 /* ---- two boxes ----------------------------------------------------------------------- */
@@ -438,8 +439,8 @@ static int moving(const car_body *b)
 
 /* car_car_impact 0x1e314: the two bodies parted and pushed; a light hit leaves both
    driven as before (from their bodies), a hard one (above 0xea5b0, 0xea5b4 with a
-   player in it) throws both about (kind 4), a player's car knocked over once. (The
-   replay's highlights 0x5c6d4 and the viewed car's sound 0x531dc: not in the port) */
+   player in it) throws both about (kind 4), a player's car knocked over once, the car
+   heard falling silent. (The replay's highlights 0x5c6d4: not in the port) */
 static int impact(race_car *a, race_car *b)
 {
     vec3 pt, n;
@@ -457,6 +458,10 @@ static int impact(race_car *a, race_car *b)
         b->road_speed = crash_body_road_speed(b);
         return 1;
     }
+    if (a == rsnd_heard() && a->state != 4)
+        rsnd_engine_off();
+    if (b == rsnd_heard() && b->state != 4)
+        rsnd_engine_off();
     a->state = 4;
     b->state = 4;
     if (moving(&a->body))
@@ -477,7 +482,8 @@ static int impact(race_car *a, race_car *b)
 }
 
 /* car_car_collide 0x1c6a4: the cars as bodies, and the hit; one hard enough to be heard
-   shakes both views (the sound, 0x7fb58 and 0x52e40: not in the port) */
+   is heard from the car other than the one heard (0x7fb58, 0x52e40) and shakes both
+   views */
 static int collide(race_car *a, race_car *b)
 {
     int s, t;
@@ -489,6 +495,9 @@ static int collide(race_car *a, race_car *b)
     if (!impact(a, b))
         return 0;
     if (g_collide.impulse >= g_crash.hit_level) {
+        int angle, dist;
+        rsnd_where(a != rsnd_heard() ? a : b, &angle, &dist);
+        rsnd_hit(2, 2, g_collide.impulse * 20, dist, angle);
         g_crash.hit_level = g_collide.impulse + 0x8000;
         g_crash.hit_wait = 10;
         s = g_collide.impulse > 0xa0000 ? 0xa0000 : g_collide.impulse;
@@ -508,8 +517,8 @@ static int collide(race_car *a, race_car *b)
 /* ---- a car and the roadside objects ----------------------------------------------- */
 
 /* 0x1ee80: is the point (x, z) under the car, within half its model's width across it
-   and half its length along it? (The force feedback 0x4d730 and the knock's sound near
-   the camera, 0x52d2c: not in the port) */
+   and half its length along it? Then the knock heard, near the camera (-8 .. 9 nodes
+   from it). (The force feedback 0x4d730: not in the port) */
 static int object_under(const race_car *c, int x, int z)
 {
     int dx = x - c->pos.x, dz = z - c->pos.z, a = c->yaw >> 8;
@@ -519,7 +528,15 @@ static int object_under(const race_car *c, int x, int z)
     if (across > c->size[0] >> 1 || across < -(c->size[0] >> 1))
         return 0;
     along = mulr(si, dx) + mulr(co, dz);
-    return along <= c->size[2] >> 1 && along >= -(c->size[2] >> 1);
+    if (along > c->size[2] >> 1 || along < -(c->size[2] >> 1))
+        return 0;
+    a = c->node - g_camera->node;
+    if (a <= 9 && a > -9) {
+        int angle, dist;
+        rsnd_where(c, &angle, &dist);
+        rsnd_hit(2, 0xa, 0x10000, dist, angle);
+    }
+    return 1;
 }
 
 static int placement_node(int i)

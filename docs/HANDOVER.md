@@ -296,6 +296,21 @@ Ghidra project and `build/decomp`, one command). The git history was started aga
   stood still in `--race`). Not yet: the view from the police car (camera 7), the siren,
   the arrest's film.
 
+- **The race's sounds** (`port/src/sndlib.c`, `racesnd.c`, `audio.c`'s voices, NOTES §4.18):
+  EA's sound library (the CD's banks put in one table of 128, 16 voices handed out by mask
+  and priority, the random spreads of pitch, volume and pan drawn from the collisions'
+  random numbers, the pitch and the sides) and the game's 16 channels: the engine's two
+  loops by throttle and revs, the road's noise, the tyres, the horns (the player's, the
+  computer's: `0x80a60` now runs in every check, its random number is the game's), the
+  radar's beep, the siren and its echo, the two cars heard loudest with their Doppler
+  shift, the hits, landings, scrapes, knocked objects and the gear's clunk; the engine
+  silenced while thrown about. **Equal**: `opponent_emu.py --full --sound` runs the
+  original's whole sound path in Unicorn (`snap_emu.py` steps over the library's
+  `push ds; call 0x94710 .. pop ds`) and compares every voice record, channel and sound
+  global every step: all 495 runs on the 11 snapshots. The other checks still equal.
+  `--race cy1` is heard (`RENFS_SNDWAV=f` writes it). A voice's end comes from the clock
+  (`snd_time`), not the mixer. Not yet: the race's music (voice 0 held for it), the speech.
+
 **Progress page for Danik**: https://claude.ai/artifact/VZdxTpYC3oLXYeBVJpoDoM (every step,
 its percent done and weight). Update its steps file after each finished step.
 
@@ -323,10 +338,11 @@ races 320x200 / 320x240; commit locally as the work goes.
    the racers' markers, the dashboard, the map and the mirror in it, and the player's car
    drives and crashes (equal step for step), and the status bar's numbers and the race's
    timing, the camera outside and the crash's smoke, the opponent's driving, and cars
-   meeting cars, the roadside objects knocked over, the traffic and the police. Next:
-   the sounds (the engines, the horns, the siren, the crashes: `0x80a60`, `0x53214`..),
-   the race's keys (`race_keys` `0x47c88`: the cameras, among them 6 and 7 from the car
-   ahead and the police car, the watched car).
+   meeting cars, the roadside objects knocked over, the traffic, the police and the
+   sounds. Next: the race's keys (`race_keys` `0x47c88`: the cameras, among them 6 and 7
+   from the car ahead and the police car, the watched car, the pause and its mute
+   `0xeded0`), then the race's music (`0x34xxx`, the loops "loop1".., "p1".."p8") and the
+   speech (`0x722b4`/`0x72438`).
    Open: who writes `0x136618` (28 sections drawn: a detail setting?). The walls `0x59294`
    and the circuits' sky ring `0x4ace8` can be checked on CY1 memory with made-up input,
    or on snapshots of another track (`tools/nfsdos.py`).

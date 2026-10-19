@@ -64,6 +64,14 @@ class Snap:
         def on_out(mu, port, size, value, _):
             self.io.append(("out", port, value))
         mu.hook_add(UC_HOOK_INTR, on_int)
+
+        # the sound library's routines that the timer's interrupt may run (0x8ca7b, 0x9eaae)
+        # start with push ds, call 0x94710 (DS loaded with DOS/4GW's data selector) and end
+        # with pop ds: the image is flat here, so both are stepped over
+        def flat_ds(mu, addr, size, to):
+            mu.reg_write(UC_X86_REG_EIP, game(to))
+        for at, to in ((0x8ca7b, 0x8ca81), (0x8cb11, 0x8cb12), (0x9eaae, 0x9eab4), (0x9eae9, 0x9eaea)):
+            mu.hook_add(UC_HOOK_CODE, flat_ds, to, begin=game(at), end=game(at))
         mu.hook_add(UC_HOOK_INSN, on_in, None, 1, 0, UC_X86_INS_IN)
         mu.hook_add(UC_HOOK_INSN, on_out, None, 1, 0, UC_X86_INS_OUT)
 

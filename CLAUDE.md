@@ -141,6 +141,10 @@ The traffic (NOTES §4.16): kind 6 waits `0x7e0c8`, placed `0x7cac8` (where `0x7
 The police (NOTES §4.17): out ahead at the road's marks `0x79500`, the chase and the
 pull-over `0x79728` (warning, ticket; arrested at the second), the player held `0x7ea20`,
 the picture `0x30424`.
+The race's sounds (NOTES §4.18): EA's library (voices `0x160fa4`, `snd_play` `0x95a7a`, its
+random numbers the collisions' `0x91e04`), 16 channels `0x13c2dc`, each step `0x80974`,
+`0x7fef8`, `0x7fcbc`, `0x7fe88`, `0x800a0` (the radar `0xea814` too); `horn_want` `0x80a60`
+is game logic (a random number) with the sound off as well.
 Cars drawn: `cars_at_node` `0x6837c` → `0x66d08` → `0x66880` (NOTES §4.10); their
 pictures re-coloured by `0x65020` through a colour map `0xf9520` that keeps what the last
 re-colouring left. Snapshots e1..e5: a 320x200 race, `NFS_DOS_DIR=$PWD/build/dosnfs`.
@@ -242,6 +246,10 @@ the race's end; equal step for step, `tools/timing_emu.py`; NOTES §4.12), `oppo
 `traffic_police_tick` `0x7a040`'s lanes and target speeds; equal step for step,
 `tools/opponent_emu.py`; the traffic's coming and going, NOTES §4.16; the police, §4.17), `race.c` (`--race`: the loading
 and the frame, a step every 3 ticks),
+`sndlib.c` (EA's sound library: banks, voices by mask and priority, the random spreads,
+pitch and sides; NOTES §4.18) and `racesnd.c` (the race's 16 channels: engine, road, tyres,
+horns, siren and radar, the two nearest cars, the hits; equal step for step,
+`tools/opponent_emu.py --full --sound`), the samples mixed by `audio.c`'s voices,
 `collide.c` (cars meeting cars: `0x1c878`'s loop, the boxes pushed apart `0x2b864`/`0x26324`,
 the hit `0x2afb8`, EA's random numbers `0x91e04`; equal, `tools/collide_emu.py`, NOTES §4.14;
 the roadside objects knocked over `0x1ebf4`, NOTES §4.15),

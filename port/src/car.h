@@ -86,6 +86,8 @@ typedef struct {
     int speed_abs;             /* +0x70: the larger of |vel.x|, |vel.z| and a quarter of
                                   the other */
     int yaw_rate;              /* +0x74 */
+    int snd_dist;              /* +0x3a1: its distance from the camera last step (0x7ff88) */
+    int snd_mode;              /* +0x3ad: the camera's mode then */
     int throttle;              /* +0x3b1: 0..255 */
     int throttle_kept;         /* +0x3b5: given back after a shift */
     int shift_wait;            /* +0x3bd: steps until the clutch bites, -1 none */

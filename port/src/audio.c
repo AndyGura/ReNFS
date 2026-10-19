@@ -1,5 +1,6 @@
 /* The sound card. SDL's device at 44.1 kHz, 16-bit stereo; each stream is converted to
-   that by an SDL_AudioStream and the streams are added together, clipped. */
+   that by an SDL_AudioStream, each voice (a sample in memory, the race's sounds) stepped
+   through at its own rate, and all of them added together, clipped. */
 #include "audio.h"
 #include <SDL.h>
 #include <stdio.h>
@@ -7,6 +8,7 @@
 #include <string.h>
 
 #define STREAMS 8
+#define VOICES 16
 #define RATE 44100
 
 static SDL_AudioDeviceID g_dev;
@@ -43,6 +45,57 @@ static struct {
     int release;               /* closed by the mixer once played out */
 } g_st[STREAMS];
 
+/* the voices (the EA mixer's 16, 0x1240e8): where a sample is, how far it has got and how
+   fast it goes (32.32 frames), its volume each side */
+static struct {
+    const unsigned char *d;
+    int bytes, channels;
+    unsigned long frames, loop, loop_end;  /* loop_end 0: played once */
+    unsigned long long pos, step;
+    int left, right;
+} g_vc[VOICES];
+
+/* frame f's sample on channel ch, 16 bits */
+static int voice_sample(int v, unsigned long f, int ch)
+{
+    const unsigned char *p;
+    if (g_vc[v].channels == 1)
+        ch = 0;
+    p = g_vc[v].d + (f * g_vc[v].channels + ch) * g_vc[v].bytes;
+    if (g_vc[v].bytes == 1)
+        return (signed char)p[0] * 256;
+    return (short)(p[0] | p[1] << 8);
+}
+
+/* the voices into acc (frames of two), each frame between two of the sample's */
+static void voices_mix(int *acc, int frames)
+{
+    for (int v = 0; v < VOICES; v++) {
+        for (int i = 0; i < frames && g_vc[v].d; i++) {
+            unsigned long f = (unsigned long)(g_vc[v].pos >> 32), g = f + 1;
+            int t = (int)((g_vc[v].pos >> 16) & 0xffff);
+            if (g_vc[v].loop_end && g >= g_vc[v].loop_end)
+                g = g_vc[v].loop;
+            else if (g >= g_vc[v].frames)
+                g = f;
+            for (int ch = 0; ch < 2; ch++) {
+                int a = voice_sample(v, f, ch), b = voice_sample(v, g, ch);
+                int s = a + (int)((long long)(b - a) * t >> 16);
+                acc[2 * i + ch] += s * (ch ? g_vc[v].right : g_vc[v].left) / 127;
+            }
+            g_vc[v].pos += g_vc[v].step;
+            f = (unsigned long)(g_vc[v].pos >> 32);
+            if (g_vc[v].loop_end) {
+                while (f >= g_vc[v].loop_end) {
+                    g_vc[v].pos -= (unsigned long long)(g_vc[v].loop_end - g_vc[v].loop) << 32;
+                    f = (unsigned long)(g_vc[v].pos >> 32);
+                }
+            } else if (f >= g_vc[v].frames)
+                g_vc[v].d = 0;
+        }
+    }
+}
+
 static void mix(void *unused, Uint8 *out, int len)
 {
     static short buf[4096];
@@ -71,6 +124,7 @@ static void mix(void *unused, Uint8 *out, int len)
             g_st[s].conv = 0;
         }
     }
+    voices_mix(acc, frames);
     for (int i = 0; i < frames * 2; i++) {
         int v = acc[i];
         ((short *)out)[i] = (short)(v > 32767 ? 32767 : v < -32768 ? -32768 : v);
@@ -189,5 +243,64 @@ void audio_stream_close(int s)
     SDL_LockAudioDevice(g_dev);
     SDL_FreeAudioStream(g_st[s].conv);
     g_st[s].conv = 0;
+    SDL_UnlockAudioDevice(g_dev);
+}
+
+/* the step through a sample at freq frames a second (16.16) */
+static unsigned long long voice_step(unsigned long freq)
+{
+    return ((unsigned long long)freq << 16) / RATE;
+}
+
+void audio_voice_start(int v, const void *d, int bytes, int channels, unsigned long frames,
+                       long loop, unsigned long loop_len, unsigned long freq, int left, int right)
+{
+    if (!g_dev || v < 0 || v >= VOICES)
+        return;
+    SDL_LockAudioDevice(g_dev);
+    g_vc[v].d = frames ? d : 0;
+    g_vc[v].bytes = bytes == 1 ? 1 : 2;
+    g_vc[v].channels = channels == 2 ? 2 : 1;
+    g_vc[v].frames = frames;
+    if (loop < 0)
+        loop = 0;
+    g_vc[v].loop = loop_len ? (unsigned long)loop : 0;
+    g_vc[v].loop_end = loop_len ? (unsigned long)loop + loop_len : 0;
+    if (g_vc[v].loop_end > frames)
+        g_vc[v].loop_end = frames;
+    if (g_vc[v].loop_end <= g_vc[v].loop)
+        g_vc[v].loop_end = 0;
+    g_vc[v].pos = 0;
+    g_vc[v].step = voice_step(freq);
+    g_vc[v].left = left;
+    g_vc[v].right = right;
+    SDL_UnlockAudioDevice(g_dev);
+}
+
+void audio_voice_rate(int v, unsigned long freq)
+{
+    if (!g_dev || v < 0 || v >= VOICES)
+        return;
+    SDL_LockAudioDevice(g_dev);
+    g_vc[v].step = voice_step(freq);
+    SDL_UnlockAudioDevice(g_dev);
+}
+
+void audio_voice_volume(int v, int left, int right)
+{
+    if (!g_dev || v < 0 || v >= VOICES)
+        return;
+    SDL_LockAudioDevice(g_dev);
+    g_vc[v].left = left;
+    g_vc[v].right = right;
+    SDL_UnlockAudioDevice(g_dev);
+}
+
+void audio_voice_stop(int v)
+{
+    if (!g_dev || v < 0 || v >= VOICES)
+        return;
+    SDL_LockAudioDevice(g_dev);
+    g_vc[v].d = 0;
     SDL_UnlockAudioDevice(g_dev);
 }

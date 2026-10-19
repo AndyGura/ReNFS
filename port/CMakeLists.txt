@@ -23,6 +23,8 @@ add_executable(renfs
   src/video.c
   src/fe.c
   src/audio.c
+  src/sndlib.c
+  src/racesnd.c
   src/eacs.c
   src/tgv.c
   src/movie.c

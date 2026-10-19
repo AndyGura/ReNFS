@@ -8,6 +8,8 @@
 #include "crash.h"
 #include "drive.h"
 #include "exe.h"
+#include "hud.h"
+#include "racesnd.h"
 #include "timing.h"
 #include "track.h"
 #include <string.h>
@@ -1608,7 +1610,9 @@ static void change_speed(race_car *c, race_car *const *nb, int l, int best, cons
 }
 
 /* 0x79b60: a racer near a player: the lanes the player blocks scored down; stuck behind
-   one in its lane it wants to sound its horn (the sounds: not yet) */
+   one in its lane it wants to sound its horn, and sounds it (0x80a60) after a few steps,
+   or as it comes up on a player who is driving, 5 nodes behind it or 2 behind the first
+   car */
 static void near_humans(race_car *c, int l, int *s, int node, int prog)
 {
     const unsigned char *rec = g_opp.rec[c->slot];
@@ -1633,11 +1637,16 @@ static void near_humans(race_car *c, int l, int *s, int node, int prog)
                 unsigned r = ((rnd() * 10) >> 16);
 
                 c->body.honks++;
-                if ((int)r < c->body.honks)
+                if ((int)r < c->body.honks) {
+                    rsnd_horn(c->slot, 0);
                     c->body.honks = 0;
+                }
             }
         } else
             c->body.honks = 0;
+        if ((h->node - c->node == 5 || g_cars[0]->node - c->node == 2)
+            && c->road_speed > 0xf0000 && h->state == 1)
+            rsnd_horn(c->slot, 0);
     }
 }
 
@@ -1837,9 +1846,11 @@ void opponent_tick(void)
         score_speeds(c, a, b, s);
         if (BACKWARDS(c) && nb[1] && nb[1]->road_speed > 0xa0000)
             s[2] -= 0x1e0000;
-        /* the traffic coming the other way sometimes sounds its horn (the sound: not yet) */
-        if (!(WORD(c) & 0x404) && !POLICE(c) && BACKWARDS(c) && near && a[1] > -0x30000)
-            rnd();
+        /* the traffic coming the other way sometimes sounds its horn (one time in 7.3),
+           when moving and the radar is quiet */
+        if (!(WORD(c) & 0x404) && !POLICE(c) && BACKWARDS(c) && near && a[1] > -0x30000
+            && (rnd() & 0xff) < 0x23 && c->road_speed && !g_hud.radar)
+            rsnd_horn(c->slot, c->horn_sound);
         /* the best lane, its middle, kept on the road, moved by its place in the lane */
         best = l;
         m = s[1];

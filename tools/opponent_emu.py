@@ -32,10 +32,27 @@ from unicorn import UC_HOOK_CODE
 from unicorn.x86_const import UC_X86_REG_ESP, UC_X86_REG_EIP
 import drive_emu as D
 
-SOURCES = [f for f in D.SOURCES if f != "opponent.c"]
+SOURCES = [f for f in D.SOURCES if f not in ("opponent.c", "racesnd.c")]    # (sound_test.c has it)
 LEFT_OUT = dict(D.LEFT_OUT)
-# sounds; EXPLODE's push
-LEFT_OUT.update({0x80a60: 0, 0x78370: 0})
+# EXPLODE's push (a computer's horn wanted, 0x80a60, is the game's: its random number)
+LEFT_OUT.update({0x78370: 0})
+# with --sound the sounds are the original's too: the hits', the engine's on and off, where
+# a car is heard from
+SOUNDS = (0x52d2c, 0x52e40, 0x52ea8, 0x53214, 0x531dc, 0x7fb58)
+# the race's sounds' globals, in sound_test_var's order
+SOUND_VARS = [(0xeded0, "muted"), (0xeded4, "engine"), (0xee358, "beep on"), (0xee35c, "beep wait"),
+              (0xee360, "road pitch"), (0xee364, "revs"), (0xee368, "load"), (0xee36c, "road up"),
+              (0xee370, "under vol"), (0xee374, "under pan"), (0xf7768, "skid 0"), (0xf776c, "skid 1"),
+              (0xf7770, "echo now"), (0xf7774, "horn kind"), (0xf7778, "horn time"), (0xf777c, "horn car"),
+              (0xf7780, "siren on"), (0xf7784, "echo wait"), (0xf7788, "siren node"),
+              (0xf778c, "siren bend"), (0xea814, "radar"), (0x12b9f8, "radar flash"), (0xf973c, "next voice")]
+SOUND_VARS += [(0xeded8 + 4 * c, "bend %d" % c) for c in range(16)]
+for c in range(16):
+    SOUND_VARS += [(0x13c2dc + 8 * c, "channel %d voice" % c), (0x13c2e0 + 8 * c, "channel %d sound" % c)]
+VOICES, SLOTS, SND_SETTINGS = 0x160fa4, 0x161224, 0x12da53
+# the voice records' fields compared (the rest is the mixer's)
+VOICE_FIELDS = [(0, 4), (4, 4), (0xa, 1), (0xb, 1), (0xc, 4), (0x10, 1), (0x11, 1), (0x12, 1), (0x13, 1),
+                (0x16, 1), (0x17, 1), (0x18, 4), (0x24, 1), (0x25, 1), (0x26, 1), (0x27, 1)]
 KIND = {1: 0x7ea20, 2: 0x382d0, 3: 0x7b34c, 4: 0x1cfe0, 5: 0x7d9e4, 6: 0x7e0c8}
 CAR = 0x800
 
@@ -142,6 +159,7 @@ def lib():
     subprocess.check_call(["cc", "-O1", "-g", "-fwrapv", "-shared", "-fPIC", "-o", out] +
                           ["port/src/" + f for f in SOURCES] +
                           ["tools/drive_test.c", "tools/timing_test.c", "tools/opponent_test.c", "tools/collide_test.c",
+                           "tools/sound_test.c",
                            "-Iport/src"] +
                           subprocess.check_output(["sdl2-config", "--cflags", "--libs"]).decode().split())
     L = ctypes.CDLL(os.path.abspath(out))
@@ -153,6 +171,9 @@ def lib():
     L.opp_test_grid.restype = P(ctypes.c_int)
     L.opp_test_drivers.restype = P(ctypes.c_int)
     L.timing_test_array.restype = P(ctypes.c_int)
+    L.sound_test_var.restype = P(ctypes.c_int)
+    L.timing_test_var.restype = P(ctypes.c_int)
+    L.sound_test_freq.restype = ctypes.c_uint
     return L
 
 
@@ -185,6 +206,16 @@ def check_settings(L, s):
 
 
 # the ported routines, for --coverage: (first, last instruction + 1)
+# the race's sounds (--sound): the game's (racesnd.c) and the library's (sndlib.c)
+SOUND_PORTED = [(a, a + n) for a, n in (
+    (0x52ac8, 70), (0x7fb2c, 44), (0x52ecc, 439), (0x53084, 41), (0x52b10, 293), (0x52c38, 184),
+    (0x52cf0, 57), (0x52d2c, 240), (0x52e1c, 36), (0x52e40, 61), (0x52e80, 37), (0x52ea8, 34),
+    (0x530b0, 186), (0x5316c, 54), (0x531a4, 8), (0x531ac, 48), (0x531dc, 54), (0x53214, 139),
+    (0x53338, 1559), (0x7fb58, 212), (0x7fc2c, 142), (0x7fcbc, 460), (0x7fe88, 110), (0x7fef8, 141),
+    (0x7ff88, 148), (0x8001c, 132), (0x800a0, 2257), (0x80974, 234), (0x80a60, 77),
+    (0x95a7a, 212), (0x95b4e, 398), (0x95cfb, 25), (0x98bf5, 138), (0x8169b, 128), (0x8171b, 131),
+    (0x8179e, 118), (0x81814, 109), (0x8193c, 60), (0x9ea7d, 49), (0x9eaae, 61), (0xa1fbb, 127),
+    (0xa062c, 121), (0xa20a8, 217))]
 PORTED = [(0x7b34c, 0x7bf35), (0x7b178, 0x7b34a), (0x7cf04, 0x7cf68), (0x7cf98, 0x7d9e2),
           (0x7a040, 0x7aeb6), (0x78c88, 0x794fe), (0x78a80, 0x78c30), (0x7850c, 0x7865e),
           (0x79b60, 0x79e27), (0x79e28, 0x79ffc), (0x786d4, 0x78a7f), (0x78660, 0x786d4),
@@ -201,7 +232,7 @@ PORTED = [(0x7b34c, 0x7bf35), (0x7b178, 0x7b34a), (0x7cf04, 0x7cf68), (0x7cf98, 
           (0x7ea20, 0x7ea86)]
 
 
-def run(L, F, OF, path, scr, var, coverage=False, full=False):
+def run(L, F, OF, path, scr, var, coverage=False, full=False, sound=False):
     s = Snap(path)
     mu = s.mu
     if coverage:
@@ -214,7 +245,8 @@ def run(L, F, OF, path, scr, var, coverage=False, full=False):
         mu.reg_write(UC_X86_REG_ESP, sp + 4 + 4 * k)
         mu.reg_write(UC_X86_REG_EIP, ret)
     for at, k in LEFT_OUT.items():
-        mu.hook_add(UC_HOOK_CODE, hook, k, begin=game(at), end=game(at))
+        if not (sound and at in SOUNDS):
+            mu.hook_add(UC_HOOK_CODE, hook, k, begin=game(at), end=game(at))
     met = {0x1c6a4: 0, 0x2afb8: 0, 0x1e591: 0}      # the cars near, touching, a hard hit
 
     def count(mu, addr, size, u):
@@ -353,6 +385,42 @@ def run(L, F, OF, path, scr, var, coverage=False, full=False):
         for i in range(n_cars):
             arr[i] = rd(s, a + 4 * i)
     D.set_collide(L, s)
+    L.timing_test_var(21)[0] = rd(s, 0x145c90)
+    # the race's sounds: the settings (silent without --sound), the banks, the globals,
+    # the voices and the camera they are heard from
+    sset = SND_SETTINGS + 0x4b * player
+    sfx = rd(s, sset + 0x14) if sound else 0
+    L.sound_test_start(sfx, rd(s, sset + 0x18), 1 if rd(s, sset + 0x1c) == 2 else 0,
+                       f(cars[0], 0x48a), f(cars[1], 0x48a), rd(s, 0x12da12))
+    slot_of = {s.u32(SLOTS + 4 * n): n for n in range(128) if s.u32(SLOTS + 4 * n)}
+    if sound:
+        rec, head = ctypes.create_string_buffer(0x48), ctypes.create_string_buffer(0x1c)
+        for n in range(128):
+            p = s.u32(SLOTS + 4 * n)
+            if bool(p) != bool(L.sound_test_slot(n, rec, head)):
+                return "sound %d: in the bank on one side only" % n
+            # (+4 and the header's +0x18 are pointers there, offsets here; +0x1c on is the mixer's)
+            if p and bytes(mu.mem_read(p + 8, 0x38)) != rec.raw[8:0x40]:
+                return "sound %d: its record differs" % n
+
+    def voice_raw(v):
+        raw = bytearray(s.read(VOICES + 0x28 * v, 0x28))
+        p = struct.unpack_from("<I", raw, 0)[0]
+        struct.pack_into("<i", raw, 0, -1 if p == 0 else slot_of.get(p, -2))
+        return bytes(raw)
+    for k, (a, nm) in enumerate(SOUND_VARS):
+        L.sound_test_var(k)[0] = rd(s, a)
+    for v in range(16):
+        L.sound_test_voice(v, ctypes.create_string_buffer(voice_raw(v), 0x28), 1)
+    for k in range(2):
+        p = s.u32(0xf7790 + 4 * k)
+        L.sound_test_near(k, cars.index(p) if p in cars else -1, 1)
+    CAM = 0x129ecc
+    cc = s.u32(CAM + 0x90)
+    L.sound_test_camera(rd(s, CAM), rd(s, CAM + 0x10), rd(s, CAM + 0x14), rd(s, CAM + 0x18),
+                        rd(s, CAM + 0x38), rd(s, CAM + 0x44), cars.index(cc) if cc in cars else 0)
+    heard = [0]
+    vb = ctypes.create_string_buffer(0x28)
     out = ctypes.create_string_buffer(CAR)
     n = 0
     for steps, w in D.START + pieces(scr):
@@ -391,6 +459,10 @@ def run(L, F, OF, path, scr, var, coverage=False, full=False):
             s.call(0x518c0)
             s.call(0x1c878)
             s.call(0x518c0)
+            # (race_update_cars after the camera: the sounds, but at the pause)
+            if sound and rd(s, 0xf6b74) != 3 and sfx:
+                for a in (0x80974, 0x7fef8, 0x7fcbc) + ((0x7fe88,) if rd(s, 0x12da30) > 1 else ()) + (0x800a0,):
+                    s.call(a)
             # the port's
             if fl & 4:
                 L.drive_controls(rc[0])
@@ -405,6 +477,8 @@ def run(L, F, OF, path, scr, var, coverage=False, full=False):
             L.timing_sort()
             L.crash_world()
             L.timing_sort()
+            if sound:
+                L.rsnd_step()
             # compared
             diff = []
             for k, a in enumerate(cars):
@@ -436,6 +510,27 @@ def run(L, F, OF, path, scr, var, coverage=False, full=False):
             for k, (a, nm) in enumerate(D.CRASH_GLOBALS):
                 if rd(s, a, 4) != L.crash_test_global(k, 0, 0):
                     diff.append("%s %d/%d" % (nm, rd(s, a, 4), L.crash_test_global(k, 0, 0)))
+            for k, (a, nm) in enumerate(SOUND_VARS):
+                x, y = rd(s, a), L.sound_test_var(k)[0]
+                if x != y and (sound or nm.startswith("horn")):
+                    diff.append("%s %d/%d" % (nm, x, y))
+            if sound:
+                for v in range(16):
+                    t = voice_raw(v)
+                    L.sound_test_voice(v, vb, 0)
+                    for o, nb in VOICE_FIELDS:
+                        x = int.from_bytes(t[o:o + nb], "little", signed=True)
+                        y = int.from_bytes(vb.raw[o:o + nb], "little", signed=True)
+                        if x != y:
+                            diff.append("voice %d +%#x %d/%d" % (v, o, x, y))
+                for k in range(2):
+                    p = s.u32(0xf7790 + 4 * k)
+                    x = cars.index(p) if p in cars else -1 if not p else -2
+                    if x != L.sound_test_near(k, 0, 0):
+                        diff.append("near %d %d/%d" % (k, x, L.sound_test_near(k, 0, 0)))
+                if rd(s, CAM + 0x44) != L.sound_test_cam_yaw():
+                    diff.append("camera yaw")
+                heard[0] += sum(1 for v in range(16) if s.read(VOICES + 0x28 * v + 0x16, 1)[0])
             ea = (ctypes.c_uint * 6)()
             L.collide_test_random(ea, 0)
             if list(ea) != list(struct.unpack("<6I", s.read(0xf8a8c, 24))):
@@ -482,6 +577,8 @@ def run(L, F, OF, path, scr, var, coverage=False, full=False):
             touched += "; the police out at step %d, node %d, %d steps chasing, %d caught, " \
                 "%d warnings, %d tickets, result %d" % (pol["came"] + (pol["chase"], pol["caught"],
                 rd(s, 0x14ec34), rd(s, 0x14ec30), rd(s, 0x13c178)))
+    if sound:
+        touched += "; %d voices playing a step on average" % (heard[0] // max(n, 1))
     return "equal, %d steps (the player at node %d, the opponent at %d, %.1f m/s, lane place %.2f m%s)" % (
         n, f(cars[0], 0x48), f(opp, 0x48), f(opp, 0x15c) / 65536, f(opp, 0x80) / 65536, touched)
 
@@ -490,8 +587,11 @@ def main():
     args = sys.argv[1:]
     coverage = "--coverage" in args
     full = "--full" in args
+    sound = "--sound" in args
+    if sound and coverage:
+        PORTED[:] = SOUND_PORTED
     only = [a[7:] for a in args if a.startswith("--only=")]
-    args = [a for a in args if a not in ("--coverage", "--full") and not a.startswith("--only=")]
+    args = [a for a in args if a not in ("--coverage", "--full", "--sound") and not a.startswith("--only=")]
     paths = args or sorted(glob.glob("build/snap/[der]*.bin"))
     L = lib()
     L.files_init(b"NFSSE", None)
@@ -509,7 +609,7 @@ def main():
         for scr, var in RUNS:
             if only and var not in only and "%s %s" % (scr, var) not in only:
                 continue
-            r = run(L, F, OF, p, scr, V[var], coverage, full)
+            r = run(L, F, OF, p, scr, V[var], coverage, full, sound)
             bad += not r.startswith("equal")
             print("%s %-6s %-18s %s" % (os.path.basename(p), scr, var, r), flush=True)
     print("all equal" if not bad else "%d runs differ" % bad)

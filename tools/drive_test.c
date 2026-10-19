@@ -8,6 +8,16 @@
 #include "crash.h"
 #include "drive.h"
 #include "opponent.h"
+#include "view.h"
+
+/* a camera for the sounds' calls (where a hit is heard from), which these tests leave
+   silent */
+static race_camera test_camera;
+__attribute__((constructor)) static void test_camera_set(void)
+{
+    if (!g_camera)
+        g_camera = &test_camera;
+}
 
 #define I(o, f) { o, offsetof(race_car, f), 4 }
 #define V(o, f) I(o, f.x), I(o + 4, f.y), I(o + 8, f.z)
@@ -22,7 +32,7 @@ static const struct { int at, off, size; } fields[] = {
     I(0x68, speed), I(0x6c, wheel_speed), I(0x70, speed_abs), I(0x74, yaw_rate),
     I(0x78, half_len), I(0x7c, half_wid), I(0x365, body_roll), I(0x369, body_pitch),
     V(0x36d, along), V(0x379, across), V(0x385, ground), I(0x39d, dist),
-    I(0x3b1, throttle), I(0x3b5, throttle_kept), I(0x3b9, braking), I(0x3bd, shift_wait),
+    I(0x3a1, snd_dist), I(0x3ad, snd_mode), I(0x3b1, throttle), I(0x3b5, throttle_kept), I(0x3b9, braking), I(0x3bd, shift_wait),
     I(0x3c1, rpm), I(0x3c5, rpm_road), I(0x3c9, grip_extra), I(0x3cd, grip_rear),
     I(0x3d1, grip_front), I(0x3d5, shift_last), I(0x3d9, push_side), I(0x3dd, push_up),
     I(0x3e1, push_fwd), I(0x3e5, engine_force), I(0x3e9, gearbox), I(0x3ed, gear),

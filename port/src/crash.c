@@ -4,6 +4,7 @@
    the machine code does, 32-bit sums wrapping. The body's coordinates are the car's with
    z turned round: its turn's elements 2, 5, 6 and 7 and its z change sign between them. */
 #include "crash.h"
+#include "racesnd.h"
 #include "cardraw.h"
 #include "collide.h"
 #include "exe.h"
@@ -595,9 +596,11 @@ static void body_angles(race_car *c)
 }
 
 /* 0x1cd40: the car driven by kind k again, from the body: its place, its speed, its turn
-   half way to the body's spin. (The viewed car's sounds then stop: not in the port) */
+   half way to the body's spin; the car heard, thrown about, heard again */
 static void set_kind(race_car *c, int k)
 {
+    if (c == rsnd_heard() && c->state == 4)
+        rsnd_engine_on();
     c->state = k;
     car_from_body(c);
     c->yaw_rate += (-mulr(c->body.spin.y, 0x28be63) - c->yaw_rate) >> 1;
@@ -627,6 +630,8 @@ static void stand_up(car_body *b, const vec3 *up)
 /* 0x1ceb4: landed on its wheels: driven again, the gearbox's automatic in neutral */
 static void land(race_car *c)
 {
+    if (c == rsnd_heard() && c->state == 4)
+        rsnd_engine_on();      /* (and again in set_kind, as the original) */
     set_kind(c, 2);
     c->crashing = 0;
     body_angles(c);
@@ -639,7 +644,7 @@ static void land(race_car *c)
 }
 
 /* car_crash 0x1cb14: the car to kind 4, tumbling, put back in 300 steps at the latest.
-   (A highlight for the replay, 0x5c, and the viewed car's sound: not in the port) */
+   (A highlight for the replay, 0x5c: not in the port.) The car heard falls silent */
 static void crash_begin(race_car *c)
 {
     body_from_car(c);
@@ -648,6 +653,8 @@ static void crash_begin(race_car *c)
     smoke_reset(&g_crash.smoke);
     c->bits[1] &= ~2;
     c->body.wait = 300;
+    if (c == rsnd_heard())
+        rsnd_engine_off();
 }
 
 void crash_hard_hit(race_car *c, int a, int b, int s)
@@ -931,7 +938,11 @@ void crash_step(race_car *c)
         }
         c->slide_rear = (b->m[4] > 0xcccc ? 4 : 2) << 8 | 1;
         if (g_crash.hit_level < best) {
-            /* (the hit's sound for a body under 8, 0x52e40: not in the port) */
+            /* the hit heard (0x52e40), for a body under 8 */
+            int angle, dist;
+            rsnd_where(c, &angle, &dist);
+            if (b->mass < 0x80000)
+                rsnd_hit(b->m[4] > 0xcccc ? 4 : 2, 1, best * 20, dist, angle);
             g_crash.hit_level = best + 0x8000;
             g_crash.hit_wait = 10;
         }
@@ -1041,12 +1052,14 @@ void crash_mat_mul(int *out, const int *a, const int *b)
 }
 
 /* 0x1ca9c: a computer's car turned too far spins out: thrown about as a box for 60
-   steps (the viewed car's sound: not yet) */
+   steps (the car heard falls silent) */
 void crash_spin_out(race_car *c)
 {
     body_from_car(c);
     c->state = 4;
     c->body.wait = 60;
+    if (c == rsnd_heard())
+        rsnd_engine_off();
 }
 
 void crash_start(void)
