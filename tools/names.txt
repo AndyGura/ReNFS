@@ -495,3 +495,16 @@
 0xa6a79 edge_make_flat
 0xa6060 plot_pixel
 0xa6e80 poly_solid_rows
+0x30094 dash_redraw
+0x31684 dash_frame
+0x2f2a4 status_bar
+0x2d6b4 hud_time
+0x2d3ac hud_time_split
+0x2d47c hud_digits
+0x2d314 dash_clip
+0x5885c clip_box
+0x815c8 drawshape_see_through_at
+0x2d150 hud_reset_shown
+0x2d284 dash_redraw_due
+0x5f240 hud_find_pictures
+0x314e4 hud_frame

@@ -43,7 +43,8 @@ def race_palette(s, name, L, cars):
     if not L.dash_load(car, s.i32(0x12c308)):
         sys.exit("no dashboard")
     L.dash_queue_colours()
-    L.cockpit_queue_colours()
+    if not L.hud_load():       # (load_cockpit_mask 0x5f7c8: its colours and the program's)
+        sys.exit("no HUD")
     L.pal_apply_pieces()
     L.race_colours(marks, n, s.i32(0x12da20))
     return keep, marks
@@ -106,6 +107,10 @@ def check(path, name, L):
             if d:
                 pbad.append("car %d %s: %d bytes" % (k, "near far".split()[e], d))
     print("   pictures: %s" % ("; ".join(pbad) if pbad else "every car's near and far equal"))
+    mask = ctypes.c_void_p.in_dll(L, "g_mask").value
+    n = struct.unpack("<I", ctypes.string_at(mask + 4, 4))[0]
+    print("   the HUD's pictures: %s" % ("equal" if ctypes.string_at(mask, n) == s.raw(s.u32(0x145604), n)
+                                         else "differ"))
     shade = bytes((U8 * 256).in_dll(L, "g_shade"))
     marks = bytes((U8 * 8).in_dll(L, "g_marker_colour")) + struct.pack("<i", ctypes.c_int.in_dll(L, "g_marker_line").value)
     if marks != s.read(0x13d5e8, 8) + s.read(0x13d5c8, 4):

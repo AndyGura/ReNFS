@@ -5,6 +5,7 @@
 #include "car.h"
 #include "cardraw.h"
 #include "dash.h"
+#include "hud.h"
 #include "exe.h"
 #include "files.h"
 #include "racepal.h"
@@ -92,7 +93,8 @@ int race_test(const char *name)
     if (!dash_load(car, 0))
         return 0;
     dash_queue_colours();
-    cockpit_queue_colours();
+    if (!hud_load())
+        return 0;
     video_mode(320, 200);
     pal_apply_pieces();
     race_colours(marks, RACE_CARS, 0);
@@ -174,6 +176,7 @@ int race_test(const char *name)
     g_ncars = 0;
     for (i = 0; i < RACE_CARS; i++)
         car_free(&cars[i]);
+    hud_free();
     dash_free();
     trackfam_free();
     track_free();

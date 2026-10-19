@@ -23,7 +23,7 @@ from roaddraw_emu import Painters, CARS
 from setup_check import Fam
 
 I, U8, P = ctypes.c_int, ctypes.c_ubyte, ctypes.c_void_p
-SOURCES = ["cardraw.c", "model.c", "polyfill.c", "camera.c", "car.c", "dash.c", "view.c", "sky.c", "roaddraw.c",
+SOURCES = ["cardraw.c", "model.c", "polyfill.c", "camera.c", "car.c", "dash.c", "hud.c", "config.c", "view.c", "sky.c", "roaddraw.c",
            "trackinfo.c", "road.c", "poly.c", "raster.c", "track.c", "files.c", "exe.c", "trackfam.c",
            "racepal.c", "font.c", "video.c", "fsh.c", "unpack.c"]
 LEFT_OUT = {0x59294: 3, 0x66738: 0}

@@ -1612,6 +1612,74 @@ grid's yaw), the list made each frame (the step's job), the rows marked, the car
 as the road reaches them. At the standing start the rival is beside the player, out of
 the windscreen's view, in the original too (e1).
 
+### 4.11 The dashboard and the HUD (2026-10-19)
+
+**The frame** (`race_draw_frame` `0x5bc40`): the 3D view is painted into an off-screen
+picture (`0xf4578`, 320x200, its own window), then in the driver's view (camera mode 0,
+`0x12ba2c` = 0) `0x31684(player's car)` puts it on the screen; other views `0x314e4`.
+`0x2d284` (sets `0x12b8d4`) asks for the whole dashboard again, done by `0x31684` through
+`0x30094`. With `0xeaafc` (0 in these races) all of it goes to a back buffer `0xf4588`
+instead of the screen (`0xba93c` sets the screen's window, `0xf88d4` → `0xf889c`).
+
+**EA's windows and blits.** A window record (13 words, the current one at `0xf889c`):
+w, h, the clip x0 y0 x1 y1 (`0xf88a4`..), `+0x18` the kind (0x7b08: 8 bits), `+0x20` the
+row in bytes, `+0x28` a table of row offsets, `+0x2c` the base. An off-screen picture is a
+window record followed by an FSH shape (`+0x38`), its pixels after the shape's 16 bytes.
+`setwindow` `0x8118c(record)`, `cliprect` `0x812ec(x0, x1, y0, y1)` (clamped to 0 and the
+window's size), `0x5885c(x, y, w, h)` = `cliprect(x, x + w, y, y + h)`. The blitter
+`0x9d8d0(shape, x, y, record)`: for an 8-bit shape on an 8-bit window a rectangle cut to
+the clip, row by row with the record's row routine (`+4` for 8 bits): `0xf79a4` copies
+(memmove), `0xf79cc` skips 255 (0x81434; kind 4 shapes skip 0), `0xf7a50` copies the other
+way, the window into the shape (`0x84248(shape, x, y)`, which also sets the shape's x, y).
+Entries: `0x81214(s, x, y)` copy, `0x81230(s)` copy at its own place (+0xc, +0xe, signed),
+`0x81280(s, x, y)`, `0x8129c(s)`, `0x812bc(s, x, y)` by its centre (+8, +0xa); see-through
+`0x815c8(s, x, y)`, `0x81580(s)` / `0x815e4(s)` at its own place, `0x81600(s, x, y)` by its
+centre.
+
+**The HUD's pictures** (`load_cockpit_mask` `0x5f7c8`, after `0x2e8bc` in `race_main`):
+`D:\simdata\misc\` + `masklo.fsh` (`maskhi.fsh` at 640x480, `masklog`/`maskhig` German)
+into `0x145604`, its `!pal` (>> 2 when 8-bit) queued for re-colouring (`0x55e68`) and the
+program's 13 colours at 0xf0 (`0xf6d18`); `0x5f240` finds the pictures by name, many
+from the program's tables of names: `0xf6c84` grey digits gry0..9, gryb (`0x1456b8`),
+`0xf6cb0` yellow yel0..9, yelr, yeln, plus, mnus, yelb (`0x1456e8`), `0xf6cec` red
+(`0x145728`), `0xf6bc0`/`0xf6be4`/`0xf6c08` the replay's buttons, `0xf6c2c`/`0xf6c4c` the
+views', `0xf6c6c`/`0xf6c78` fuel?; then the `MMB` and `.B<s><n>` lists. Re-coloured, equal
+byte for byte to the snapshot's (`tools/racepal_emu.py`).
+
+**The whole dashboard** `0x30094`: the screen's window; `0x2d314` (the race running,
+`0xf6b74` = 1, and the redraw due: the clip the whole screen); the dashboard's picture
+`dash` (`0x12b4d8`) see-through at (0, 0) (`0x815c8`); `0x12ba0c` = 1; **the map's box**:
+the screen at (0x104, 0x7f) taken into `0xf4580` (57x52, `0x84248`; 640x480: (0x208,
+0x132)), which is then darkened twice through the shade table (`0x8a0cf` = `0x8a04c` mode 0
+with `0xa5dd4`, corners (0, 0), (0x38, 0), (0x38, 0x3b), (0, 0x3b); 640x480 (0x70, 0x8b));
+then `0x2f2a4` the status bar; `0x12b8d0` = 0x63 (the wheel drawn next), `0x12b8d4` = 0,
+`0x2d150` (every number shown set to −99: drawn again).
+**The status bar** `0x2f2a4`: with `0x12b940` = 0 or the race's steps `0x145c94` < 360
+only a black strip (0, 0, 320, 16) in `0x13d5c8`. Else `stat` at its place, then by
+`0x12b8cc`: 1 (the race timed) `rtet`, the time of record 6 (+ 10 · `0x12dd24` on a circuit,
+`0x13bb80`) of the track `0x12da12`, `splt`, plus or minus (`0x14ea6c` ≥ 0); 0 (a segment)
+`segt`, then with splits (`0x14ea70` > 0) `splt` and plus/minus, else `lap#` (circuit) or
+`mile`, and the time: the best lap `0x13c20c` on a circuit, else the record `0x12da0e`
+(the segment) of the track (CONFIG.DAT +0xb5 + track · 0xa6b + k · 0x27 + 0x1b); 2 `0x145780`
+and `0x2d8c0` (not read yet). Then (< 2) `head` (race type `0x12da20` 0, 1) or `sing`.
+A time (`0x2d6b4(t + 300, x, y, step, gap)`, 320x200: (0x11, 3, 6, 2)): t − 300 (≥ 0) split
+by `0x2d3ac` into minutes, seconds, tenths (`0x12b8c4`, `0x12b8c0`, `0x12b8bc`), each drawn
+by `0x2d47c(v, x, y, step, n, table)`: n digits, the most significant first, copied
+(`0x81214`) step apart; minutes at x, seconds at x + 2·step + gap, tenths 2·step + gap on.
+**Ported (`port/src/hud.c`): equal to the original on e1 (the strip) and e3 (the bar),
+the screen and the map's background (`tools/dash_emu.py`).**
+
+**Each frame** `0x31684(car)` (to be ported): `0x306e8`; the redraw when due; the wheel's
+picture by |steering| (`+0x18`) in 7 steps (the limits at `0x31780`, other ones at
+640x480); the view copied to the screen through the dashboard's
+BAMF list `0x12b8a4[0x143e04]` (`0x8b8f0`; `<car>DL.FMM`, list 0 copies 1:1); the mirror
+(`0x5b040`); the wheel when it changed (`0x12b4e4`/`0x12b500`[i] see-through, the left or
+right one); into the view's picture the gauges (`tach` `0x12b4dc`, `sped` `0x12b4e0`, the
+needles `0x2fc40`, the wheel's parts over them `0x12b51c`.. ) then their two rectangles
+(`0x12b884`.., from `tach` and `sped`'s places and sizes) copied to the screen; the
+status bar's numbers (`0x2e4f0`, `0x30214`, `0x2f644`, `0x30d8c`) and the map (`0xf4584` at
+(0x103, 0x7e)).
+
 ## 5. The original in DOSBox (2026-10-19)
 
 - The game for DOSBox is a COPY of the installed game in `~/dosgames/nfs` (`NFSSE/` +
