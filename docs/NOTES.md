@@ -617,7 +617,16 @@ libraries `0x80000`..`0x94000` and `0x95000`..`0xb0000`, Watcom's runtime `0x940
     6 bits x 4) and builds the exact 32x32x32 inverse map (`inverse_colormap` `0x819c0`:
     cell centres x*8+4, entries 0..253, the lowest wins a tie). **`pal_fade_up` `0x71918`
     calls it at its end**; checked: the original's table on the game mode screen equals
-    this computation in all 32768 cells.
+    this computation in all 32768 cells. **It is Spencer W. Thomas's inverse colormap**
+    (Graphics Gems II, `inv_cmap.c`: `0x819c0` the colours, `invcmap_red_loop` `0x81bd8`,
+    `_green_loop` `0x81d5c`, `_blue_loop` `0x82000`; distances unsigned, 0xffffffff at
+    first, colours B G R 0 from `read_dac`, only those allowed in `0xf77c8`): each colour
+    scans out from its own cell and stops at the first cell it cannot claim after some it
+    could, so a region's ragged edge can leave a cell to a farther colour. A plain search
+    gives the same table on the menus and on 4 race snapshots, but 2 cells differ on r1's
+    palette; the port does Thomas's (`font.c`), equal in every cell on all 6 (2026-10-19).
+    **The allowed entries `0xf77c8`**: the program's 0..253; the race's own (`race_colours`
+    `0x2e74c`), never put back.
   - `fe_yes_no_dialog` `0x73b04`: two windows of 340x100 holding the screen at (150,190);
     the box darkened through `remap_table` `0x89f3c` (0x9000 a channel, 6-bit cap, weights
     2R 3G 1B) by `polygon` `0x8a0cf`, two red frames `frame` `0x8a0f0`, the question red
@@ -1351,6 +1360,24 @@ not 0: the replay?), `0x2a918`, the second drawing pass `0x5a4f0`, the widget bl
 `0x71208`..`0x74dcc`, Watcom's runtime.
 
 ### 4.9 The race's palette and its textures (2026-10-19)
+
+**Made by the port alone (2026-10-19; `tools/racepal_emu.py`: the palette 0..253 and the
+inverse table equal to the original on all 6 snapshots, given the snapshot's cars).** The
+cars' colours (`load_car_cfm` `0x65874`): the file `SIMDATA/CARFAMS/<name>.CFM` by the id
+`0x12dce4[n]` (< 100 the traffic's names `0xf6e70` (Wagon, CRX, Vandura, BMW, SunBird,
+JETTA, RODEO, axxess, probe, Jeep, Lemans, Pickup); 100..199 `M` + the racers' `0xf6ca0`;
+200..399 the racers' `0xf6b10` (TSupra, LDiabl, P911, CZR1, F512TR, DVIPER, ANSX, MRX7..,
+Traffc), `+0x48a` = id − 100 or 200; 400 and up `CopMust` `0xf6e60`); the container's
+entry 1 (`+0x51e`, the near pictures) "!PAL" (`+0x522`) and "!xxx" (`+0x526`, not for the
+police: `+0x174` & 8) and entry 3's (`+0x65a`) "!PAL": 8-bit ones (type 0x24) made 6-bit,
+each tinted (`pal_tint_shape` `0x562e8`: `pal_tint(0, w·h/3)`). The dashboard's
+(`load_dash` `0x2e8d4`): `SIMDATA/DASH/<car>DL.FSH` (`DH` at 640x480, `0x12c308`), "!pal"
+(made 6-bit if 8) else the block after "dash"; not tinted before the pieces are set (only
+after, by `0x2e74c`, for its own pictures). On CY1 (r1, d): the ids 204, 201, 400, then
+the traffic (7, 5, 0, 11, 6, 4 in r1). `race_colours` `0x2e74c`: the DAC read back
+(`0x13cb48`), the allowed entries 0..254 less 0x47, 0x5f (with `0x12da20` < 2), 0xfa..0xff
+and the marks `0x14e5bc[i]`, the inverse table; then the fog table `0x8a390` (car `+0x48a`'s
+colour `0xea710`), the dashboard re-coloured and tinted, the DAC again into `0x12ba30`.
 
 One palette for everything in a race, made of **pieces**: `pal_queue_piece` `0x55ea0(start,
 count, pal)` lists them (50 at most, 0x13c7f0), `0x55f58` sets them all (setpalette) after

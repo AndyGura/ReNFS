@@ -18,11 +18,26 @@ typedef struct {
     int pitch_shake;           /* +0x42d */
     int player;                /* +0x47d: its place in the race's tables */
     int number;                /* +0x48a: which car (0x12da53 ..; the 512TR is 4) */
+    int police;                /* +0x174 & 8 */
+    unsigned char *cfm;        /* its CFM file (+0x792: the container) */
+    unsigned char *colours;    /* +0x526: its body's colours ("!xxx"), 6 bits, tinted */
 } race_car;
 
 /* the car's place on the starting grid (0x7c938): grid its slot (0x12dca0[player]),
    racers how many race (0x12da2c), kind the race's (0x12da12: > 2 a circuit) */
 void car_grid_place(race_car *c, int grid, int racers, int kind);
+
+/* the car's file (load_car_cfm 0x65874), by its id (0x12dce4[player]): < 100 the
+   traffic's names (0xf6e70), 100..199 the racers' with an M before (0xf6ca0), 200..399
+   the racers' (0xf6b10), 400 and up the police's CopMust; the number from the racers'.
+   Its pictures' palettes tinted as they load (racepal.h). 0 if missing */
+int car_load(race_car *c, int id);
+void car_free(race_car *c);
+/* every car's colours as pieces of the race's palette (0x64e14, one player): at
+   0xf6ea0[i], 0xf6ec8[i] of them, the police's none; a mark (0xf6ef0[i], 0x47 and 0x5f
+   for the two racers) in the player's car's colour (0xf6f5c + 3 · its number) kept in
+   marks[i] (0x14e5bc); and four of the program's at 0xfa (0xf6de0) */
+void cars_queue_colours(race_car *const *cars, int n, unsigned char *marks);
 
 /* the width of one of n lanes of a road `half` wide (the node's +1 / 8), 8.8; the
    original's table 0x15d15c (made by load_traffic_cfg 0x7de84) */

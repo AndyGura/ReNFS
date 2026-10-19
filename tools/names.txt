@@ -440,3 +440,12 @@
 0x63f50 traffic_defaults
 0x506dc race_laps_init
 0x6324c camera_check_mode
+0x64e14 cars_queue_colours
+0x2e8bc dash_queue_colours
+0x2e74c race_colours
+0x81bd8 invcmap_red_loop
+0x81d5c invcmap_green_loop
+0x82000 invcmap_blue_loop
+0x562e8 pal_tint_shape
+0x55abc hud_find_colours
+0x55790 hud_nearest

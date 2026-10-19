@@ -9,6 +9,7 @@
 
 text_style g_text;
 const unsigned char *g_inv;
+unsigned char g_colour_off[256] = { [254] = 1, [255] = 1 };
 static int g_clip_on, g_clip[4];
 
 void text_clip(int x0, int y0, int x1, int y1)
@@ -80,7 +81,9 @@ int nearest_colour(unsigned long rgb)
     int found = 0;
     if (g_inv)
         return g_inv[(r >> 3) << 10 | (g >> 3) << 5 | b >> 3];
-    for (int i = 0; i < 254; i++) {        /* 254 and 255 are the mouse pointer's */
+    for (int i = 0; i < 256; i++) {
+        if (g_colour_off[i])
+            continue;
         long d = (long)(g - p[3 * i + 1]) * (g - p[3 * i + 1]) + (long)(r - p[3 * i]) * (r - p[3 * i]) +
                  (long)(b - p[3 * i + 2]) * (b - p[3 * i + 2]);
         if (d < best) {
@@ -91,27 +94,181 @@ int nearest_colour(unsigned long rgb)
     return found;
 }
 
+/* inverse_colormap 0x819c0 (Spencer W. Thomas's, Graphics Gems II): each allowed colour
+   claims the cells nearer to it than to the colours before it, scanning out from its
+   own cell along blue, then green, then red, and stopping a scan at the first cell it
+   cannot claim after some it could. Exact but for rare cells its regions' edges miss
+   (two on one race's palette): the original's table, so the port's */
+#define CELLS 32
+static struct {
+    unsigned dist[CELLS * CELLS * CELLS];     /* the squared distance of the colour held */
+    unsigned char *map;
+    int index;                                /* the colour claiming */
+    int rc, gc, bc;                           /* its cell */
+    long rinc, ginc0, binc0;                  /* the distance's steps from there */
+    long cdist;
+    int at;                                   /* its cell's place */
+    /* the red loop's row, the green loop's column (0x15d968.., 0x15d984..) */
+    long rdist, gdist;
+    int rat, gat;
+    int g_here, g_min, g_max;                 /* 0x15d9c8, 0x15d9c4, 0x15d9c0 */
+    long g_inc;                               /* 0x15d9bc */
+    int b_here, b_min, b_max;                 /* 0x15d9d8, 0x15d9d4, 0x15d9d0 */
+    long b_inc;                               /* 0x15d9cc */
+} g_ic;
+
+#define XSQR 64                               /* (256 / CELLS)^2 */
+
+/* 0x82000 */
+static int blue_loop(int restart)
+{
+    int detect = 0, b, at;
+    long bdist, bxx;
+
+    if (restart) {
+        g_ic.b_here = g_ic.bc;
+        g_ic.b_min = 0;
+        g_ic.b_max = CELLS - 1;
+        g_ic.b_inc = g_ic.binc0;
+    }
+    for (b = g_ic.b_here, bdist = g_ic.gdist, bxx = g_ic.b_inc, at = g_ic.gat; b <= g_ic.b_max;
+         b++, at++, bdist += bxx, bxx += 2 * XSQR)
+        if (g_ic.dist[at] > (unsigned)bdist) {
+            if (b > g_ic.b_here) {
+                g_ic.b_here = b;
+                g_ic.gat = at;
+                g_ic.gdist = bdist;
+                g_ic.b_inc = bxx;
+            }
+            detect = 1;
+            break;
+        }
+    for (; b <= g_ic.b_max && g_ic.dist[at] > (unsigned)bdist; b++, at++, bdist += bxx, bxx += 2 * XSQR) {
+        g_ic.dist[at] = (unsigned)bdist;
+        g_ic.map[at] = (unsigned char)g_ic.index;
+    }
+    b = g_ic.b_here - 1;
+    bxx = g_ic.b_inc - 2 * XSQR;
+    bdist = g_ic.gdist - bxx;
+    at = g_ic.gat - 1;
+    if (!detect)
+        for (; b >= g_ic.b_min; b--, at--, bxx -= 2 * XSQR, bdist -= bxx)
+            if (g_ic.dist[at] > (unsigned)bdist) {
+                g_ic.b_here = b;
+                g_ic.gat = at;
+                g_ic.gdist = bdist;
+                g_ic.b_inc = bxx;
+                detect = 1;
+                break;
+            }
+    for (; b >= g_ic.b_min && g_ic.dist[at] > (unsigned)bdist; b--, at--, bxx -= 2 * XSQR, bdist -= bxx) {
+        g_ic.dist[at] = (unsigned)bdist;
+        g_ic.map[at] = (unsigned char)g_ic.index;
+    }
+    return detect;
+}
+
+/* 0x81d5c: the blue loop moves gat / gdist to where it found the colour's run, and
+   the column goes on from there; gcat / gcdist go on from where it was */
+static int green_loop(int restart)
+{
+    int detect = 0, first, g, gcat;
+    long gcdist, gxx;
+
+    if (restart) {
+        g_ic.g_here = g_ic.gc;
+        g_ic.g_min = 0;
+        g_ic.g_max = CELLS - 1;
+        g_ic.g_inc = g_ic.ginc0;
+    }
+    for (g = g_ic.g_here, gcdist = g_ic.gdist = g_ic.rdist, gxx = g_ic.g_inc,
+         gcat = g_ic.gat = g_ic.rat, first = 1; g <= g_ic.g_max;
+         g++, g_ic.gat += CELLS, gcat += CELLS, g_ic.gdist += gxx, gcdist += gxx, gxx += 2 * XSQR,
+         first = 0) {
+        if (blue_loop(first)) {
+            if (!detect) {
+                if (g > g_ic.g_here) {
+                    g_ic.g_here = g;
+                    g_ic.rat = gcat;
+                    g_ic.rdist = gcdist;
+                    g_ic.g_inc = gxx;
+                }
+                detect = 1;
+            }
+        } else if (detect)
+            break;
+    }
+    for (g = g_ic.g_here - 1, gxx = g_ic.g_inc - 2 * XSQR, gcdist = g_ic.gdist = g_ic.rdist - gxx,
+         gcat = g_ic.gat = g_ic.rat - CELLS, first = 1; g >= g_ic.g_min;
+         g--, g_ic.gat -= CELLS, gcat -= CELLS, gxx -= 2 * XSQR, g_ic.gdist -= gxx, gcdist -= gxx,
+         first = 0) {
+        if (blue_loop(first)) {
+            if (!detect) {
+                g_ic.g_here = g;
+                g_ic.rat = gcat;
+                g_ic.rdist = gcdist;
+                g_ic.g_inc = gxx;
+                detect = 1;
+            }
+        } else if (detect)
+            break;
+    }
+    return detect;
+}
+
+/* 0x81bd8: up the red planes from the colour's, then down; the green loop moves rat /
+   rdist along the plane */
+static void red_loop(void)
+{
+    int detect = 0, first, r;
+    long rxx;
+
+    for (r = g_ic.rc, g_ic.rdist = g_ic.cdist, rxx = g_ic.rinc, g_ic.rat = g_ic.at, first = 1; r < CELLS;
+         r++, g_ic.rat += CELLS * CELLS, g_ic.rdist += rxx, rxx += 2 * XSQR, first = 0) {
+        if (green_loop(first))
+            detect = 1;
+        else if (detect)
+            break;
+    }
+    for (r = g_ic.rc - 1, rxx = g_ic.rinc - 2 * XSQR, g_ic.rdist = g_ic.cdist - rxx,
+         g_ic.rat = g_ic.at - CELLS * CELLS, first = 1; r >= 0;
+         r--, g_ic.rat -= CELLS * CELLS, rxx -= 2 * XSQR, g_ic.rdist -= rxx, first = 0) {
+        if (green_loop(first))
+            detect = 1;
+        else if (detect)
+            break;
+    }
+}
+
 void inv_build(void)
 {
-    static unsigned char table[32768];
+    static unsigned char table[CELLS * CELLS * CELLS];
     const unsigned char *p8 = video_palette8();
-    int pal[254][3];
-    for (int i = 0; i < 254; i++)
-        for (int c = 0; c < 3; c++)
-            pal[i][c] = (p8[3 * i + c] >> 2) * 4;
-    for (int cell = 0; cell < 32768; cell++) {
-        int r = (cell >> 10) * 8 + 4, g = (cell >> 5 & 31) * 8 + 4, b = (cell & 31) * 8 + 4;
-        long best = 0x7fffffff;
-        int found = 0;
-        for (int i = 0; i < 254; i++) {     /* the first nearest wins */
-            long d = (long)(r - pal[i][0]) * (r - pal[i][0]) + (long)(g - pal[i][1]) * (g - pal[i][1]) +
-                     (long)(b - pal[i][2]) * (b - pal[i][2]);
-            if (d < best) {
-                best = d;
-                found = i;
-            }
-        }
-        table[cell] = (unsigned char)found;
+    int i;
+
+    for (i = 0; i < CELLS * CELLS * CELLS; i++)
+        g_ic.dist[i] = 0xffffffffu;
+    g_ic.map = table;
+    for (i = 0; i < 256; i++) {
+        /* the colour as the card reads it back: 6 bits x 4 */
+        int r = (p8[3 * i] >> 2) * 4, g = (p8[3 * i + 1] >> 2) * 4, b = (p8[3 * i + 2] >> 2) * 4;
+        long rd, gd, bd;
+
+        if (g_colour_off[i])
+            continue;
+        g_ic.index = i;
+        g_ic.rc = r >> 3;
+        g_ic.gc = g >> 3;
+        g_ic.bc = b >> 3;
+        rd = r - (g_ic.rc * 8 + 4);
+        gd = g - (g_ic.gc * 8 + 4);
+        bd = b - (g_ic.bc * 8 + 4);
+        g_ic.cdist = rd * rd + gd * gd + bd * bd;
+        g_ic.rinc = 2 * ((g_ic.rc + 1) * XSQR - r * 8);
+        g_ic.ginc0 = 2 * ((g_ic.gc + 1) * XSQR - g * 8);
+        g_ic.binc0 = 2 * ((g_ic.bc + 1) * XSQR - b * 8);
+        g_ic.at = g_ic.rc * CELLS * CELLS + g_ic.gc * CELLS + g_ic.bc;
+        red_loop();
     }
     g_inv = table;
 }

@@ -24,12 +24,16 @@ typedef struct {
 extern text_style g_text;          /* the current one (0x1605e4) */
 void text_colour(int fg);
 
+/* the entries a colour may not be matched to (0xf77c8, there 0 for these): the
+   program's 254 and 255 (the mouse pointer's), the race's its own (racepal.c); never
+   put back after a race, as in the original */
+extern unsigned char g_colour_off[256];
 /* nearestcolour 0x80c80: the entry nearest 0xRRGGBB. Through the screen's inverse
-   palette (.INV) when it has one, else the closest of entries 0..253 */
+   palette (.INV) when it has one, else the closest of the allowed entries */
 int nearest_colour(unsigned long rgb);
 extern const unsigned char *g_inv;     /* 0xf77c4: 32 KB, or 0 */
 /* 0x8227c: the table made from the palette in the card (read back, 6 bits x 4): each
-   cell of 32x32x32 gets the entry (0..253) nearest its middle (0x819c0, the exact
+   cell of 32x32x32 gets the allowed entry nearest its middle (0x819c0, the exact
    inverse colour map). pal_fade_up makes it at its end, so the menus always have one */
 void inv_build(void);
 

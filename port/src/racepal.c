@@ -4,6 +4,7 @@
 #include "video.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #define MAX_PIECES 50          /* the original stops dead past these */
 #define MAX_REMAPS 100
@@ -126,4 +127,20 @@ void pal_apply_remaps(void)
     for (i = 0; i < g_nremaps; i++)
         pal_remap(g_remaps[i].bank, g_remaps[i].pal);
     g_nremaps = 0;
+}
+
+void race_colours(const unsigned char *marks, int n, int mode)
+{
+    int i;
+
+    memset(g_colour_off, 0, 255);
+    g_colour_off[0x47] = 1;
+    if (mode < 2)
+        g_colour_off[0x5f] = 1;
+    for (i = 0xfa; i < 0x100; i++)
+        g_colour_off[i] = 1;
+    for (i = 0; i < n; i++)
+        if (marks[i])
+            g_colour_off[marks[i]] = 1;
+    inv_build();
 }
