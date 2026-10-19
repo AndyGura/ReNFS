@@ -174,3 +174,60 @@ int fix_cos(int a)
 {
     return fix_sin(a + 0x100);
 }
+
+/* EA's 0x80b00: between two entries of the table, the slope from the cosine there
+   (2 pi in 16.16 = 0x6487e, a step of the table = 64 of a's) */
+int ea_sin(int a)
+{
+    int i = a >> 6, f = (a & 0x3f) * 0x6487e >> 9;
+    return fix_sin(i) + ((fix_cos(i) >> 2) * f >> 21);
+}
+
+/* 0x80b70 */
+int ea_cos(int a)
+{
+    int i = a >> 6, f = (a & 0x3f) * 0x6487e >> 9;
+    return fix_cos(i) + ((-fix_sin(i) >> 2) * f >> 21);
+}
+
+/* 0x927b0: the smaller over the larger as a 32-bit fraction, into the table of an
+   eighth of a turn (0x125db8, 257 entries), then the octant */
+int ea_atan2(int y, int x)
+{
+    int oct = 0, a;
+    unsigned small, large, ratio, i, f;
+    if (x < 0) {
+        oct = 2;
+        x = (int)(0u - (unsigned)x);
+    }
+    if (y < 0) {
+        oct |= 4;
+        y = (int)(0u - (unsigned)y);
+    }
+    if (y == x)
+        a = 0x2000;
+    else {
+        small = (unsigned)y;
+        large = (unsigned)x;
+        if (x < y) {
+            oct |= 1;
+            small = (unsigned)x;
+            large = (unsigned)y;
+        }
+        ratio = (unsigned)(((unsigned long long)small << 32) / large);
+        i = ratio >> 24;
+        f = ratio >> 8 & 0xffff;
+        a = exe_i32(0x125db8 + 4 * i);
+        a += (int)((unsigned)(exe_i32(0x125dbc + 4 * i) - a) * f >> 16);
+    }
+    switch (oct) {
+    case 1: return 0x4000 - a;
+    case 2: return 0x8000 - a;
+    case 3: return a + 0x4000;
+    case 4: return -a;
+    case 5: return a - 0x4000;
+    case 6: return a - 0x8000;
+    case 7: return -a - 0x4000;
+    }
+    return a;
+}

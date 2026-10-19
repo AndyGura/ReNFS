@@ -14,6 +14,12 @@ typedef struct {
    x0..x1, y0..y1 (the ends outside) */
 void raster_window(unsigned char *base, int pitch, int x0, int y0, int x1, int y1);
 
+/* the window's picture: a row's start, and the window */
+unsigned char *raster_row(int y);
+void raster_clip(int *x0, int *y0, int *x1, int *y1);
+/* a rectangle of one colour, cut to the window (0x8a2a0) */
+void raster_fill(int x, int y, int w, int h, int colour);
+
 /* the corners in order round the quad: uv in 16.16 picture pixels, xy in screen pixels */
 void raster_quad(const raster_tex *t, const int uv[8], const int xy[8]);
 

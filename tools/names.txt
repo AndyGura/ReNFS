@@ -391,3 +391,15 @@
 0x679ec cars_on_row
 0x6837c cars_at_node
 0x5a0a8 road_draw_b
+0x4a9d0 sky_draw
+0x4a8b4 sky_draw_flat
+0x49bdc sky_strip
+0x49a78 sky_tables
+0x4a64c sky_ring_setup
+0x4ace8 sky_ring_draw
+0x14154 view_setup
+0x80b00 ea_sin
+0x80b70 ea_cos
+0x927b0 ea_atan2
+0x8a2a0 fill_rect
+0x9d8d0 ea_blit

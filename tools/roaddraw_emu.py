@@ -17,13 +17,13 @@ from snap_emu import Snap, game
 from road_emu import Road, ROAD_SECTIONS
 from poly_emu import Vec3
 
-SOURCES = ["roaddraw.c", "trackinfo.c", "road.c", "poly.c", "raster.c", "track.c", "files.c", "exe.c",
+SOURCES = ["roaddraw.c", "sky.c", "trackinfo.c", "road.c", "poly.c", "raster.c", "track.c", "files.c", "exe.c",
            "trackfam.c", "racepal.c", "font.c", "video.c", "fsh.c", "unpack.c"]
 
 
 def lib():
     out = "build/roaddraw_test.so"
-    subprocess.check_call(["cc", "-O1", "-shared", "-fPIC", "-o", out] +
+    subprocess.check_call(["cc", "-O1", "-g", "-shared", "-fPIC", "-o", out] +
                           ["port/src/" + f for f in SOURCES] + ["-Iport/src"] +
                           subprocess.check_output(["sdl2-config", "--cflags", "--libs"]).decode().split())
     return ctypes.CDLL(os.path.abspath(out))

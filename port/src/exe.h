@@ -15,5 +15,10 @@ int exe_i32(unsigned addr);
 /* the sine table (0xf8448): a turn is 1024, 65536 = 1 */
 int fix_sin(int a);
 int fix_cos(int a);
+/* EA's sine and cosine of a in 65536 a turn (0x80b00, 0x80b70), and the angle of
+   (x, y) the same way (0x927b0): 16.16 */
+int ea_sin(int a);
+int ea_cos(int a);
+int ea_atan2(int y, int x);
 
 #endif

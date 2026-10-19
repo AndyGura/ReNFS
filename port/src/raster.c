@@ -28,6 +28,35 @@ void raster_window(unsigned char *base, int pitch, int x0, int y0, int x1, int y
     g_y1 = y1 > ROWS ? ROWS : y1;
 }
 
+unsigned char *raster_row(int y)
+{
+    return g_base + y * g_pitch;
+}
+
+void raster_clip(int *x0, int *y0, int *x1, int *y1)
+{
+    *x0 = g_x0;
+    *y0 = g_y0;
+    *x1 = g_x1;
+    *y1 = g_y1;
+}
+
+void raster_fill(int x, int y, int w, int h, int colour)
+{
+    int x1 = x + w, y1 = y + h;
+    if (x < g_x0)
+        x = g_x0;
+    if (y < g_y0)
+        y = g_y0;
+    if (x1 > g_x1)
+        x1 = g_x1;
+    if (y1 > g_y1)
+        y1 = g_y1;
+    for (; y < y1; y++)
+        for (w = x; w < x1; w++)
+            g_base[y * g_pitch + w] = (unsigned char)colour;
+}
+
 static int shl16(int v)
 {
     return (int)((unsigned)v << 16);

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""The road painted into the screen, pixel by pixel: the original's 0x597e4 and 0x5a4f0
-run on a snapshot with its own painters (the cars, the walls and the 3D objects left
-out on both sides), against the port's road_draw with its own (port/src/roaddraw.c,
-poly.c, raster.c) given the same road points and view. Writes both pictures, and one of
+"""The road painted into the screen, pixel by pixel: the original's sky 0x4a9d0, then
+0x597e4 and 0x5a4f0, run on a snapshot with its own painters (the cars, the walls and the 3D objects left
+out on both sides), against the port's sky_draw and road_draw with its own
+(port/src/sky.c, roaddraw.c, poly.c, raster.c) given the same road points and view. Writes both pictures, and one of
 the pixels that differ, to build/shots/road_<snapshot>_{orig,port,diff}.png.
 
     build/venv/bin/python tools/roadpic_emu.py cy1 build/snap/d2.bin [...]
@@ -47,9 +47,27 @@ def original(s, n, node):
         mu.reg_write(UC_X86_REG_EIP, ret)
     for at, k in LEFT_OUT.items():
         mu.hook_add(UC_HOOK_CODE, hook, k, begin=game(at), end=game(at))
+    s.call(0x4a9d0, eax=s.u32(0x143df4))
     s.call(0x597e4)
     s.call(0x5a4f0, eax=n, edx=node)
     return bytes(mu.mem_read(base, W * H))
+
+
+def sky_setup(s, L):
+    """the port's sky tables from the road ahead's view (camera +0x88), as 0x14154 makes
+    them"""
+    view = struct.unpack("<I", s.raw(s.u32(0x143df4) + 0x88, 4))[0]
+    fov = struct.unpack("<i", s.raw(view, 4))[0]
+    entry = struct.unpack("<I", s.raw(view + 0x1c, 4))[0]
+    e4, width = struct.unpack("<ii", s.raw(entry + 4, 4) + s.raw(entry + 0x10, 4))
+    L.sky_tables(width, fov // 2, ctypes.c_short(((fov << 8) // 360) * 5).value, e4 * width // 320)
+
+
+def sky(s, L, win):
+    cam = s.u32(0x143df4)
+    yaw = struct.unpack("<i", s.raw(cam + 0x44, 4))[0]
+    m = (ctypes.c_int * 9)(*struct.unpack("<9i", s.raw(s.u32(0x143df8), 36)))
+    L.sky_draw(yaw, m, ctypes.byref(win), s.read(0x12d9d6, 1)[0])
 
 
 def port(s, name, L, n, node):
@@ -70,6 +88,8 @@ def port(s, name, L, n, node):
     ctypes.c_void_p.in_dll(L, "g_paint").value = ctypes.cast(L.raster_quad, ctypes.c_void_p).value
     fb = (ctypes.c_ubyte * (W * H))()
     L.raster_window(fb, W, *CLIP)
+    sky_setup(s, L)
+    sky(s, L, win)
     L.road_objects_start()
     L.road_draw(n, node, near, ctypes.byref(win))
     return bytes(fb)
@@ -84,6 +104,9 @@ def main():
     os.makedirs("build/shots", exist_ok=True)
     for p in snaps:
         s = Snap(p)
+        if s.u32(0x143dfc) != struct.unpack("<I", s.raw(s.u32(0x143df4) + 0x88, 4))[0]:
+            print("%s: skipped (taken while the mirror's view was current)" % os.path.basename(p))
+            continue
         n = s.i32(0x136618)
         node = struct.unpack("<i", s.raw(s.u32(0x143df4) + 0x38, 4))[0]
         s.write(0xf88a4, struct.pack("<4i", *CLIP))     # what the far quads' outcode reads

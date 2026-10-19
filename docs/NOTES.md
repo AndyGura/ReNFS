@@ -1099,6 +1099,46 @@ that packs the four pointers and screen points of a child.
   `0xf7a2c` − (y · r >> shift). The shift is taken mod 32 by the CPU (z ≥ 2^24: no shift).
   The table (`0x83af4`): r[i] = (`0xf7a30` << 16) / i, i < 10 as 10; 0x400 entries.
 
+#### The sky: `sky_draw` `0x4a9d0(camera)` (2026-10-19; the open roads' kind ported, `port/src/sky.c`)
+
+- Once: `0x12ef40` = `sky_ring_setup` `0x4a64c(0x12ef60, 0x12ef5c, 1)` (0x448 bytes; the
+  circuits' ring of "HR_Ring" pictures). The heading `[0x143df4]+0x44` (2^24 a turn) >> 14
+  → d = (sin << 8, 0, cos << 8) (`0xf8448`) >> `0xf6aa4`, turned by `[0x143df8]`
+  (`0x83a54`) and projected (`0x94c80(1, .., 16)`): the screen y of the horizon (>>
+  `0xf456c`, 0 in the snapshots). **`0x12ef6c` (the INFO's ring type) = 0** (CL, AL, CY:
+  the open roads) → `0x4a8b4(y)`; else, if the ring has a radius, `0x4ace8(ring, −camera
+  >> 10, &screen point)` (TR1..7; not read yet).
+- `0x4a8b4(y)`: the shape "horz" of the family's entry 2 (`0x143e50`); the picture's
+  column at the middle = ((mirror ? −yaw : yaw) × 5, a rounded 16.16 multiply) >> 16, C
+  remainder by its width; unless `0x12d9d6` (then h = cy = 0): top = y − (cy (+0xa) ·
+  `0x12efbc` >> 16), bottom = top + ((h − 1) · `0x12efbc` >> 16). `fill_rect` `0x8a2a0(win
+  x, win y, win w, top, the picture's first pixel)`, `sky_strip` `0x49bdc(shape, column, 1,
+  win x, top)`, `0x8a2a0(win x, bottom, win w, win y + win h − bottom, its last pixel)`
+  (`0x8a2a0` makes a one-colour shape for EA's blitter `0x9d8d0`: cut to the window).
+- `sky_strip`: rows n = (h − 1) × `0x12efbc` (rounded), cut to the window's top (k rows
+  skipped) and bottom; for the `0x12efb8` columns, those before the picture's end (or,
+  when the first column is left of its start, those left of it, a row lower) and the rest
+  wrapped round; screen row i reads picture row `0x12dd60[k + i]` + 1 (+1), column
+  middle + `0x12df40[j]` (`0x94aed`, the rest from the same table position).
+- **The tables `sky_tables` `0x49a78(width, half fov, scale, squash)`**, from `view_setup`
+  `0x14154(view, mode)`: the view record +0 = its field of view in degrees (85 ahead, 70
+  the mirror), +0x1c = `0xe85c0` + 680 · `0x143e2c` + 40 · mode, a window entry (+4 the
+  squash 0xd999, +0x10 the width, +0x18.. x, y, w, h); arguments (+0x10, fov / 2, short((fov
+  << 8) / 360 × 5), +4 × width / 320). a = (half fov << 16) / 360; t = tan a (`ea_sin` /
+  `ea_cos` `0x80b00` / `0x80b70`, EA's 16.16 division: whole part and remainder apart; cos
+  0 → 0x11); focal = (width/2 << 16) / t; per = (scale/2) / a; with half fov > 10:
+  `0x12efbc` = squash, `0x12dd60[i]` = (i · (1/squash)) >> 16 for 480 rows, `0x12efb8` =
+  width, `0x12df40[w/2 ± i]` = ±(`ea_atan2` `0x927b0(i << 16, focal)` × per, rounded).
+  `ea_sin(a)` (65536 a turn) = table(a >> 6) + ((table cos >> 2) · ((a & 63) · 0x6487e >>
+  9) >> 21); `ea_cos` the same with −sin. `ea_atan2(y, x)`: |y|, |x|, the smaller << 32 /
+  the larger (unsigned), the eighth-turn table `0x125db8` (257) at >> 24 plus the next
+  step × the 16 bits below, then the octant (x < 0: 2, y < 0: 4, swapped: 1); equal →
+  0x2000. **The tables are made for the road ahead only** (d1 was taken with the mirror's
+  view current and still holds the 320-wide ones).
+- **Checked** (`tools/sky_emu.py`, and `tools/roadpic_emu.py` sky then road): the tables
+  equal, **the sky and the road together pixel for pixel on the 5 snapshots with the road
+  ahead's view current**.
+
 #### Painting the road: `0x5a4f0` (2026-10-19; ported, `port/src/roaddraw.c`)
 
 `race_draw_frame` calls `road_objects_start` `0x597e4` (`0x1365d8` > 180 → 0; if > 0:
