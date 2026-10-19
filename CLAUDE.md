@@ -191,8 +191,10 @@ and `movie.c` (the movies), `fe.c` (front end screens), `mainmenu.c` (Control Ce
 keys, mouse, text styles, the yes/no dialog), `font.c` (FFN, letters blended pixel by
 pixel, `nearest_colour`, the inverse table), `sound.c` (the front end's sound bank and
 music), `config.c` (CONFIG.DAT), `main.c`.
-The race so far: `raster.c` (the quad painter), `poly.c` (projection, quad cutting),
-`road.c` (the frame's points, into the view), `track.c` (the TRI and its ring of sections),
+The race so far: `raster.c` (the quad and triangle painters), `poly.c` (projection, quad cutting),
+`road.c` (the frame's points, into the view), `roaddraw.c` (the road painted far to near,
+the roadside objects; pixel-exact on the snapshots, `tools/roadpic_emu.py`), `track.c`
+(the TRI and its ring of sections), `trackinfo.c`, `trackfam.c`, `racepal.c`,
 `exe.c`: **the game's fixed tables are read from the CD's `NFS_DOS.EXE`** at the
 original's addresses (checked by a sum of the image), never copied into the port. The menus' look is checked against the
 original's screenshots by palette entry (DOSBox Staging changes colours slightly).

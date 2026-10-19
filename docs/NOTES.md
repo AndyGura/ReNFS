@@ -958,9 +958,8 @@ race_from_menu 0x3770c (from fe_main_menu)
   flags) drawn by `draw_quad` `0x35b04` with the texture from `0x140cd8`; then the objects
   and cars at that slice: `draw_slice_objects` `0x68430` (→ `0x66d08`). The section's kind
   is `0x136621 + section × 6` → a record of `0x4c` bytes at `0xf61c0`.
-- `0x5a4f0` (1.1 KB, reaches 18 KB) is a second pass of the same shape with `0x35348`
-  (another polygon routine), `0x59d3c`, `0x5a0a8`, `0x679ec`: the walls and roadside, or
-  the near part. To read.
+- `0x5a4f0` is the road ahead (the view); `0x5aa84` the mirror's. Read and ported: see
+  "Painting the road" below.
 - `draw_horizon` `0x5adbc` (`horz`), the HUD and dashboard `0x314e4` / `0x31684` /
   `0x3081c` (`b00t`.., the cockpit) / `0x31cb4` (`mpbd`, the map), `0x59a74`, `0x5868c`.
 
@@ -1099,6 +1098,88 @@ that packs the four pointers and screen points of a child.
   `[0xf7a14]`[z]; x' = `0xf7a28` + (x · r >> shift, rounded by the last bit out), y' =
   `0xf7a2c` − (y · r >> shift). The shift is taken mod 32 by the CPU (z ≥ 2^24: no shift).
   The table (`0x83af4`): r[i] = (`0xf7a30` << 16) / i, i < 10 as 10; 0x400 entries.
+
+#### Painting the road: `0x5a4f0` (2026-10-19; ported, `port/src/roaddraw.c`)
+
+`race_draw_frame` calls `road_objects_start` `0x597e4` (`0x1365d8` > 180 → 0; if > 0:
+next = `0x1365cc` + it − 1, less the placements' count if past it; `0x1365c8` (the points
+not yet painted) = `0x1365c0`; `0x1365d4` = that placement's node; else −1), then after
+the window and the horizon **`road_draw` `0x5a4f0(N = 0x136618, S = the camera's node)`**:
+- M = min(N, 4). `0x58f30`: from the view's window record (x, y, w, h at +0x18..): left
+  `0x143da4` = x, `0x143da8` = y, right `0x143da0` = x + w, bottom `0x143d9c` = y + h.
+  Unless `0x143dcc` (0 in a race; with it `0x5a0a8` at the end instead, which also reads
+  `0x143e60` and `0x143dd0`): **`road_draw_far` `0x59d3c(N, S, M)`** first.
+- The near part: first point = `0x13bb78` − 11 − (N − M)·11; row r = 4M + 3 − (S & 3),
+  the texture's size = `0xf4690[r]`; section = (S/4 + M − 1) & mask, row node = ((S & ~3)
+  + 4M − 1) & node mask. Per section (M of them, the camera's last): first point −= the
+  section's points (`0x136624 + 6·sec`); its kind's record `0xf61bc + 0x4c·kind` (+0 its
+  points, +4 its quads, +8 and +0x10 four pairs of point bytes, a row each, for the walls,
+  +0x48 its first quad); the quads (11 bytes at `0xf4880`: four corner numbers from the
+  first point, the strip 0..9 across, at +6 a pointer to the tile {+0 ushift, +4 uindex,
+  +8 the first size}, +10 the rows it closes) **from the last one back**; the section's
+  ring data `0x4f48c(sec)` (= `track_section`): +1 flags, +2 + strip the texture row.
+- A quad: corners from `0x13a47c` (screen) and `0x138c58` (view). **`0x58f70(S, strip)`**:
+  not when all four x > right, or all < left, or bottom < y of corners 0 and 3; then
+  visible if any of the triples (1,2,3), (3,0,1), (2,3,0) (`0xf6b08`) has `0x961f0` area
+  < 0 (strip < 5) or > 0 (strip ≥ 5); area = (C.y − B.y)(A.x − B.x) − (C.x − B.x)(A.y −
+  B.y), A, B, C = the triple's corners (32-bit products), reversed in the mirror
+  (`0x12dd28`, `0x58eec`). Visible → texture `0x140cd8[row][tile+8 + size]` (0: nothing)
+  to **`0x35348(tex, tile+0, 0, tile+4, 0, view points, S, near)`**.
+- A quad closing c > 0 rows: the walls `0x59294(rec + 0x10 + 2·(row node & 3), row node,
+  first point, tile, size, side = (flags & 0x1f) + 0x20, (flags & 0x20) == 0)` if flags &
+  0x80, the same with rec + 8 if flags & 0x40 (no city track has any). Then c times:
+  while the row node = `0x1365d4`, `draw_object` `0x59490(r, 1)`; `0x679ec(−999, S, row
+  node, 0, &S0, &S3)`; `0x6837c((row node + 1) & mask)` (the cars); row node −1; while
+  `0x1365d4` = row node and the next placement's byte +8 = 0, `0x59490(r, 1)`. Then r −=
+  c, size = `0xf4690[r]`. At the end `0x6837c((row node + 1) & mask)`.
+- **`0x59d3c`** the same over rows 4N − 4 down to 4M: first point = count − 11, −= the
+  kind record's +0; r = 4N + 3 − (S & 3), size = `0xf4708[r / 4]`; section from S/4 + N −
+  1, the next = row node >> 2; a quad painted when **`0x590b0`** (the outcode `0x91cee` of
+  its corners = 0, then the triples (1,2,3), (3,0,1) at `0xf6b2c`) and view z of corner 3
+  > 0, by **`[0x12c0e4]` = `paint_whole` `0x350d4(tex, S)`**; per row only the objects
+  and `0x6837c`. Sets `0x143e60` = 1 << (S & 3) (<< 4 more when camera +0 ≠ 0), read only
+  by `0x5a0a8`.
+- **`draw_object` `0x59490(r, draw)`**: the placement `0x1365d0`, its kind. Type 1 (a 3D
+  model): `0x1365c8` −1, `0x66738(0x146f14 + 0x138·kind[2], &that point of 0x12f540,
+  (placement[5] << 16) + (node i16 +0x18 << 10))`. Else `0x1365c8` −= type; if draw and
+  the four points' view z (`0x131f70`) ≥ 0x86: type 4, picture `0x141ed8[kind[2] + v]`, v
+  = `0xf458c[r]` if placement byte +8 else `0xf4604[r]` (+ ((`0x145c94` / kind[9]) %
+  kind[8])·4 when kind[0] & 4, animated), painted by `paint_whole` if `0x59430` (all four
+  x within ±0x800); type 6 (also points 4, 5 ≥ 0x86): the board (corners 1,2,3,0 when
+  kind[0] & 1) with `0x141ed8[kind[2] + 0xf4604[r]]` and the side (4,5,2,1 when kind[0] &
+  2, else 1,4,5,2) with kind[3], both by **`[0x12c0d8]` = `paint_picture` `0x35090`**
+  (→ `0x91bf0` / `0x91b90`: `0x91360` / `0x90b30` with uv (0,0), (w·65536 − 1, 0), ..,
+  the whole picture); `0x143dd0` set during the side (read only by `0x58c5c`, `0x5a0a8`).
+  No track has a type-6 kind with flags 1 or 2 (the original would read past its copy).
+  Then the cursor back one: `0x1365d0` −1; below 0 → the last placement, its node on a
+  circuit unless it is the one just drawn, else −1.
+- **The far painter `paint_whole` `0x350d4(shape, S)`**: type `0x45` → `0x906d0` (type
+  `0x7b` meanwhile) else `0x90900`: two triangles, picture points (1,1), (w−2,1), (w−2,h−2)
+  on S0 S1 S2 and (w−2,h−2), (1,h−2), (1,1) on S2 S3 S0, each made 16.16 + 0x8000 by
+  `0x905e0` / `0x8fad0` for **`raster_tri` `0x8fbd8` / `0x8f0c8(shape, uv, xy)`**: top =
+  least y, bottom = greatest (the first test y1 > y0, then y2), middle = 3 − (top | bottom);
+  dy = yb − yt < 1.0 → nothing. The long edge at the middle's row: x = xt + (xb − xt)(ym
+  − yt) / dy (64-bit), width w = xm − that, |w| in [1.0, 0x600) else nothing; the picture
+  there likewise; du, dv = (Δ << 16) / w. A table of a row's steps `0xa6240(0x15ed1c,
+  0x8000, 0x8000, du, dv, width, (|w| >> 16) + 1)`: entry i = ((0x8000 + i·dv) >> 16)·width
+  + ((0x8000 + i·du) >> 16) (a power-of-two width shifted; written in pairs). Rows from yt
+  >> 16 to the middle's row then to yb >> 16 (each cut at the window's bottom), both sides
+  from xt, the picture stepped down the left side (the short side when the middle is on
+  the left, else the long one), every slope (Δ << 16) / Δy (Δ itself when Δy = 0); a row:
+  n = (right >> 16) − (left >> 16), cut at the window's right, its left cut skips k
+  pixels, painted only from the window's top: pixel i = picture[(v >> 16)·width + (u >>
+  16) + steps[k] + steps[i]] (**steps[k] + steps[i], not steps[k + i]**), `0x94aed`
+  (`0x9473e` leaves 255 out). A quicker path when the corners are inside compares their
+  16.16 x with the window's pixels, so it is taken only for rows that paint nothing.
+  **`tools/raster_emu.py --whole`: equal on 5,000 random quads and picture sizes.**
+- **Checked**: `tools/roaddraw_emu.py` catches every call out of the original's
+  `0x597e4` + `0x5a4f0` on a snapshot (0x35348, 0x350d4, 0x35090, 0x59294, 0x66738,
+  0x679ec, 0x6837c) against the port's: **equal call for call on all 6 CY1 snapshots**
+  (220..373 calls). `tools/roadpic_emu.py` lets both paint (cars, walls and models left
+  out) into a 320 × 200 screen with the 3D view's window (0, 0, 320, 127): **equal pixel
+  for pixel on all 6** (r1a after putting back the see-through mark of the picture it was
+  paused painting). The walls `0x59294` and the 3D models `0x66738` are not ported yet
+  and no CY1 frame reaches them.
 
 ### 4.8 Cars meeting cars, walls, traffic and the police
 

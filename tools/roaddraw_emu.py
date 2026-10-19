@@ -17,7 +17,7 @@ from snap_emu import Snap, game
 from road_emu import Road, ROAD_SECTIONS
 from poly_emu import Vec3
 
-SOURCES = ["roaddraw.c", "road.c", "poly.c", "raster.c", "track.c", "files.c", "exe.c",
+SOURCES = ["roaddraw.c", "trackinfo.c", "road.c", "poly.c", "raster.c", "track.c", "files.c", "exe.c",
            "trackfam.c", "racepal.c", "font.c", "video.c", "fsh.c", "unpack.c"]
 
 
@@ -114,11 +114,21 @@ def original(s, n, node):
     return out
 
 
-def port(s, name, L, n, node):
+def setup(s, name, L, n, node):
+    """the port's road, track, family and view as the snapshot has them; returns the near
+    plane and the window"""
     L.track_load(name.encode())
     L.track_keep_sections(node // 4 if node >= 0 else -((-node) // 4))
+    if not L.trackinfo_load(name.encode(), s.i32(0x12c340), s.i32(0x143e2c)):
+        sys.exit("no track info")
     if not L.trackfam_load(name.encode(), s.i32(0x12c340), s.i32(0x12da12)):
         sys.exit("no track family")
+    # the pictures re-coloured through the original's inverse table of the race palette
+    global _inv
+    _inv = ctypes.create_string_buffer(s.raw(s.u32(0xf77c4), 32768), 32768)
+    ctypes.c_void_p.in_dll(L, "g_inv").value = ctypes.addressof(_inv)
+    L.pal_apply_remaps()
+    L.pal_apply_pieces()
     famfile = ctypes.c_void_p.in_dll(L, "g_fam").value
     road = Road.in_dll(L, "g_road")
     ctypes.memset(ctypes.addressof(road), 0, ctypes.sizeof(road))
@@ -140,7 +150,13 @@ def port(s, name, L, n, node):
     view = s.u32(0x143dfc)
     near = struct.unpack("<i", s.raw(view + 4, 4))[0]
     win = Window(*struct.unpack("<4i", s.raw(struct.unpack("<I", s.raw(view + 0x1c, 4))[0] + 0x18, 16)))
+    return near, win
 
+
+def port(s, name, L, n, node):
+    near, win = setup(s, name, L, n, node)
+    famfile = ctypes.c_void_p.in_dll(L, "g_fam").value
+    road = Road.in_dll(L, "g_road")
     out = []
     vbase = ctypes.addressof(road.view)
     exe_at = L.exe_at
