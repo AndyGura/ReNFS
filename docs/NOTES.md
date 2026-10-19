@@ -2241,8 +2241,8 @@ before the start, and the player catching and passing a slowed opponent), and th
 settings read from the program equal to the snapshots' blocks. With two cars, the branches for
 several cars in the lanes (`0x78c88` 241 of 618 instructions run, `0x7850c` 24 of 106,
 `0x78660`, `0x7e548`, `0x7e5e4` none) wait for the traffic to be checked. `--race cy1` races one
-opponent (`RENFS_SEED=n` for its random numbers). Not yet: the traffic's coming and going
-(`0x79500`, `0x77de8`, `0x7cac8`), the police (`0x79728`, `0x786d4`'s police branch,
+opponent (`RENFS_SEED=n` for its random numbers). The traffic's coming and going: §4.16.
+Not yet: the police's coming (`0x79500`), the police (`0x79728`, `0x786d4`'s police branch,
 `chase_drop` `0x781ac`), EXPLODE's push (`0x78370`), the horns and engines' sounds.
 
 ### 4.14 Cars meeting cars (2026-10-19)
@@ -2323,7 +2323,7 @@ players (the field on a circuit, all cars on an open road): its chase flags (`+0
 & 0xfff7dbff, `0xf74a8` 0); a racer of kind 4 or 5 within the road's edges (−node+2 ×
 0x2000 .. node+3 × 0x2000) is put back as kind 5 does (kind 4 through `0x1cd40`(3) first);
 the traffic, and cars of kind 3 out of the stretches or police, are placed again by
-`0x7cac8` (with the traffic).
+`0x7cac8` (§4.16).
 
 **Ported (`port/src/collide.c`, `crash.c`, `opponent.c`): equal to the original.**
 `tools/collide_emu.py`: 22,000 random pairs of the snapshots' two cars (turned, placed and
@@ -2338,7 +2338,7 @@ hard hit, both thrown, the opponent stood up, the player put back and the oppone
 it), and started thrown about (tumbling, on its roof, rolling; near the player or far
 ahead; with the player's car thrown at a wall too, so that the player is put back while
 the opponent still lies there). Not run: the police's parts, the long cars (traffic) and
-kind 6. `RENFS_PLACE=s:a,c,v` puts the opponent so in `--race`. Not yet: the traffic's placing `0x7cac8`, the police's parts, the sounds.
+kind 6. `RENFS_PLACE=s:a,c,v` puts the opponent so in `--race`. The traffic's placing: §4.16. Not yet: the police's parts, the sounds.
 
 ### 4.15 The roadside objects knocked over (2026-10-19)
 
@@ -2379,6 +2379,77 @@ list's end), `0x1ee80` all but the force feedback. `tools/opponent_emu.py` too (
 `tools/cars_emu.py` checks the box against the snapshots' `+0x64e/+0x652/+0x64a`. In
 `--race cy1` (`RENFS_SEED=7`, gas from retrace 420) the "65" sign at node 74 falls at about
 retrace 1100; `RENFS_VIEW=4` shows it from outside.
+
+### 4.16 The traffic's coming and going (2026-10-19)
+
+The snapshots hold the whole field: the player (car 0), the rival (1), the police car (2,
+`+0x174` & 8, `+0x51a` = 3: not driven until it comes, §4.8) and six traffic cars (3..8,
+`0x12da3c` = 6). **At the start** (`cars_create` `0x51388`): every car slot = index;
+`car_setup` `0x51200` gives a computer's car kind 3, `+0x51a` 3 (then | 4), its z 1 m, node
+and progress 0; `car_setup_body` `0x512e8` its size from the PDN, or for the traffic (a PDN
+without the three halves) from the near model (`+0x78` = `+0x64a`, `+0x7c` = `+0x64e`, the
+body's halves the model's / 2, `+0xbc`, `+0x84`, the radius `0x2c2d8`); so the rival's
+`+0x78/+0x7c` are its PDN's, not `0x51200`'s 0x50000/0x28000. `load_traffic_cfg` `0x7de84`:
+`0x15d480` (waiting) 0, `0x15d154` 0, `0x15d158` = the traffic, `0xf74a8` 0.
+
+- **`car_move_on` `0x77de8`** (from `drive_opponent` before `drive_check_lap`, for a car not
+  a racer or a racer before progress 2): progress < 2 → placed with a wait (`car_place`
+  (1); the traffic's `+0x158` stretch 0 first); else (field ≤ 2) out of both racers' outer
+  windows (`in_outer_window` `0x77c78`: `[zone+2, zone+1)`) → `+0x158` + 1 and
+  `traffic_place_again` `0x77d3c`: placed in stretch `+0x158` (`car_place(0)`); while it
+  lands inside an inner window (`0x77cfc`) the next stretch; past both: stretch 0 and
+  placed to wait (`car_place(1)`). (A police car: its own branch, §4.8.)
+- **`car_place` `0x7cac8`** (car, wait): `+0x405/+0x409` 0 (the player's chase bits off);
+  `place_where` `0x7c5b4`: the side (1 the racers' way, 0 coming): behind the player's car
+  (node − 12, the police − 18) for `+0x175` & 0x24 or the police on a one-way road (node
+  0's left lanes 0); else at random (> 0x7fff), 1 on a one-way road, the traffic's count of
+  its old side (`0x15d154` coming, `0x15d158` going) down, the side flipped when the new
+  one already holds ≥ traffic − 1, its count up; the node: the stretch's inner window's
+  start − (r & 15) when the side is 1 and the stretch's racer stands (`+0x70` < 1), else its
+  end + (11·r >> 16); at least 0, masked. The place across: a random lane on that side,
+  its middle (`+0x164` = w·((r·lanes >> 16) + 1) − w/2, or the left's negated), plus the
+  car's own `+0x33c`; a racer on its grid place instead (`place_racer_grid` `0x7c7e8`,
+  unless the rival is a traffic car, `0x12da9e` = 9). Then **`place_at` `0x7ccc0`** (`ret
+  4`): node, progress, `+0x90` grip `0x15d2f4`[r & 3], a new lane place (`car_lane_pick`
+  `0x7e5e4`), waits and steering 0, `+0x88` 100 / 160; `place_flags` `0x7c3f8`;
+  **`place_speed` `0x7c4d4`**: going: (settings +0x48 + the stretch's racer's `+0x70`) / 2
+  by its grip (`0x7e548`; a racer's `+0x15c` 0; a `+0x174` & 0x404 car the player's road
+  speed), `+0x174`/`+0x175` & 0x10 off; coming: −`0x78660`, `+0x175` | 0x10; `+0x164`;
+  **`place_on_road` `0x7c294`**: `0x7dbd8`, the node's point, z + r, + across × the road's
+  side axis, `drive_check_lap` (and the frame again on a new node), turned with the road
+  (rows 0 and 2 negated coming); the grip again; with the wait (not a racer unless the
+  rival is traffic, not police, not a human): `+0x84` = (settings +0x30 · r >> 16) + 1,
+  kind 6, `0x15d480` + 1.
+- **`drive_opponent_wait` `0x7e0c8`** (kind 6): the traffic's `+0x158` 0 (1 at random while
+  the leading racer's node < 0x78), held at node 1 at (8, 200 + 10·slot, 8) m; `+0x84`
+  counted down; at 0 it comes (`0x15d480` − 1, kind 3, `0x77d3c`) once the furthest racer's
+  node ≥ slot·16 + 15, fewer than settings +0x34 cars are on the road (`0x15d480` >
+  traffic − +0x34; 4 on CY1, 0 in a time trial or on a circuit's head to head) and the
+  race has traffic (`0x12da28` & 4 off); else it waits another step.
+- **`0x7c030`'s loop** (the player put back): every car's chase bits off and `0xf74a8` 0;
+  a car not a racer that is thrown about, police or out of the inner windows, outside the
+  field, goes back to waiting (`car_place(1)`; a waiting one's count first taken back).
+  **`chase_drop` `0x781ac`** (p): with police on, the police car's `+0x175` & 0xdb and
+  `+0x176` & 0x87 (with p & 0xf7 first), the player's `+0x175` & 0xdb, `+0x176` & 0xfe,
+  `0xf74a8` 0; called by the put back (p 1, with a chase), a hard hit of a racer (0), a
+  police car's spin-out (0), its stand-up after a crash (0) and kind 5 (1).
+- The race's top speed (`0x14ec44` + 0x1d2·car) is kept for every car, the traffic too:
+  `0x14ea80` holds 9 results (the port's table had 8, and the ninth car wrote past it).
+
+**Ported (`port/src/opponent.c`, `crash.c`, `car.c`, `race.c`): equal to the original.**
+`tools/opponent_emu.py --full`: the whole field of the snapshot (9 cars, the police car
+parked: its coming `0x79500` and pulling over `0x79728` left out on both sides), every
+car stepped by its kind (6 = `0x7e0c8`) and compared every step, the counts `0x15d480`,
+`0x15d154/8`, `0x12da9e`, `0xf74a8` too; 419 runs (the 34 settings and 3 "two-way")
+on all 11 snapshots, up to 26 placings in a run. **CY1 is one-way** (every node's byte 4 =
+0x02: no lanes the other way), so all its traffic goes the racers' way; the "two-way"
+settings give every node two lanes each way (byte 4 = 0x22, in the snapshot and the
+port alike) to run the coming side too (`place_at`'s 0x7cbe2.., `place_speed`'s 0x7c576..).
+Never run yet: `place_racer_grid` (the rival a traffic car) and `0x77d3c`'s police branch.
+In `--race cy1` the six traffic cars wait off the road, come on ahead of the racers from
+about 25 s (at most 4 at a time), and go back to wait when they fall out of reach
+(`build/shots/traffic_beside.png`, `traffic_passing.png`, `traffic_ahead.png`). Not yet:
+the police's coming (`0x79500`), the chase, the horns.
 
 ## 5. The original in DOSBox (2026-10-19)
 

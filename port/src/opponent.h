@@ -29,6 +29,12 @@ typedef struct {
     int off;                   /* 0xf74ac: no ticks (the replay) */
     int explode;               /* 0xf74a4 */
     int traffic;               /* 0x12da3c: traffic cars */
+    int waiting;               /* 0x15d480: traffic cars waiting off the road (kind 6) */
+    int sides[2];              /* 0x15d154, 0x15d158: traffic cars placed coming the
+                                  other way, and going the racers' way */
+    int rival_car;             /* 0x12da9e: the rival's car (9: a traffic car) */
+    int chase_off;             /* 0xf74a8: (the police's; cleared as a police car is
+                                  placed) */
     int wander;                /* 0xf74f0: 1 in this many steps the traffic picks another
                                   place in its lane (0x28) */
     int bend_drop;             /* 0x15d47c: the last bend's turn (7e64c) */
@@ -38,6 +44,9 @@ typedef struct {
     unsigned mult;             /* 0xeab78: and multiplier */
     unsigned last;             /* 0xeab74: the last product */
     int grid[8];               /* 0x12dca0: each racer's place on the grid */
+    int drivers[9];            /* 0x12dcc0 (right after): each racer's driver, its letter
+                                  less 'A' (0x583ec), 99 none. A traffic car's grid place
+                                  is read past grid[] into it, as the original does */
     int humans_only;           /* tests (drive_emu): the tick only refreshes the players'
                                   cars, as before the opponents were ported */
 } opp_race;
@@ -46,14 +55,23 @@ extern opp_race g_opp;
 
 /* load_traffic_cfg 0x7de84's part: the settings (0x63f50, from the program), each racer's
    driver by the race type and its grid place (0x583ec), the stretches of road (0x7814c),
-   the random numbers seeded (0x38c10) */
+   the traffic's counts (none waiting, all going the racers' way: g_opp.traffic set
+   before), the random numbers seeded (0x38c10) */
 void opponent_start(unsigned seed);
 /* drive_opponent 0x7b34c: a step of a car the computer drives (kind 3) */
 void opponent_drive(race_car *c);
-/* 0x7c030's loop: after a player's crash, the racers thrown about put back on the road */
+/* 0x7c030's loop: after a player's crash, the racers thrown about put back on the road,
+   the traffic and the police out of reach (or thrown about) placed again */
 void opponent_put_back(void);
+/* chase_drop 0x781ac: the police's chase dropped, the player's car's chase flags off
+   (with p the police car's +0x176 & 8 too) */
+void opponent_chase_drop(int p);
 /* drive_kind5 0x7d9e4: a step of a computer's car stood up after a crash (kind 5) */
 void opponent_recover(race_car *c);
+/* drive_opponent_wait 0x7e0c8: a step of a traffic car waiting off the road (kind 6):
+   held out of the way; its wait over, it is put on the road again ahead of a racer
+   once the racers are far enough along and few enough cars are on the road */
+void opponent_wait(race_car *c);
 /* 0x7bf94: is the car near any player (in their stretches of road)? */
 int opponent_near_players(const race_car *c);
 /* traffic_police_tick 0x7a040: every fourth step, the cars refreshed and the target

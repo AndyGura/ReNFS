@@ -123,7 +123,7 @@ static int car_models(race_car *c, int id)
 /* car_setup_body 0x512e8: the car's size from its PDN (SIMDATA/CARFAMS, loaded by
    load_car_cfm 0x65874): its first three words are half its width, height and length
    (the tumbling body's, 0x2c920); the car's +0x78, +0x7c twice its length and width.
-   (A PDN without them, the traffic's, gives the model's size: not here yet) */
+   A PDN without them (the traffic's) leaves the model's size */
 static void car_size(race_car *c, const char *name)
 {
     char path[80];
@@ -147,7 +147,8 @@ static void car_size(race_car *c, const char *name)
         if (w && h && l) {
             c->half_len = l * 2;
             c->half_wid = w * 2;
-        }
+        } else
+            crash_body_from_model(c);
     }
     free(u);
 }

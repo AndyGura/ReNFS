@@ -9,7 +9,8 @@ int *opp_test_var(int k)
         &g_opp.brake, &g_opp.lead_index, &g_opp.ticks, &g_opp.lane_w, &g_opp.lane_rule,
         &g_opp.off, &g_opp.explode, &g_opp.traffic, &g_opp.wander, &g_opp.bend_drop,
         &g_opp.bend_slow, &g_opp.behind, (int *)&g_opp.random, (int *)&g_opp.mult,
-        (int *)&g_opp.last, &g_race_type, &g_drive.police,
+        (int *)&g_opp.last, &g_race_type, &g_drive.police, &g_opp.waiting, &g_opp.sides[0],
+        &g_opp.sides[1], &g_opp.rival_car, &g_opp.chase_off,
     };
 
     return k >= 0 && k < (int)(sizeof v / sizeof v[0]) ? v[k] : 0;
@@ -28,6 +29,17 @@ int *opp_test_cfg(void)
 int *opp_test_grid(void)
 {
     return g_opp.grid;
+}
+
+/* a test: node n's byte at `at` set to v (the road given lanes the other way) */
+void opp_test_node_byte(int n, int at, int v)
+{
+    ((unsigned char *)node_ptr(n))[at] = (unsigned char)v;
+}
+
+int *opp_test_drivers(void)
+{
+    return g_opp.drivers;
 }
 
 /* racer k's driver: the record at the original's address (0: none) */

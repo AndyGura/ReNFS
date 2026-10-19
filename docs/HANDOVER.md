@@ -269,6 +269,19 @@ Ghidra project and `build/decomp`, one command). The git history was started aga
   `RENFS_VIEW=n` (a test) watches the race from camera n (`build/shots/knock_sign.png`,
   camera 4). Not yet: its force feedback and sound.
 
+- **The traffic** (`port/src/opponent.c`, NOTES §4.16): six traffic cars wait off the road
+  (kind 6, `0x7e0c8`) and come on ahead of the racers (on CY1, a one-way road, all going
+  their way; on a two-way road some come the other way), at most four at a time (`car_place` `0x7cac8` and its parts), placed again when
+  they fall out of the racers' reach (`0x77de8`, `0x77d3c`) and after the player's crash
+  (`0x7c030`), the chase dropped (`0x781ac`); sized by their models (`0x512e8`).
+  **Equal**: `tools/opponent_emu.py --full` keeps the snapshot's whole field (9 cars, the
+  police car parked) and compares every car every step: 419 runs on all 11
+  snapshots, the coming side through a "two-way" setting (every node given lanes both
+  ways). `--race cy1` has the traffic (`build/shots/traffic_beside.png`,
+  `traffic_passing.png`, `traffic_ahead.png`). The police car waits out of sight. Fixed
+  on the way: the race's top speeds are kept for all 9 cars (the ninth wrote past the
+  port's table), and the rival's size is its PDN's.
+
 **Progress page for Danik**: https://claude.ai/artifact/VZdxTpYC3oLXYeBVJpoDoM (every step,
 its percent done and weight). Update its steps file after each finished step.
 
@@ -296,8 +309,9 @@ races 320x200 / 320x240; commit locally as the work goes.
    the racers' markers, the dashboard, the map and the mirror in it, and the player's car
    drives and crashes (equal step for step), and the status bar's numbers and the race's
    timing, the camera outside and the crash's smoke, the opponent's driving, and cars
-   meeting cars, and the roadside objects knocked over. Next: the traffic
-   (`0x79500`, `0x77de8`, `0x7cac8`), the police, the sounds, the race's keys
+   meeting cars, the roadside objects knocked over, and the traffic. Next: the police
+   (its coming `0x79500`, the chase and pulling over `0x79728`, `0x786d4`'s police
+   branch, `0x77d3c`'s police branch, the camera mode 7), the sounds, the race's keys
    (`race_keys` `0x47c88`: the cameras, the watched car).
    Open: who writes `0x136618` (28 sections drawn: a detail setting?). The walls `0x59294`
    and the circuits' sky ring `0x4ace8` can be checked on CY1 memory with made-up input,

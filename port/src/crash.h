@@ -55,6 +55,10 @@ void crash_start(void);
 /* the body from the car's PDN (0x2c920 and car_apply_pdn 0x1e9cc): its weight, size and
    turn's resistance; the car's half height and reach */
 void crash_body_setup(race_car *c, const unsigned char *pdn);
+/* 0x512e8's other half: a car whose PDN gives no size (the traffic's) sized by its near
+   model (+0x64e/+0x652/+0x64a, car_extents): its length and width, the body's halves,
+   its reach, height and radius */
+void crash_body_from_model(race_car *c);
 /* car_hard_hit 0x78204: the crash begun, the hit's push a turn of the body: a about its
    axis up, b along, s across */
 void crash_hard_hit(race_car *c, int a, int b, int s);

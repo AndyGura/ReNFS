@@ -230,6 +230,12 @@ static void zones_start(void)
 
 /* ---- small things -------------------------------------------------------------------- */
 
+/* car k's place on the grid (0x12dca0[k]; past the eight, the drivers' table after it) */
+static int grid_place(int k)
+{
+    return k < 8 ? g_opp.grid[k] : k < 17 ? g_opp.drivers[k - 8] : 0;
+}
+
 /* 0x7cf04: how fast the car may slide across at speed s, towards es's side */
 static int slide_limit(const race_car *c, int es, int s)
 {
@@ -425,7 +431,8 @@ static void plan(race_car *c, int prev)
             c->road_speed -= slow;
     }
     /* the race's top speed, where the road's limit allows it */
-    if (c->road_speed > g_drive.top_speed[c->player] && limit_at(c->node, 0) >= c->road_speed)
+    if (c->player >= 0 && c->player < DRIVE_RESULTS && c->road_speed > g_drive.top_speed[c->player]
+        && limit_at(c->node, 0) >= c->road_speed)
         g_drive.top_speed[c->player] = c->road_speed;
 
     /* the velocity: along the road, or along the car while it turns */
@@ -490,6 +497,272 @@ static void plan(race_car *c, int prev)
     c->body.wait = n;
 }
 
+/* ---- the traffic placed on the road (0x7cac8) ----------------------------------------- */
+
+static int by_grip(const race_car *c, int v);
+static int oncoming(const race_car *c);
+static void lane_pick(race_car *c);
+
+/* the road has no lanes coming the other way (its first node's) */
+static int one_way(void)
+{
+    return (node_ptr(0)[4] >> 4 & 15) == 0;
+}
+
+/* 0x77c78: node within one of the outer windows round the racers (1 + which, 0 none) */
+static int in_reach(int node)
+{
+    int p;
+
+    node &= g_track.node_mask;
+    for (p = 0; p < 2; p++)
+        if (in_window(node, g_opp.zone[p][2], g_opp.zone[p][1]))
+            return p + 1;
+    return 0;
+}
+
+/* 0x7c5b4: where the car comes on: its side (1 the racers' way, 0 coming the other way)
+   and node. Behind the player's car when it must (+0x175 & 0x24, or the police on a
+   one-way road); else a side at random, the traffic kept to at most all but one of its
+   cars on a side, and a node just ahead of its stretch's inner window, or just behind
+   it for a car going the racers' way when the stretch's racer stands */
+static void place_where(race_car *c, int *side, int *node)
+{
+    int ow = one_way(), k = c->zone, n;
+
+    if ((c->bits[1] & 0x24) || (POLICE(c) && ow)) {
+        *side = 1;
+        n = g_cars[0]->node - (POLICE(c) ? 0x12 : 0xc);
+    } else {
+        if (POLICE(c))
+            *side = 0;
+        else {
+            *side = rnd() > 0x7fff;
+            if (ow)
+                *side = 1;
+            if (!RACER(c)) {
+                int *was = &g_opp.sides[BACKWARDS(c) ? 0 : 1];
+
+                if (--*was < 0)
+                    *was = 0;
+                if (g_opp.sides[*side] >= g_opp.traffic - 1 && !ow)
+                    *side = !*side;
+                g_opp.sides[*side]++;
+            }
+        }
+        if (g_cars[g_opp.zone[k][0]]->speed_abs < 0x10000 && *side == 1 && !RACER(c))
+            n = g_opp.zone[k][5] - (int)(rnd() & 15);
+        else
+            n = g_opp.zone[k][4] + (int)(rnd() * 11 >> 16);
+    }
+    *node = (n < 0 ? 0 : n) & g_track.node_mask;
+}
+
+/* 0x7c7e8: a racer back on its grid place (unless the rival is a traffic car): its
+   lane by the grid place's side, its node by its row */
+static void place_racer(race_car *c, int *node)
+{
+    const unsigned char *nd, *n20;
+    int w, g, odd;
+
+    if (!RACER(c) || g_opp.rival_car == 9)
+        return;
+    nd = node_ptr(10 & g_track.node_mask);
+    w = lane_width(nd[4] & 15, nd[1] >> 3) << 8;
+    g = g_opp.grid[c->player];
+    odd = g % 2;
+    c->across_to = odd * w + -w / 2 + one_way() * w + c->lane_offset;
+    n20 = node_ptr(20 & g_track.node_mask);
+    if ((n20[4] >> 4 & 15) == 2 && (n20[4] & 15) == 1 && !odd)
+        c->across_to -= w;
+    *node = g_field > 2 ? 0x20 - 2 * g : 0x20 - g / 2 * 4;
+}
+
+/* 0x7c3f8: the flags of a car placed */
+static void place_flags(race_car *c)
+{
+    c->bits[1] &= 0x7f;
+    c->bits[2] &= 0xfd;
+    if (c->bits[1] & 0x20)
+        c->bits[1] = (c->bits[1] & 0xdb) | 4;
+    else if (POLICE(c))
+        g_opp.chase_off = 0;
+    if (POLICE(c) && !(c->bits[1] & 4))
+        c->part &= ~4;
+}
+
+/* 0x7c4d4: its speed: going the racers' way (or a racer) half the settings' and half its
+   stretch's racer's, by its grip; coming the other way by how fast that racer goes */
+static void place_speed(race_car *c, int side)
+{
+    int v = g_cars[g_opp.zone[c->zone][0]]->speed_abs;
+
+    if (side || RACER(c)) {
+        int s;
+
+        c->speed_to = (CFG(0x48) >> 1) + (v >> 1);
+        s = c->speed_to = by_grip(c, c->speed_to);
+        if (RACER(c))
+            c->road_speed = 0;
+        else if (WORD(c) & 0x404)
+            c->road_speed = c->speed_to = g_cars[0]->road_speed;
+        else
+            c->road_speed = s;
+        c->bits[0] &= ~0x10;
+        c->bits[1] &= ~0x10;
+    } else {
+        c->road_speed = c->speed_to = -oncoming(c);
+        c->bits[0] &= ~0x10;
+        c->bits[1] |= 0x10;
+    }
+}
+
+/* 0x7c294: put at its node's point, a random bit along and its place across, turned
+   along the road (round, coming the other way) */
+static void put_on_road(race_car *c)
+{
+    int a, k, m[9];
+
+    crash_road_frame(c);
+    c->pos = c->road_at;
+    c->pos.z += (int)rnd();
+    a = c->across_to >> 8;
+    c->pos.x += a * (c->road_side.x >> 8);
+    c->pos.y += a * (c->road_side.y >> 8);
+    c->pos.z += a * (c->road_side.z >> 8);
+    if (drive_check_lap(c))
+        crash_road_frame(c);
+    memcpy(c->turn, &c->road_side, sizeof c->turn);
+    if (BACKWARDS(c))
+        for (k = 0; k < 3; k++) {
+            c->turn[k] = -c->turn[k];
+            c->turn[6 + k] = -c->turn[6 + k];
+        }
+    if (c->steer) {
+        crash_turn_y(m, c->steer);
+        crash_mat_mul(c->turn, m, c->turn);
+    }
+}
+
+/* 0x7ccc0: the car placed at node, on that side, across: its progress, grip, a new place
+   in its lane, steering and waits cleared, flags, speed, on the road. With `wait` a
+   traffic car goes off the road to wait (kind 6) a random while */
+static void place_at(race_car *c, int node, int side, int across, int wait)
+{
+    c->node = node < 0 ? 0 : node;
+    c->progress = g_track.length * (c->lap - 1) * 4 + c->node;
+    c->body.grip = CFG(0x38 + 4 * (int)(rnd() & 3));
+    lane_pick(c);
+    c->body.shift = 0;
+    c->body.honks = 0;
+    c->body.steady = STEADY(c);
+    c->steer_to = c->steer = 0;
+    c->body.wait = 0;
+    c->yaw_rate = 0;
+    /* (a police car placed while the camera watches from it: the camera back to the
+       player's car, mode 5: with the police) */
+    place_flags(c);
+    place_speed(c, side);
+    c->across_to = across;
+    put_on_road(c);
+    c->body.grip = CFG(0x38 + 4 * (int)(rnd() & 3));
+    if (wait && (!RACER(c) || g_opp.rival_car == 9) && !POLICE(c)
+        && (c->slot < 0 || c->slot >= g_humans)) {
+        c->body.honks = (int)((unsigned)CFG(0x30) * rnd() >> 16) + 1;
+        c->state = 6;
+        if (!RACER(c))
+            g_opp.waiting++;
+    }
+}
+
+/* 0x7cac8: the car placed again: where (0x7c5b4), in a lane at random on that side, at
+   its own place in it (a racer on its grid place) */
+static void place(race_car *c, int wait)
+{
+    const unsigned char *nd;
+    int side, node, w;
+
+    if (g_drive.police == 1 && POLICE(c))
+        g_cars[2]->zone = g_cars[0]->zone;
+    c->slide_front = c->slide_rear = 0;
+    if (c == g_cars[0]) {
+        c->bits[1] &= ~0x24;
+        c->bits[2] &= ~1;
+    }
+    place_where(c, &side, &node);
+    nd = node_ptr(node);
+    w = lane_width(nd[4] & 15, nd[1] >> 3) << 8;
+    if (side || RACER(c))
+        c->across_to = w * (int)((rnd() * (nd[4] & 15) >> 16) + 1) - w / 2;
+    else
+        c->across_to = -w * (int)((rnd() * (nd[4] >> 4 & 15) >> 16) + 1) + w / 2;
+    c->across_to += c->lane_offset;
+    place_racer(c, &node);
+    place_at(c, node, side, c->across_to, wait);
+}
+
+/* 0x77d3c: a traffic car out of the racers' reach placed again ahead of a racer: in its
+   stretch, else the next one's, else back to waiting off the road. (A police car's
+   return: with the police) */
+static void place_again(race_car *c)
+{
+    if (g_field > 2 || POLICE(c))
+        return;
+    while (c->zone < 2) {
+        place(c, 0);
+        if (!opponent_near(c->node))
+            break;
+        c->zone++;
+    }
+    if (c->zone < 2)
+        return;
+    c->zone = 0;
+    place(c, 1);
+}
+
+/* 0x77de8: the traffic, or a racer before its first move, moved on: a car not yet on
+   the road placed; one that has fallen out of both racers' outer windows placed again */
+static void move_on(race_car *c)
+{
+    if (c->progress < 2) {
+        if (!RACER(c))
+            c->zone = 0;
+        place(c, 1);
+    } else if (g_field <= 2 && !in_reach(c->node)) {
+        c->zone++;
+        place_again(c);
+    }
+}
+
+void opponent_wait(race_car *c)
+{
+    int top = 0, i;
+
+    for (i = 0; i < g_field; i++)
+        if (g_cars[i]->node > top)
+            top = g_cars[i]->node;
+    if (!RACER(c)) {
+        c->zone = 0;
+        if (top < 0x78 && (rnd() & 1))
+            c->zone = 1;
+    }
+    c->node = 1;
+    c->progress = 1;
+    c->pos.x = 0x80000;
+    c->pos.y = (int)((unsigned)(c->slot * 10 + 200) << 16);
+    c->pos.z = 0x80000;
+    if (--c->body.honks)
+        return;
+    if (top < c->slot * 16 + 15 || g_opp.traffic - CFG(0x34) >= g_opp.waiting || RACER(c)
+        || (g_drive.options & 4)) {
+        c->body.honks = 1;
+        return;
+    }
+    g_opp.waiting--;
+    c->state = 3;
+    place_again(c);
+}
+
 /* ---- a step (drive_opponent 0x7b34c) -------------------------------------------------- */
 
 /* 0x7b178: off the road's edge: its speed across turned back towards the road */
@@ -526,7 +799,8 @@ void opponent_drive(race_car *c)
         c->speed_abs = ax > az ? ax + (az >> 2) : az + (ax >> 2);
     }
     c->own_turn = 1;
-    /* (0x77de8: the traffic, or a racer before its first move, moved on: not yet) */
+    if (!racer || c->progress < 2)
+        move_on(c);
     if (drive_check_lap(c)) {
         crash_road_frame(c);
         memcpy(c->turn, &c->road_side, sizeof c->turn);
@@ -556,10 +830,13 @@ void opponent_drive(race_car *c)
             c->slide_front = iabs(c->steer - c->steer_to) * 20;
         } else
             c->slide_rear = c->slide_front = 0;
-        /* turned too far: it spins out (0x1ca9c). (A police car's chase is dropped:
-           not yet) */
-        if (iabs(c->steer) > (WORD(c) & 0x404 ? 0x200000 : 0x160000) && !(c->bits[2] & 2))
+        /* turned too far: it spins out (0x1ca9c), a police car's chase dropped. (The
+           replay's highlight 0x52 near a player: not in the port) */
+        if (iabs(c->steer) > (WORD(c) & 0x404 ? 0x200000 : 0x160000) && !(c->bits[2] & 2)) {
             crash_spin_out(c);
+            if (POLICE(c))
+                opponent_chase_drop(0);
+        }
     } else
         c->slide_rear = c->slide_front = 0;
     if (c->steer != c->steer_to && iabs(c->steer) < 0xf0000 && c->on_ground) {
@@ -634,11 +911,31 @@ void opponent_drive(race_car *c)
         put_down(c, off_road(c));
 }
 
+void opponent_chase_drop(int p)
+{
+    race_car *pc = g_ncars > 2 ? g_cars[2] : 0, *pl = g_cars[0];
+
+    if (g_drive.police != 1)
+        return;
+    if (pc) {
+        if (p)
+            pc->bits[2] &= 0xf7;
+        pc->bits[1] &= 0xdb;
+    }
+    pl->bits[1] &= 0xdb;
+    pl->bits[2] &= 0xfe;
+    if (pc) {
+        pc->bits[1] &= 0xdb;
+        pc->bits[2] &= 0x87;
+    }
+    g_opp.chase_off = 0;
+}
+
 /* 0x7c030's loop: a player's car put back on the road after its crash puts back the
    racers thrown about or stood up (kinds 4, 5) that are within the road's edges: driven
-   again (kind 3), standing, along the road. Their chase flags are cleared. (The traffic,
-   and the cars of kind 3 out of the stretches round the racers or police cars, are
-   placed again by 0x7cac8: with the traffic and the police) */
+   again (kind 3), standing, along the road. The other cars thrown about, the police and
+   those out of the stretches round the racers are placed again (0x7cac8), to wait off
+   the road. Their chase flags are cleared */
 void opponent_put_back(void)
 {
     int n = g_track.loop ? g_field : g_ncars, i;
@@ -653,10 +950,20 @@ void opponent_put_back(void)
         far = !opponent_near(c->node);
         c->bits[1] &= 0xdb;
         c->bits[2] &= 0xf7;
+        g_opp.chase_off = 0;
         k = c->state;
         if (k != 5 && k != 4 && !(c->bits[0] & 8) && !far)
             continue;
-        if (!RACER(c) || (k != 4 && k != 5))
+        if (!RACER(c)) {
+            if (c->slot < 0 || c->slot >= g_field) {
+                if (k == 6)
+                    g_opp.waiting--;
+                c->state = 3;
+                place(c, 1);
+            }
+            continue;
+        }
+        if (k != 4 && k != 5)
             continue;
         nd = node_ptr(c->node);
         if (-(int)((unsigned)nd[2] << 13) > c->road_off || (int)((unsigned)nd[3] << 13) < c->road_off)
@@ -678,17 +985,18 @@ void opponent_put_back(void)
 /* drive_kind5 0x7d9e4: a computer's car stood up again after being thrown about (kind
    5). Its turning eased out; while a player is near, it drives with nothing to reach (it
    stops); out of their sight it is put back along the road, standing, and driven as
-   before (kind 3). (A police car's chase dropped, 0x781ac: with the police. A car of kind
-   6 counted down, 0x15d480: this one is of kind 5) */
+   before (kind 3). A police car's chase is dropped first */
 void opponent_recover(race_car *c)
 {
     int d = c->bits[0] & 4 ? 0x23333 : 0x13333;
 
-    if (c->yaw_rate > 0) {
-        c->yaw_rate -= d;
-        if (c->yaw_rate < 0)
-            c->yaw_rate = 0;
-    } else if (c->yaw_rate < 0) {
+    if (POLICE(c))
+        opponent_chase_drop(1);
+    /* the turning eased out: a turn one way by d a step; the other way (positive) the
+       original eases it too, then clears whatever is left at once */
+    if (c->yaw_rate > 0)
+        c->yaw_rate = 0;
+    else if (c->yaw_rate < 0) {
         c->yaw_rate += d;
         if (c->yaw_rate > 0)
             c->yaw_rate = 0;
@@ -818,13 +1126,16 @@ void opponent_wander(race_car *c)
     int lim = c->slot >= g_humans && c->slot < g_field
             ? rec32(g_opp.rec[c->slot], 0x89) : g_opp.wander;
 
-    if ((unsigned)lim * rnd() >> 16 == 1) {
-        /* 0x7e5e4: a new place in its lane */
-        unsigned k = rnd() & 3;
+    if ((unsigned)lim * rnd() >> 16 == 1)
+        lane_pick(c);
+}
 
-        c->lane_offset = RACER(c) ? rec32(g_opp.rec[c->player], 0x79 + 4 * k)
-                                  : CFG(0x4c + 4 * k);
-    }
+/* 0x7e5e4: a new place in its lane, from its driver's record or the settings */
+static void lane_pick(race_car *c)
+{
+    unsigned k = rnd() & 3;
+
+    c->lane_offset = RACER(c) ? rec32(g_opp.rec[c->player], 0x79 + 4 * k) : CFG(0x4c + 4 * k);
 }
 
 /* ---- every fourth step: the lanes (0x7a040) --------------------------------------------- */
@@ -1183,7 +1494,7 @@ void opponent_tick(void)
             s[0] = -0x10000;
             s[1] = s[2] = 0;
             if (g_race_type >= 2 && c->progress < 200
-                && c->progress < g_opp.grid[c->player] * 5 + 100 && !edge(n, l))
+                && c->progress < grid_place(c->player) * 5 + 100 && !edge(n, l))
                 s[1] = 0x1b580000;
             else if (g_race_type == 1 && RACER(c) && n < 0x3c && iabs(n - g_cars[0]->node) < 5
                      && !edge(n, l))
@@ -1346,9 +1657,12 @@ void opponent_start(unsigned seed)
 
     settings();
     memset(g_opp.rec, 0, sizeof g_opp.rec);
+    for (i = 0; i < 9; i++)
+        g_opp.drivers[i] = 99;         /* (0x373ea, race_setup) */
     for (i = g_humans; i < g_field && i < 8; i++) {
         int letter = exe_at(0xf4038 + set * 8 + g_opp.grid[i], 1)[0] - 'A';
 
+        g_opp.drivers[i] = letter;
         g_opp.rec[i] = exe_at(0xf4070 + 0x8d * letter, 0x8d);
     }
     g_opp.lead = g_cars[0];
@@ -1360,6 +1674,10 @@ void opponent_start(unsigned seed)
     g_opp.lane_rule = 1;
     g_opp.wander = exe_i32(0xf74f0);
     g_opp.brake = 0x5999;
+    g_opp.waiting = 0;
+    g_opp.sides[0] = 0;
+    g_opp.sides[1] = g_opp.traffic;
+    g_opp.chase_off = 0;
     if (g_race_type == 0 || (g_race_type == 1 && g_track.loop))
         CFG(0x34) = 0;
     /* 0x38c10 */

@@ -1315,7 +1315,7 @@ static void physics(race_car *c)
     if ((g_drive.flags & 4) && g_drive.state == 1 && !g_drive.first_move
         && iabs(c->speed) > 0xccc)
         g_drive.first_move = g_drive.steps + 1;
-    if (c->player < DRIVE_PLAYERS && iabs(c->speed) > g_drive.top_speed[c->player])
+    if (c->player < DRIVE_RESULTS && iabs(c->speed) > g_drive.top_speed[c->player])
         g_drive.top_speed[c->player] = iabs(c->speed);
     /* (the acceleration test's times, 0x2d71c and 0x2d778, come with its screen) */
     if (c->roll_phase > 1)
@@ -1482,6 +1482,8 @@ void drive_step(race_car *c)
         opponent_drive(c);
     else if (c->state == 5)
         opponent_recover(c);
+    else if (c->state == 6)
+        opponent_wait(c);
     else {
         physics(c);
         drive_check_lap(c);

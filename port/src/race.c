@@ -209,17 +209,21 @@ int race_test(const char *name)
     if (!drive_load(&cars[0], config_word(CFG_AUTO), config_word(CFG_TCS) == 0,
                     config_word(CFG_ABS) == 0))
         return 0;
-    /* the opponent (car_setup 0x51200 for the computer's racers): a racer driven by the
-       computer (kind 3), standing a metre up until its first step puts it on the road */
-    for (i = 1; i < RACERS; i++) {
+    /* the computer's cars (car_setup 0x51200; their size the PDN's or the model's,
+       0x512e8, as car_load left it): driven by the computer (kind 3), a metre along
+       until their first step: the opponent's puts it on the road from the grid, the
+       traffic's sends each car off the road to wait (kind 6). The police car (car 2)
+       waits out of sight for now (its coming and going: with the police) */
+    for (i = 1; i < RACE_CARS; i++) {
         cars[i].slot = i;
         cars[i].state = 3;
-        cars[i].half_len = 0x50000;
-        cars[i].half_wid = 0x28000;
-        cars[i].pos.y = 0x10000;
+        cars[i].pos.z = 0x10000;
         cars[i].lap = 1;
-        cars[i].bits[0] |= 4;
+        if (i < RACERS)
+            cars[i].bits[0] |= 4;
     }
+    cars[2].bits[0] |= 8;
+    cars[2].state = 6;
     eye = S32(cars[0].spec, 0x36c);         /* the driver's eyes above the road */
     horizon = S32(cars[0].spec, 0x370);     /* where the horizon is in the view */
     redline = S32(cars[0].spec, 0xac);      /* the engine's red line */
@@ -259,14 +263,14 @@ int race_test(const char *name)
     memset(&cam, 0, sizeof cam);
     camera_set_car(&cam, &cars[0], 0);
 
-    /* the cars on the road: only the racers so far, standing (their turn the one the grid
-       gives, +0x351) */
-    for (i = 0; i < RACERS; i++) {
+    /* the cars: the racers standing on the grid (their turn the one the grid gives,
+       +0x351), the traffic and the police after them */
+    for (i = 0; i < RACE_CARS; i++) {
         cars[i].slot = i;
         cars[i].yaw_drawn = cars[i].yaw;
         g_cars[i] = &cars[i];
     }
-    g_ncars = RACERS;
+    g_ncars = RACE_CARS;
     g_player = 0;
     if (getenv("RENFS_VIEW"))  /* a test: the race watched from camera mode n */
         camera_set_car(&cam, &cars[0], atoi(getenv("RENFS_VIEW")));
@@ -274,9 +278,10 @@ int race_test(const char *name)
     g_race_type = 1;           /* head to head (0x36c5c from CONFIG.DAT) */
     g_field = RACERS;
     g_humans = 1;
-    memcpy(g_car_marks, marks, RACERS);
-    for (i = 0; i < RACERS; i++)
-        cars[i].part = 7;      /* (+0x51a: racers, meeting the others) */
+    memcpy(g_car_marks, marks, RACE_CARS);
+    for (i = 0; i < RACE_CARS; i++)
+        cars[i].part = 7;      /* (+0x51a: driven, their finish checked, meeting the others) */
+    cars[2].part = 3;          /* (the police car's, until it comes: 0x7c3f8) */
     /* the race's timing (race_start 0x506dc): the settings' laps (CONFIG.DAT +0xb1,
        0x12dd14), the race length's times (0x12dd24) */
     g_timing.lap_limit = config_word(0xb1);
@@ -287,6 +292,8 @@ int race_test(const char *name)
        the random numbers from the clock (0x38c10 with time(), 0x91d9b) */
     for (i = 0; i < RACERS; i++)
         g_opp.grid[i] = 7 - i;
+    g_opp.traffic = RACE_CARS - RACERS - 1;    /* (0x12da3c: the cars after the police) */
+    g_opp.rival_car = cars[1].number;          /* (0x12da9e) */
     opponent_start(getenv("RENFS_SEED") ? (unsigned)strtoul(getenv("RENFS_SEED"), 0, 0)
                                         : (unsigned)time(0));
     g_camera = &cam;

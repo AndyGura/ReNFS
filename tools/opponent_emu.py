@@ -15,7 +15,11 @@ the player's car thrown at a wall too, and the result counts how often they came
 touched and hit hard. The traffic's coming and going (0x79500), the sounds and the
 replay's highlights are left out on the original's side.
 
-    build/venv/bin/python tools/opponent_emu.py [--coverage] [--only=<variant>] [snapshot ..]
+With --full the race is kept whole (the snapshot's 9 cars: the traffic waiting off the
+road (kind 6, drive_opponent_wait 0x7e0c8), placed and placed again (0x7cac8), the police
+car parked: its coming 0x79500 left out on both sides) and every car is compared.
+
+    build/venv/bin/python tools/opponent_emu.py [--full] [--coverage] [--only=<variant>] [snapshot ..]
     (default: all d*, e*, r*)
 """
 import ctypes, glob, os, struct, sys
@@ -29,7 +33,7 @@ SOURCES = [f for f in D.SOURCES if f != "opponent.c"]
 LEFT_OUT = dict(D.LEFT_OUT)
 # the traffic's coming and going; sounds; the police's lanes; EXPLODE's push
 LEFT_OUT.update({0x79500: 0, 0x80a60: 0, 0x79728: 0, 0x78370: 0})
-KIND = {2: 0x382d0, 3: 0x7b34c, 4: 0x1cfe0, 5: 0x7d9e4}
+KIND = {2: 0x382d0, 3: 0x7b34c, 4: 0x1cfe0, 5: 0x7d9e4, 6: 0x7e0c8}
 CAR = 0x800
 
 # opponent_test_var's order
@@ -37,7 +41,8 @@ VARS = [(0x15d470, "brake"), (0x15d474, "lead"), (0x15d4b8, "ticks"), (0x15d4bc,
         (0x15d488, "lane rule"), (0xf74ac, "off"), (0xf74a4, "explode"), (0x12da3c, "traffic"),
         (0xf74f0, "wander"), (0x15d47c, "bend drop"), (0x15d478, "bend slow"),
         (0x15d484, "behind"), (0xeab70, "random"), (0xeab78, "multiplier"), (0xeab74, "last"),
-        (0x12da20, "race type"), (0x12da34, "police")]
+        (0x12da20, "race type"), (0x12da34, "police"), (0x15d480, "waiting"),
+        (0x15d154, "side 0"), (0x15d158, "side 1"), (0x12da9e, "rival car"), (0xf74a8, "chase off")]
 ZONE, CFG, RECS, LEAD, RIVAL, GRID = 0x15d29c, 0x15d2bc, 0x15d490, 0x15d48c, 0x13c270, 0x12dca0
 BY_ROAD, BY_RACE, TOP = 0x13c298, 0x13c274, 0x14ec44
 TOP_G = D.GLOBALS.index((0x14ea80 + 0x1c4, 4))     # top_speed[0] in drive_test_global
@@ -71,6 +76,9 @@ VARIANTS = [("as is", {}, {}),
             ("in the air", {}, {0x3fd: 0, 0x58: 0x60000}),
             ("changing gear", {}, {0x150: 5}),
             ("past the finish", {0x13c164: 40}, {}),
+            # the road given two lanes the other way (CY1 has none): the traffic placed
+            # coming too (both sides' node bytes +4 patched)
+            ("two-way", {}, {}),
             ("before the start", {0x145c94: 250}, {}),
             # the player catching a slow opponent and passing it
             ("caught up", {0x145c94: 250}, {}, {0x170: 0x4000}),
@@ -102,7 +110,7 @@ RUNS = [("gas", "as is"), ("weave", "as is"), ("wait", "as is"), ("gas", "single
         ("weave", "ahead"), ("wait", "behind"), ("gas", "behind"), ("wait", "behind fast"),
         ("gas", "thrown"), ("wait", "thrown"), ("gas", "on its roof"), ("wait", "rolling"),
         ("wait", "both thrown"), ("wait", "both thrown roof"),
-        ("weave", "caught up later")]
+        ("weave", "caught up later"), ("gas", "two-way"), ("weave", "two-way"), ("wait", "two-way")]
 
 
 def lib():
@@ -119,6 +127,7 @@ def lib():
     L.opp_test_zone.restype = P(ctypes.c_short)
     L.opp_test_cfg.restype = P(ctypes.c_int)
     L.opp_test_grid.restype = P(ctypes.c_int)
+    L.opp_test_drivers.restype = P(ctypes.c_int)
     L.timing_test_array.restype = P(ctypes.c_int)
     return L
 
@@ -158,10 +167,14 @@ PORTED = [(0x7b34c, 0x7bf35), (0x7b178, 0x7b34a), (0x7cf04, 0x7cf68), (0x7cf98, 
           (0x7e548, 0x7e59a), (0x7e5e4, 0x7e649), (0x7e64c, 0x7e996), (0x7dd33, 0x7ddb7),
           (0x77ca4, 0x77d3b), (0x77e4c, 0x78149), (0x7bf38, 0x7bfd7), (0x51724, 0x5175d),
           # a computer's car thrown about, stood up, put back
-          (0x1de8a, 0x1e101), (0x7d9e4, 0x7daeb), (0x7daec, 0x7dbd5), (0x7c030, 0x7c292)]
+          (0x1de8a, 0x1e101), (0x7d9e4, 0x7daeb), (0x7daec, 0x7dbd5), (0x7c030, 0x7c292),
+          # the traffic waiting, placed and placed again
+          (0x7e0c8, 0x7e209), (0x77d3c, 0x77de8), (0x77de8, 0x77e4c), (0x77c78, 0x77ca3),
+          (0x77c20, 0x77c76), (0x7cac8, 0x7ccbf), (0x7c5b4, 0x7c7e5), (0x7c7e8, 0x7c938),
+          (0x7ccc0, 0x7cf01), (0x7c294, 0x7c3f6), (0x7c3f8, 0x7c4d3), (0x7c4d4, 0x7c5b4)]
 
 
-def run(L, F, OF, path, scr, var, coverage=False):
+def run(L, F, OF, path, scr, var, coverage=False, full=False):
     s = Snap(path)
     mu = s.mu
     if coverage:
@@ -184,21 +197,36 @@ def run(L, F, OF, path, scr, var, coverage=False):
     player = s.i32(0x12dd58)
     if player != 0:
         return "the player is not car 0"
-    cars = [s.u32(0x13c24c + 4 * k) for k in range(2)]
+    n_cars = s.i32(0x12da38) if full else 2
+    cars = [s.u32(0x13c24c + 4 * k) for k in range(n_cars)]
     opp = cars[1]
     kind1 = struct.unpack("<i", bytes(mu.mem_read(opp + 0x512, 4)))[0]
     if kind1 != 3:
         return "car 1 is not driven by the computer (kind %d)" % kind1
-    # the race cut down to the two
-    wr(s, 0x12da38, 2)
-    s.write(BY_ROAD, struct.pack("<2i", 0, 1))
-    s.write(BY_RACE, struct.pack("<2i", 0, 1))
+    # the race cut down to the two (or the whole field: the police car stays parked,
+    # its coming and going left out on both sides)
+    if not full:
+        wr(s, 0x12da38, 2)
+        s.write(BY_ROAD, struct.pack("<2i", 0, 1))
+        s.write(BY_RACE, struct.pack("<2i", 0, 1))
     s.call(0x518c0)
+    placed = [0]
+
+    def count_placed(mu, addr, size, u):
+        placed[0] += 1
+    mu.hook_add(UC_HOOK_CODE, count_placed, None, begin=game(0x7ccc0), end=game(0x7ccc0))
     vname, gset, cset = VARIANTS[var][:3]
     # (and fields set after 0x3f364, which works the car's top speed out again)
     late = VARIANTS[var][3] if len(VARIANTS[var]) > 3 else {}
     for a, v in gset.items():
         wr(s, a, v)
+    L.track_load(b"cy1")
+    if vname == "two-way":
+        base, nodes = s.u32(0x137430), (0x15b0c - 0x98c) // 0x24
+        for k in range(nodes):
+            b4 = bytes(mu.mem_read(base + 36 * k + 4, 1))[0]
+            mu.mem_write(base + 36 * k + 4, bytes([b4 & 15 | 0x20]))
+            L.opp_test_node_byte(k, 4, b4 & 15 | 0x20)
     for o, v in cset.items():
         if o == 0x4c:
             v += struct.unpack("<i", bytes(mu.mem_read(opp + o, 4)))[0]
@@ -261,7 +289,8 @@ def run(L, F, OF, path, scr, var, coverage=False):
         if struct.unpack("<I", raw[0x88:0x8c])[0] != a:
             return "car %d's +0x88 is not itself" % k
         spec_at = struct.unpack("<I", raw[0x479:0x47d])[0]
-        spec = ctypes.create_string_buffer(bytes(mu.mem_read(spec_at, D.SPEC)), D.SPEC)
+        spec = ctypes.create_string_buffer(bytes(mu.mem_read(spec_at, D.SPEC)) if spec_at else
+                                           bytes(D.SPEC), D.SPEC)
         c = ctypes.create_string_buffer(CAR * 2)
         L.drive_test_in(c, raw, spec)
         L.drive_test_car(k, c)
@@ -277,6 +306,9 @@ def run(L, F, OF, path, scr, var, coverage=False):
     for i, v in enumerate(struct.unpack("<107i", s.read(CFG, 0x1ac))):
         cfg[i] = v
     g = L.opp_test_grid()
+    dv = L.opp_test_drivers()
+    for i in range(9):
+        dv[i] = rd(s, GRID + 0x20 + 4 * i)
     for i in range(8):
         g[i] = rd(s, GRID + 4 * i)
         p = s.u32(RECS + 4 * i)
@@ -287,7 +319,7 @@ def run(L, F, OF, path, scr, var, coverage=False):
     L.opp_test_cars(cars.index(lead), cars.index(rival))
     for k, a in ((7, BY_ROAD), (8, BY_RACE)):
         arr = L.timing_test_array(k)
-        for i in range(2):
+        for i in range(n_cars):
             arr[i] = rd(s, a + 4 * i)
     D.set_collide(L, s)
     out = ctypes.create_string_buffer(CAR)
@@ -302,9 +334,17 @@ def run(L, F, OF, path, scr, var, coverage=False):
             L.drive_test_global(1, 1, fl)
             L.drive_test_global(24, 1, w)
             # the original's step
+            if os.environ.get("OPP_TRACE") and n == int(os.environ["OPP_TRACE"]):
+                from unicorn import UC_HOOK_MEM_WRITE
+
+                def wtrace(mu, acc, addr, size, val, u):
+                    sp = mu.reg_read(UC_X86_REG_ESP); print("write +%#x = %d at %#x (stack %s)" % (addr - tc, val, flat(mu.reg_read(UC_X86_REG_EIP)), " ".join("%x" % v for v in struct.unpack("<12I", bytes(mu.mem_read(sp, 48))))))
+                tc = cars[int(os.environ.get("OPP_TRACE_CAR", "0"))]
+                to = int(os.environ.get("OPP_TRACE_OFF", "0x58"), 0)
+                mu.hook_add(UC_HOOK_MEM_WRITE, wtrace, None, begin=tc + to, end=tc + to + 3)
             if fl & 4:
                 s.call(0x10400, eax=cars[0])
-            order = struct.unpack("<2i", s.read(BY_ROAD, 8))
+            order = struct.unpack("<%di" % n_cars, s.read(BY_ROAD, 4 * n_cars))
             kinds = []
             for idx in order:
                 a = cars[idx]
@@ -313,7 +353,7 @@ def run(L, F, OF, path, scr, var, coverage=False):
                 kinds.append(kind)
                 if not (part & 4) or not kind:
                     continue
-                if kind not in KIND or (idx and kind == 2) or (not idx and kind in (3, 5)):
+                if kind not in KIND or (idx and kind == 2) or (not idx and kind in (3, 5, 6)):
                     return "step %d: car %d of kind %d, not in the port" % (n, idx, kind)
                 s.call(KIND[kind], eax=a)
                 s.call(0x51598, eax=a)
@@ -324,7 +364,7 @@ def run(L, F, OF, path, scr, var, coverage=False):
             if fl & 4:
                 L.drive_controls(rc[0])
             arr = L.timing_test_array(7)
-            for idx in [arr[0], arr[1]]:
+            for idx in [arr[i] for i in range(n_cars)]:
                 c = rc[idx]
                 L.drive_test_out(c, out)
                 part, kind = out.raw[0x51a], struct.unpack("<i", out.raw[0x512:0x516])[0]
@@ -357,7 +397,7 @@ def run(L, F, OF, path, scr, var, coverage=False):
                 diff.append("zones %s / %s" % (zt, zp))
             for k, a in ((7, BY_ROAD), (8, BY_RACE)):
                 arr = L.timing_test_array(k)
-                if [rd(s, a), rd(s, a + 4)] != [arr[0], arr[1]]:
+                if [rd(s, a + 4 * i) for i in range(n_cars)] != [arr[i] for i in range(n_cars)]:
                     diff.append("order %d" % k)
             for p in range(2):
                 if rd(s, TOP + 0x1d2 * p) != L.drive_test_global(TOP_G + p, 0, 0):
@@ -374,6 +414,20 @@ def run(L, F, OF, path, scr, var, coverage=False):
             fd = D.fallen_differ(L, s)
             if fd:
                 diff.append(fd)
+            if diff and os.environ.get("OPP_DEBUG"):
+                for k, a in enumerate(cars):
+                    t = bytes(mu.mem_read(a, CAR))
+                    out.raw = t
+                    L.drive_test_out(rc[k], out)
+                    g = lambda b, o: struct.unpack("<i", b[o:o + 4])[0]
+                    print("car %d kind %d node %d pos %s / %s vel %s / %s ground %d/%d" % (
+                        k, g(t, 0x512), g(t, 0x48), [g(t, o) >> 8 for o in (0, 4, 8)],
+                        [g(out.raw, o) >> 8 for o in (0, 4, 8)], [g(t, o) >> 8 for o in (0x54, 0x58, 0x5c)],
+                        [g(out.raw, o) >> 8 for o in (0x54, 0x58, 0x5c)], g(t, 0x3fd), g(out.raw, 0x3fd)))
+                print(diff)
+                for k, (a, nb) in enumerate(D.GLOBALS):
+                    if a and rd(s, a, nb) != L.drive_test_global(k, 0, 0):
+                        print("global %#x %d/%d" % (a, rd(s, a, nb), L.drive_test_global(k, 0, 0)))
             if diff:
                 return "step %d (word %#x, steps %d, kinds %s, met %d, touched %d): %s" % (
                     n, w, st, kinds, met[0x1c6a4], met[0x2afb8], ", ".join(diff[:12]))
@@ -385,6 +439,9 @@ def run(L, F, OF, path, scr, var, coverage=False):
     f = lambda a, o: struct.unpack("<i", bytes(mu.mem_read(a + o, 4)))[0]
     touched = ", %d times near, %d touching, %d hard" % (met[0x1c6a4], met[0x2afb8], met[0x1e591]) \
         if met[0x1c6a4] else ""
+    if full:
+        on = sum(1 for a in cars[3:] if f(a, 0x512) != 6)
+        touched += ", %d placings, %d traffic cars on the road" % (placed[0], on)
     return "equal, %d steps (the player at node %d, the opponent at %d, %.1f m/s, lane place %.2f m%s)" % (
         n, f(cars[0], 0x48), f(opp, 0x48), f(opp, 0x15c) / 65536, f(opp, 0x80) / 65536, touched)
 
@@ -392,8 +449,9 @@ def run(L, F, OF, path, scr, var, coverage=False):
 def main():
     args = sys.argv[1:]
     coverage = "--coverage" in args
+    full = "--full" in args
     only = [a[7:] for a in args if a.startswith("--only=")]
-    args = [a for a in args if a != "--coverage" and not a.startswith("--only=")]
+    args = [a for a in args if a not in ("--coverage", "--full") and not a.startswith("--only=")]
     paths = args or sorted(glob.glob("build/snap/[der]*.bin"))
     L = lib()
     L.files_init(b"NFSSE", None)
@@ -411,7 +469,7 @@ def main():
         for scr, var in RUNS:
             if only and var not in only:
                 continue
-            r = run(L, F, OF, p, scr, V[var], coverage)
+            r = run(L, F, OF, p, scr, V[var], coverage, full)
             bad += not r.startswith("equal")
             print("%s %-6s %-18s %s" % (os.path.basename(p), scr, var, r), flush=True)
     print("all equal" if not bad else "%d runs differ" % bad)

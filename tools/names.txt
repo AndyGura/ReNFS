@@ -634,7 +634,7 @@
 0x7e64c opponent_road_allows
 0x7e548 traffic_by_grip
 0x78660 traffic_oncoming
-0x7e5e4 traffic_wander_limit
+0x7e5e4 car_lane_pick
 0x7dd33 traffic_wander
 0x77f70 opponent_zones
 0x77cfc opponent_near
@@ -659,3 +659,14 @@
 0x7fb58 sound_pan
 0x1ee80 car_over_object
 0x65160 car_model_extents
+0x77d3c traffic_place_again
+0x77de8 car_move_on
+0x77c78 in_outer_window
+0x77c20 outer_window_has
+0x7cac8 car_place
+0x7c5b4 place_where
+0x7c7e8 place_racer_grid
+0x7ccc0 place_at
+0x7c294 place_on_road
+0x7c3f8 place_flags
+0x7c4d4 place_speed

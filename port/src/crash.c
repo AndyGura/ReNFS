@@ -594,16 +594,6 @@ static void body_angles(race_car *c)
         c->roll -= 0x1000000;
 }
 
-/* 0x781ac's part for the player's car (p 1: and the police's chase dropped): the
-   chase's flags off (the police car's and 0xf74a8 come with the police) */
-static void chase_off(void)
-{
-    if (g_drive.police == 1 && g_cars[0]) {
-        g_cars[0]->bits[1] &= 0xdb;
-        g_cars[0]->bits[2] &= 0xfe;
-    }
-}
-
 /* 0x1cd40: the car driven by kind k again, from the body: its place, its speed, its turn
    half way to the body's spin. (The viewed car's sounds then stop: not in the port) */
 static void set_kind(race_car *c, int k)
@@ -669,7 +659,7 @@ void crash_hard_hit(race_car *c, int a, int b, int s)
     c->body.spin.y += mulr(s, m[1]) + mulr(b, m[7]) - mulr(a, m[4]);
     c->body.spin.z += mulr(s, m[2]) + mulr(b, m[8]) - mulr(a, m[5]);
     if (c->bits[0] & 4)
-        chase_off();
+        opponent_chase_drop(0);
 }
 
 /* the player's driving stopped: no pedals, the engine running down, out of gear */
@@ -691,7 +681,7 @@ static void respawn(race_car *c, const vec3 *side, const vec3 *at)
     c->crashing = 0;
     /* (0x7c030: the other cars thrown about put back too) */
     if (g_drive.chase)
-        chase_off();
+        opponent_chase_drop(1);
     opponent_put_back();
     memcpy(b->m, &c->road_side, 9 * sizeof(int));
     b->m[2] = -b->m[2];
@@ -892,12 +882,13 @@ void crash_step(race_car *c)
         }
     } else {
         /* a computer's car (0x1de8a): waited out, upright or out of the players' sight,
-           it is stood up and handed to kind 5 (a police car's chase dropped, 0x781ac:
-           with the police) */
+           it is stood up and handed to kind 5 (a police car's chase dropped) */
         int t = dot8((const vec3 *)&b->m[3], &up);
 
         if (!b->wait && (t > 0xf70a || !opponent_near_players(c))) {
             stand_up(b, &up);
+            if (c->bits[0] & 8)
+                opponent_chase_drop(0);
             set_kind(c, 5);
             goto placed;
         }
@@ -907,8 +898,11 @@ void crash_step(race_car *c)
             if (iabs(b->vel.x) >= 0x18000 || iabs(b->vel.y) >= 0x18000
                 || iabs(b->vel.z) >= 0x18000 || iabs(b->spin.x) >= 0x18000
                 || iabs(b->spin.y) >= 0x18000 || iabs(b->spin.z) >= 0x18000
-                || !(t > 0xf70a || t < -0xf70a || (t < 0x8f5 && t > -0x8f5)))
+                || !(t > 0xf70a || t < -0xf70a || (t < 0x8f5 && t > -0x8f5))) {
                 b->wait = (b->wait & 3) + 0x3c;
+                if (c->bits[0] & 8)
+                    opponent_chase_drop(0);
+            }
         }
         /* a long one (over 3 m from its middle to its end) kept upright, turning only
            about its up */
@@ -1068,6 +1062,20 @@ static int pdn32(const unsigned char *p, int at)
 {
     p += at;
     return (int)(p[0] | p[1] << 8 | p[2] << 16 | (unsigned)p[3] << 24);
+}
+
+void crash_body_from_model(race_car *c)
+{
+    car_body *b = &c->body;
+
+    c->half_len = c->size[2];
+    c->half_wid = c->size[0];
+    b->half[0] = c->size[0] >> 1;
+    b->half[1] = c->size[1] >> 1;
+    b->half[2] = c->size[2] >> 1;
+    c->height = b->half[1];
+    b->radius = len3((const vec3 *)b->half);
+    c->reach = b->half[0];
 }
 
 void crash_body_setup(race_car *c, const unsigned char *pdn)

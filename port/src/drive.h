@@ -9,6 +9,7 @@
 #include "car.h"
 
 #define DRIVE_PLAYERS 8
+#define DRIVE_RESULTS 9       /* the race's results (0x14ea80: 9 of 0x1d2 bytes), one a car */
 #define DRIVE_LAPS 16
 
 /* what of the race the driving reads and keeps (the original's globals; the cars, the
@@ -38,8 +39,8 @@ typedef struct {
     int nitro_until, nitro_off;/* 0xec314, 0xec318 */
     int spinning;              /* 0xec288: the driven wheels spinning (each step) */
     int first_move;            /* 0x13c170 */
-    int top_speed[DRIVE_PLAYERS];      /* 0x14ea80 + 0x1d2 a player, +0x1c4: the race's
-                                          fastest |speed| */
+    int top_speed[DRIVE_RESULTS];      /* 0x14ea80 + 0x1d2 a car, +0x1c4: the race's
+                                          fastest |speed| (the traffic's too) */
     int options;               /* 0x12da28 (the settings' word 0x15d12a): 0x20 lands
                                   softer after a long jump, but on tr6 */
     char track[8];             /* 0x12da16: the track's name */

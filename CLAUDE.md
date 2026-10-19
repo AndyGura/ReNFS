@@ -135,6 +135,9 @@ Cars meeting (NOTES §4.14): `0x1c878` after the driving, the boxes `0x2b864`, t
 kind 5 `0x7d9e4`; EA's random numbers `0x91e04` start from the image. Roadside objects
 (NOTES §4.15): a player outside the lanes `0x1ebf4`, under the car `0x1ee80` (the model's box
 `0x65160`), fallen bytes `0xea5d8`, the road gathered again `0x5004c`.
+The traffic (NOTES §4.16): kind 6 waits `0x7e0c8`, placed `0x7cac8` (where `0x7c5b4`, at
+`0x7ccc0`), again out of reach `0x77de8`/`0x77d3c`; `0x15d480` waiting, at most settings
++0x34 on the road; `opponent_emu.py --full` checks the whole field.
 Cars drawn: `cars_at_node` `0x6837c` → `0x66d08` → `0x66880` (NOTES §4.10); their
 pictures re-coloured by `0x65020` through a colour map `0xf9520` that keeps what the last
 re-colouring left. Snapshots e1..e5: a 320x200 race, `NFS_DOS_DIR=$PWD/build/dosnfs`.
@@ -234,7 +237,7 @@ tumbling as a box, landing or put back, its smoke; the 4th-step refresh 0x786d4;
 for step, drive_emu), `timing.c` (the finish, the racers' order and places, the splits,
 the race's end; equal step for step, `tools/timing_emu.py`; NOTES §4.12), `opponent.c` (the opponent's driving: `drive_opponent` `0x7b34c`, its plan `0x7cf98`,
 `traffic_police_tick` `0x7a040`'s lanes and target speeds; equal step for step,
-`tools/opponent_emu.py`; NOTES §4.13), `race.c` (`--race`: the loading
+`tools/opponent_emu.py`; the traffic's coming and going, NOTES §4.16), `race.c` (`--race`: the loading
 and the frame, a step every 3 ticks),
 `collide.c` (cars meeting cars: `0x1c878`'s loop, the boxes pushed apart `0x2b864`/`0x26324`,
 the hit `0x2afb8`, EA's random numbers `0x91e04`; equal, `tools/collide_emu.py`, NOTES §4.14;
