@@ -19,6 +19,7 @@ static SDL_Window *g_win;
 static SDL_Renderer *g_ren;
 static SDL_Texture *g_tex;
 static unsigned char g_dac[768];        /* 6 bits a channel, as the card's */
+static unsigned char g_pal8[768];       /* as given, 8 bits (0x1607a4, kept by 0x83fe4) */
 static unsigned g_rgb[256];
 
 static const char *g_shot;
@@ -28,6 +29,84 @@ static unsigned long g_virtual_ms;      /* the headless clock, in ms x 70 x 60 *
 static unsigned g_start_ms;
 
 static int g_keys[16], g_nkeys;
+
+/* the mouse, in the 640x480 picture's pixels, and its pointer drawn over the picture */
+static int g_mouse_x = 320, g_mouse_y = 240, g_mouse_buttons;
+static const unsigned char *g_cursor;
+static int g_cursor_w, g_cursor_h, g_cursor_on;
+
+void (*g_retrace_hook)(void);
+
+/* RENFS_INPUT: keys and the mouse played in at given retraces, for pictures without a
+   window: "<retrace>:<what>" separated by spaces; <what> is a key (up down left right
+   enter esc space y n j tab f1..f4), "click", "rclick" (held 6 retraces) or "m<x>,<y>" */
+typedef struct {
+    unsigned long at;
+    int scan, buttons, x, y;
+} scripted;
+static scripted g_script[64];
+static int g_nscript;
+static int g_script_scan, g_script_buttons;
+
+static const struct { const char *name; int scan; } g_script_keys[] = {
+    { "esc", 0x01 }, { "enter", 0x1c }, { "space", 0x39 }, { "up", 0x48 }, { "down", 0x50 },
+    { "left", 0x4b }, { "right", 0x4d }, { "tab", 0x0f }, { "y", 0x15 }, { "n", 0x31 },
+    { "j", 0x24 }, { "f1", 0x3b }, { "f2", 0x3c }, { "f3", 0x3d }, { "f4", 0x3e },
+};
+
+static void script_parse(const char *s)
+{
+    while (s && *s && g_nscript < 64) {
+        char what[16];
+        unsigned long at;
+        int n = 0;
+        scripted *e = &g_script[g_nscript];
+        if (sscanf(s, " %lu:%15s%n", &at, what, &n) != 2)
+            break;
+        s += n;
+        memset(e, 0, sizeof *e);
+        e->at = at;
+        e->x = -1;
+        if (!strcmp(what, "click"))
+            e->buttons = 1;
+        else if (!strcmp(what, "rclick"))
+            e->buttons = 2;
+        else if (what[0] == 'm' && sscanf(what + 1, "%d,%d", &e->x, &e->y) == 2)
+            ;
+        else {
+            for (size_t k = 0; k < sizeof g_script_keys / sizeof g_script_keys[0]; k++)
+                if (!strcmp(what, g_script_keys[k].name))
+                    e->scan = g_script_keys[k].scan;
+            if (!e->scan) {
+                fprintf(stderr, "RENFS_INPUT: what is \"%s\"?\n", what);
+                continue;
+            }
+        }
+        g_nscript++;
+    }
+}
+
+static void script_step(unsigned long retrace)
+{
+    g_script_scan = g_script_buttons = 0;
+    for (int i = 0; i < g_nscript; i++) {
+        scripted *e = &g_script[i];
+        if (e->x >= 0 && retrace == e->at) {
+            g_mouse_x = e->x;
+            g_mouse_y = e->y;
+        }
+        if (retrace == e->at && g_nkeys < 16) {   /* a press, for the key queue too */
+            int c = e->scan == 0x01 ? 0x1b : e->scan == 0x1c ? 0x0d : e->scan == 0x39 ? 0x20 : 0;
+            if (c)
+                g_keys[g_nkeys++] = c;
+        }
+        if (retrace >= e->at && retrace < e->at + 6) {
+            if (e->scan)
+                g_script_scan = e->scan;
+            g_script_buttons |= e->buttons;
+        }
+    }
+}
 
 int video_init(const char *shot, int shot_frames)
 {
@@ -54,6 +133,7 @@ int video_init(const char *shot, int shot_frames)
     }
     SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "nearest");
     video_mode(640, 480);
+    script_parse(getenv("RENFS_INPUT"));
     g_start_ms = SDL_GetTicks();
     return 1;
 }
@@ -84,8 +164,10 @@ void video_mode(int w, int h)
 void video_palette(const unsigned char *pal, int first, int count)
 {
     for (int i = first; i < first + count && i < 256; i++) {
-        for (int c = 0; c < 3; c++)
+        for (int c = 0; c < 3; c++) {
+            g_pal8[3 * i + c] = pal[3 * (i - first) + c];
             g_dac[3 * i + c] = pal[3 * (i - first) + c] >> 2;
+        }
         /* 6 bits to 8 as the screen saw them: the top bits repeated below */
         unsigned r = g_dac[3 * i], g = g_dac[3 * i + 1], b = g_dac[3 * i + 2];
         g_rgb[i] = 0xff000000u | (r << 2 | r >> 4) << 16 | (g << 2 | g >> 4) << 8 | (b << 2 | b >> 4);
@@ -98,6 +180,11 @@ void video_get_palette(unsigned char *pal, int first, int count)
         unsigned v = g_dac[3 * first + i];
         pal[i] = (unsigned char)(v << 2 | v >> 4);
     }
+}
+
+const unsigned char *video_palette8(void)
+{
+    return g_pal8;
 }
 
 /* the VGA's rates: 70 a second in the 200-line modes, 60 in the others */
@@ -115,11 +202,20 @@ static void write_shot(void)
     }
     fprintf(f, "P6\n%d %d\n255\n", g_fb_w, g_fb_h);
     for (int i = 0; i < g_fb_w * g_fb_h; i++) {
-        unsigned c = g_rgb[g_fb[i]];
+        int x = i % g_fb_w - g_mouse_x, y = i / g_fb_w - g_mouse_y;
+        unsigned char v = g_fb[i];
+        if (g_cursor && g_cursor_on && g_fb_w == 640 && x >= 0 && y >= 0 && x < g_cursor_w &&
+            y < g_cursor_h && g_cursor[y * g_cursor_w + x] != 255)
+            v = g_cursor[y * g_cursor_w + x];  /* the pointer, as on the screen */
+        unsigned c = g_rgb[v];
         unsigned char px[3] = { (unsigned char)(c >> 16), (unsigned char)(c >> 8), (unsigned char)c };
         fwrite(px, 1, 3, f);
     }
     fclose(f);
+    if (getenv("RENFS_SHOTRAW") && (f = fopen(getenv("RENFS_SHOTRAW"), "wb"))) {
+        fwrite(g_fb, 1, (size_t)g_fb_w * g_fb_h, f);   /* the palette numbers, for tests */
+        fclose(f);
+    }
     printf("%s: frame %lu\n", g_shot, g_retraces);
 }
 
@@ -129,7 +225,17 @@ static void poll(void)
     while (SDL_PollEvent(&e)) {
         if (e.type == SDL_QUIT)
             g_quit = 1;
-        else if (e.type == SDL_KEYDOWN && !e.key.repeat && g_nkeys < 16) {
+        else if (e.type == SDL_MOUSEMOTION) {
+            /* the renderer's logical size: already the 640x480 picture's pixels */
+            g_mouse_x = e.motion.x < 0 ? 0 : e.motion.x > 639 ? 639 : e.motion.x;
+            g_mouse_y = e.motion.y < 0 ? 0 : e.motion.y > 479 ? 479 : e.motion.y;
+        } else if (e.type == SDL_MOUSEBUTTONDOWN || e.type == SDL_MOUSEBUTTONUP) {
+            int bit = e.button.button == SDL_BUTTON_LEFT ? 1 : e.button.button == SDL_BUTTON_RIGHT ? 2 : 0;
+            if (e.type == SDL_MOUSEBUTTONDOWN)
+                g_mouse_buttons |= bit;
+            else
+                g_mouse_buttons &= ~bit;
+        } else if (e.type == SDL_KEYDOWN && !e.key.repeat && g_nkeys < 16) {
             SDL_Keycode k = e.key.keysym.sym;
             int c = 0;
             if (k == SDLK_ESCAPE)
@@ -156,6 +262,15 @@ void video_retrace(void)
             for (int x = 0; x < g_fb_w; x++)
                 row[x] = g_rgb[src[x]];
         }
+        /* the pointer (0x81600: its top left corner at the mouse; 255 is see-through) */
+        if (g_cursor && g_cursor_on && g_fb_w == 640) {
+            for (int y = 0; y < g_cursor_h && g_mouse_y + y < g_fb_h; y++)
+                for (int x = 0; x < g_cursor_w && g_mouse_x + x < g_fb_w; x++) {
+                    unsigned char c = g_cursor[y * g_cursor_w + x];
+                    if (c != 255)
+                        ((unsigned *)((char *)pixels + (g_mouse_y + y) * pitch))[g_mouse_x + x] = g_rgb[c];
+                }
+        }
         SDL_UnlockTexture(g_tex);
     }
     SDL_RenderClear(g_ren);
@@ -163,6 +278,10 @@ void video_retrace(void)
     SDL_RenderPresent(g_ren);
     g_retraces++;
     g_virtual_ms += 4200 / retrace_rate();
+    if (g_nscript)
+        script_step(g_retraces);
+    if (g_retrace_hook)
+        g_retrace_hook();
     if (g_shot) {
         if ((int)g_retraces >= g_shot_at) {
             write_shot();
@@ -215,4 +334,99 @@ int key_get(void)
     c = g_keys[0];
     memmove(g_keys, g_keys + 1, --g_nkeys * sizeof g_keys[0]);
     return c;
+}
+
+/* PC scan codes (set 1, as the game's keyboard handler sees them) to SDL's: the keys of
+   the extended block give the same codes as the keypad's */
+static const SDL_Scancode g_pc_keys[0x59][2] = {
+    [0x01] = { SDL_SCANCODE_ESCAPE },
+    [0x02] = { SDL_SCANCODE_1 }, [0x03] = { SDL_SCANCODE_2 }, [0x04] = { SDL_SCANCODE_3 },
+    [0x05] = { SDL_SCANCODE_4 }, [0x06] = { SDL_SCANCODE_5 }, [0x07] = { SDL_SCANCODE_6 },
+    [0x08] = { SDL_SCANCODE_7 }, [0x09] = { SDL_SCANCODE_8 }, [0x0a] = { SDL_SCANCODE_9 },
+    [0x0b] = { SDL_SCANCODE_0 }, [0x0c] = { SDL_SCANCODE_MINUS }, [0x0d] = { SDL_SCANCODE_EQUALS },
+    [0x0e] = { SDL_SCANCODE_BACKSPACE }, [0x0f] = { SDL_SCANCODE_TAB },
+    [0x10] = { SDL_SCANCODE_Q }, [0x11] = { SDL_SCANCODE_W }, [0x12] = { SDL_SCANCODE_E },
+    [0x13] = { SDL_SCANCODE_R }, [0x14] = { SDL_SCANCODE_T }, [0x15] = { SDL_SCANCODE_Y },
+    [0x16] = { SDL_SCANCODE_U }, [0x17] = { SDL_SCANCODE_I }, [0x18] = { SDL_SCANCODE_O },
+    [0x19] = { SDL_SCANCODE_P }, [0x1a] = { SDL_SCANCODE_LEFTBRACKET },
+    [0x1b] = { SDL_SCANCODE_RIGHTBRACKET }, [0x1c] = { SDL_SCANCODE_RETURN, SDL_SCANCODE_KP_ENTER },
+    [0x1d] = { SDL_SCANCODE_LCTRL, SDL_SCANCODE_RCTRL },
+    [0x1e] = { SDL_SCANCODE_A }, [0x1f] = { SDL_SCANCODE_S }, [0x20] = { SDL_SCANCODE_D },
+    [0x21] = { SDL_SCANCODE_F }, [0x22] = { SDL_SCANCODE_G }, [0x23] = { SDL_SCANCODE_H },
+    [0x24] = { SDL_SCANCODE_J }, [0x25] = { SDL_SCANCODE_K }, [0x26] = { SDL_SCANCODE_L },
+    [0x27] = { SDL_SCANCODE_SEMICOLON }, [0x28] = { SDL_SCANCODE_APOSTROPHE },
+    [0x29] = { SDL_SCANCODE_GRAVE }, [0x2a] = { SDL_SCANCODE_LSHIFT },
+    [0x2b] = { SDL_SCANCODE_BACKSLASH }, [0x2c] = { SDL_SCANCODE_Z }, [0x2d] = { SDL_SCANCODE_X },
+    [0x2e] = { SDL_SCANCODE_C }, [0x2f] = { SDL_SCANCODE_V }, [0x30] = { SDL_SCANCODE_B },
+    [0x31] = { SDL_SCANCODE_N }, [0x32] = { SDL_SCANCODE_M }, [0x33] = { SDL_SCANCODE_COMMA },
+    [0x34] = { SDL_SCANCODE_PERIOD }, [0x35] = { SDL_SCANCODE_SLASH, SDL_SCANCODE_KP_DIVIDE },
+    [0x36] = { SDL_SCANCODE_RSHIFT }, [0x37] = { SDL_SCANCODE_KP_MULTIPLY },
+    [0x38] = { SDL_SCANCODE_LALT, SDL_SCANCODE_RALT }, [0x39] = { SDL_SCANCODE_SPACE },
+    [0x3a] = { SDL_SCANCODE_CAPSLOCK },
+    [0x3b] = { SDL_SCANCODE_F1 }, [0x3c] = { SDL_SCANCODE_F2 }, [0x3d] = { SDL_SCANCODE_F3 },
+    [0x3e] = { SDL_SCANCODE_F4 }, [0x3f] = { SDL_SCANCODE_F5 }, [0x40] = { SDL_SCANCODE_F6 },
+    [0x41] = { SDL_SCANCODE_F7 }, [0x42] = { SDL_SCANCODE_F8 }, [0x43] = { SDL_SCANCODE_F9 },
+    [0x44] = { SDL_SCANCODE_F10 }, [0x45] = { SDL_SCANCODE_NUMLOCKCLEAR },
+    [0x46] = { SDL_SCANCODE_SCROLLLOCK },
+    [0x47] = { SDL_SCANCODE_HOME, SDL_SCANCODE_KP_7 }, [0x48] = { SDL_SCANCODE_UP, SDL_SCANCODE_KP_8 },
+    [0x49] = { SDL_SCANCODE_PAGEUP, SDL_SCANCODE_KP_9 }, [0x4a] = { SDL_SCANCODE_KP_MINUS },
+    [0x4b] = { SDL_SCANCODE_LEFT, SDL_SCANCODE_KP_4 }, [0x4c] = { SDL_SCANCODE_KP_5 },
+    [0x4d] = { SDL_SCANCODE_RIGHT, SDL_SCANCODE_KP_6 }, [0x4e] = { SDL_SCANCODE_KP_PLUS },
+    [0x4f] = { SDL_SCANCODE_END, SDL_SCANCODE_KP_1 }, [0x50] = { SDL_SCANCODE_DOWN, SDL_SCANCODE_KP_2 },
+    [0x51] = { SDL_SCANCODE_PAGEDOWN, SDL_SCANCODE_KP_3 },
+    [0x52] = { SDL_SCANCODE_INSERT, SDL_SCANCODE_KP_0 },
+    [0x53] = { SDL_SCANCODE_DELETE, SDL_SCANCODE_KP_PERIOD },
+    [0x57] = { SDL_SCANCODE_F11 }, [0x58] = { SDL_SCANCODE_F12 },
+};
+
+int key_down(int scan)
+{
+    const Uint8 *k = SDL_GetKeyboardState(0);
+    if (scan <= 0 || scan >= 0x59)
+        return 0;
+    if (scan == g_script_scan)
+        return 1;
+    for (int i = 0; i < 2; i++)
+        if (g_pc_keys[scan][i] && k[g_pc_keys[scan][i]])
+            return 1;
+    return 0;
+}
+
+int mouse_read(int *x, int *y)
+{
+    if (x)
+        *x = g_mouse_x;
+    if (y)
+        *y = g_mouse_y;
+    return g_mouse_buttons | g_script_buttons;
+}
+
+void mouse_place(int x, int y)
+{
+    g_mouse_x = x;
+    g_mouse_y = y;
+    if (!g_shot && (SDL_GetWindowFlags(g_win) & SDL_WINDOW_MOUSE_FOCUS)) {
+        /* the window's pixels from the picture's (the renderer keeps it 4:3, centred) */
+        int ww, wh;
+        float sx, sy;
+        SDL_Rect vp;
+        SDL_GetWindowSize(g_win, &ww, &wh);
+        SDL_RenderGetScale(g_ren, &sx, &sy);
+        SDL_RenderGetViewport(g_ren, &vp);
+        SDL_WarpMouseInWindow(g_win, (int)((x + vp.x) * sx), (int)((y + vp.y) * sy));
+    }
+}
+
+void mouse_pointer(const unsigned char *pixels, int w, int h)
+{
+    g_cursor = pixels;
+    g_cursor_w = w;
+    g_cursor_h = h;
+}
+
+void mouse_show(int on)
+{
+    g_cursor_on = on;
+    if (!g_shot)
+        SDL_ShowCursor(on ? SDL_DISABLE : SDL_ENABLE);
 }

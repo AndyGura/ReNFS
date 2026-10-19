@@ -39,6 +39,8 @@ static void wav_header(void)
 static struct {
     SDL_AudioStream *conv;
     int channels, rate;
+    int volume;                /* 0..127 */
+    int release;               /* closed by the mixer once played out */
 } g_st[STREAMS];
 
 static void mix(void *unused, Uint8 *out, int len)
@@ -55,10 +57,19 @@ static void mix(void *unused, Uint8 *out, int len)
         if (!g_st[s].conv)
             continue;
         got = SDL_AudioStreamGet(g_st[s].conv, buf, frames * 4);
-        if (got <= 0)
+        if (got <= 0) {
+            if (g_st[s].release) {
+                SDL_FreeAudioStream(g_st[s].conv);
+                g_st[s].conv = 0;
+            }
             continue;
+        }
         for (int i = 0; i < got / 2; i++)
-            acc[i] += buf[i];
+            acc[i] += buf[i] * g_st[s].volume / 127;
+        if (g_st[s].release && SDL_AudioStreamAvailable(g_st[s].conv) == 0) {
+            SDL_FreeAudioStream(g_st[s].conv);
+            g_st[s].conv = 0;
+        }
     }
     for (int i = 0; i < frames * 2; i++) {
         int v = acc[i];
@@ -123,6 +134,8 @@ int audio_stream_open(int rate, int channels)
         g_st[s].conv = c;
         g_st[s].channels = channels;
         g_st[s].rate = rate;
+        g_st[s].volume = 127;
+        g_st[s].release = 0;
         SDL_UnlockAudioDevice(g_dev);
         return s;
     }
@@ -148,6 +161,25 @@ int audio_stream_queued(int s)
     q = (long)(SDL_AudioStreamAvailable(g_st[s].conv) / 4) * g_st[s].rate / RATE;
     SDL_UnlockAudioDevice(g_dev);
     return q > 0 ? (int)q : 0;
+}
+
+void audio_stream_volume(int s, int volume)
+{
+    if (s < 0 || !g_st[s].conv)
+        return;
+    SDL_LockAudioDevice(g_dev);
+    g_st[s].volume = volume < 0 ? 0 : volume > 127 ? 127 : volume;
+    SDL_UnlockAudioDevice(g_dev);
+}
+
+void audio_stream_release(int s)
+{
+    if (s < 0 || !g_st[s].conv)
+        return;
+    SDL_LockAudioDevice(g_dev);
+    SDL_AudioStreamFlush(g_st[s].conv);
+    g_st[s].release = 1;
+    SDL_UnlockAudioDevice(g_dev);
 }
 
 void audio_stream_close(int s)

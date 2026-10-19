@@ -1,8 +1,12 @@
 /* The front end. */
 #include "fe.h"
+#include "font.h"
+#include "config.h"
 #include "files.h"
 #include "fsh.h"
+#include "menu.h"
 #include "movie.h"
+#include "sound.h"
 #include "video.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -23,6 +27,7 @@ void pal_fade_up(const unsigned char *pal, int first, int count)
         video_retrace();
         video_palette(p, first, count);
     }
+    inv_build();                           /* 0x8227c */
 }
 
 void pal_fade_down(int first, int count)
@@ -36,7 +41,7 @@ void pal_fade_down(int first, int count)
     }
 }
 
-/* drawshapeatpos for an 8-bit picture: at its own x, y, colour 0 drawn too */
+/* drawshapeatpos 0x8129c for an 8-bit picture: at its own x, y, colour 0 drawn too */
 static void draw_picture(const shape *s)
 {
     for (int y = 0; y < s->h && s->y + y < g_fb_h; y++) {
@@ -122,19 +127,190 @@ int fe_attract_mode(void)
     return 1;
 }
 
+int fe_game_mode_screen(void)
+{
+    /* the three buttons: lit, dark; the mouse put in their middle (0x41d64, 0x41d6a) */
+    static const char *const lit[3] = { "sinl", "modl", "exil" };
+    static const char *const dark[3] = { "sind", "modd", "exid" };
+    static const int button_x[3] = { 320, 320, 320 }, button_y[3] = { 167, 242, 315 };
+    char path[256];
+    unsigned char pal[768];
+    fsh_file f;
+    shape bg, sh;
+    int sel = 0, prev = 0, changed = 0, redraw = 1, first = 1, done = 0, result = 0;
+    int ready = 1, held = 0, released = 1;
+    int mx, my;
+
+    mouse_place(button_x[0], button_y[0]);
+    fe_sound_bank_load();
+    snprintf(path, sizeof path, "%s/CONTROL/GAMEMOD2.QFS", art_dir());
+    if (!fsh_load(&f, path) || !fsh_find(&f, "bgnd", &bg) || !fsh_palette(&f, 0, pal)) {
+        fprintf(stderr, "renfs: %s is missing\n", path);
+        fe_sound_bank_free();
+        return 1;
+    }
+    fe_mouse_load();
+    fe_mouse_save();
+    for (;;) {
+        /* the mouse over a button picks it */
+        mouse_read(&mx, &my);
+        {
+            int over = my <= 0xcd ? 0 : my <= 0x118 ? 1 : 2;
+            if (over != sel) {
+                prev = sel;
+                sel = over;
+                changed = 1;
+            }
+        }
+        if (redraw) {
+            draw_picture(&bg);
+            if (fsh_find(&f, lit[sel], &sh))
+                draw_picture(&sh);
+            video_retrace();
+            mouse_show(1);                 /* 0x52288 */
+            g_mouse_active = 1;
+            if (first) {
+                pal_fade_up(pal, 0, 256);
+                inv_build();               /* 0x8227c again */
+                first = 0;
+            }
+            settimeout(4500);              /* 45 seconds */
+            changed = redraw = 0;
+        }
+        if (changed) {
+            redraw = 1;
+            if (prev != sel)
+                fe_play_sound(0x47);
+            if (fsh_find(&f, dark[prev], &sh))
+                draw_picture(&sh);
+            if (fsh_find(&f, lit[sel], &sh))
+                draw_picture(&sh);
+            changed = 0;
+        }
+        /* a key acts once, then again only after a quarter of a second held (the arrows)
+           or once let go */
+        {
+            int k = fe_read_keys();
+            if (!ready && k != 0x1b && k != 0x20 && k != 0x0d) {
+                held += (int)ticksince();
+                if (held > 25)
+                    ready = 1;
+            }
+        }
+        if (g_mouse_active)
+            fe_mouse_read();
+        if (!g_mouse_buttons)
+            released = 1;
+        fe_mouse_moved();
+        {
+            int k = fe_read_keys();
+            if (k == 0x20 || k == 0x0d || (g_mouse_buttons == 1 && released)) {
+                fe_mouse_press();
+                if (ready) {
+                    fe_play_sound(0x48);
+                    if (sel == 0) {
+                        if (fe_enter_name()) {
+                            done = 1;
+                            result = 0;
+                        }
+                    } else if (sel == 2) {
+                        done = 1;
+                        result = 1;
+                    }
+                    /* sel 1, the modem game: not in the port (no network) */
+                }
+                ticksince();
+                released = ready = held = 0;
+            } else if (k == 0 || !ready) {
+                if (k == 0)
+                    ready = 1;
+            } else {
+                if (k == 0x1b) {
+                    fe_play_sound(0x48);
+                    if (fe_ask_exit()) {
+                        done = 1;
+                        result = 1;
+                    }
+                    fe_wait_keys_up();
+                } else if (k == 0x4800 || k == 0x5000) {
+                    prev = sel;
+                    sel = k == 0x4800 ? (sel + 2) % 3 : (sel + 1) % 3;
+                    mouse_place(button_x[sel], button_y[sel]);
+                    fe_mouse_save();
+                    changed = 1;
+                }
+                settimeout(4500);
+                ticksince();
+                ready = held = 0;
+            }
+        }
+        video_retrace();                   /* the original runs on; the port waits here */
+        if (g_quit) {
+            done = 1;
+            result = 1;
+        }
+        if (!first && !done) {
+            if (timedout()) {              /* nothing chosen in 45 seconds: the movies */
+                fe_play_sound(0x48);
+                done = 1;
+                result = 2;
+            } else if (g_mouse_buttons == 2 && released) {
+                if (fe_ask_exit()) {
+                    done = 1;
+                    result = 1;
+                }
+                fe_wait_keys_up();
+                do {                       /* until the button is let go */
+                    if (g_mouse_active)
+                        fe_mouse_read();
+                    video_retrace();
+                } while ((fe_read_keys() || g_mouse_buttons) && !g_quit);
+            }
+        }
+        if (done)
+            break;
+    }
+    mouse_show(0);
+    fe_sound_bank_free();
+    pal_fade_down(0, 256);
+    fsh_free(&f);
+    return result;
+}
+
 void fe_outer_loop(void)
 {
-    int state = 2, attract = 1;
-    while (!g_quit) {
-        if (attract) {
+    int state = 2, again = 1, first = 1;
+    fe_font_load();                        /* 0x42250, at start-up */
+    do {
+        if (again) {
+            music_fade_out();
+            music_wait_end();
             fe_attract_mode();
-            attract = 0;
-            /* here the original loads CONFIG.DAT the first time (3 if it is missing) */
+            again = 0;
+            if (first) {
+                first = 0;
+                if (!config_load())
+                    state = 3;
+            }
+            music_choose();
         }
         if (state == 2 || state == 3)
             fe_title_screen();
-        /* fe_game_mode_screen 0x47274 (single player, modem, exit; 2 when nothing was
-           chosen in time, then the movies again), then fe_main_menu 0x42c30: next */
-        break;
-    }
+        state = fe_game_mode_screen();
+        if (state == 2)
+            again = 1;
+        if (state == 0) {
+            /* fe_main_menu 0x42c30, then the settings saved: next */
+            fprintf(stderr, "renfs: the main menu is not written yet\n");
+            state = 1;
+        }
+    } while (state != 1 && !g_quit);
+    music_fade_out();
+    music_wait_end();
+}
+
+/* fe_enter_name 0x743b4: to be written; for now the name stays as it is */
+int fe_enter_name(void)
+{
+    return 1;
 }

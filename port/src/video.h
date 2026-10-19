@@ -19,6 +19,8 @@ void video_mode(int w, int h);
 void video_palette(const unsigned char *pal, int first, int count);
 /* the palette read back from the card (0x98aec): its 6 bits widened, v << 2 | v >> 4 */
 void video_get_palette(unsigned char *pal, int first, int count);
+/* the palette as last given, 8 bits a channel (what nearestcolour 0x80c80 searches) */
+const unsigned char *video_palette8(void);
 /* wait for the next vertical retrace (0xba9c2): the frame is shown then */
 void video_retrace(void);
 
@@ -31,5 +33,21 @@ int timedout(void);
 /* the next key pressed, as the front end reads them (0x727a0): 0x1b Esc, 0x0d Enter,
    0x20 space, letters and digits as they are; 0 if none */
 int key_get(void);
+
+/* the keyboard's state (0x84742): is the key of that PC scan code (set 1) held? */
+int key_down(int scan);
+
+/* the mouse (0x848af): its place in the 640x480 picture; the buttons held (1 left,
+   2 right) */
+int mouse_read(int *x, int *y);
+/* mouse_set 0x71ad4: the mouse put there */
+void mouse_place(int x, int y);
+/* the pointer's picture (palette numbers, 255 see-through), drawn over the screen at
+   the mouse while shown */
+void mouse_pointer(const unsigned char *pixels, int w, int h);
+void mouse_show(int on);
+
+/* called at every retrace (the music is fed from it) */
+extern void (*g_retrace_hook)(void);
 
 #endif

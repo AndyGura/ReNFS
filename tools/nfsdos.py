@@ -12,6 +12,9 @@ The plan is a comma-separated list of steps:
     watch:<s>           print the game's clocks every 0.25 s for <s> seconds
     peek:<s>:<a>[+<a>..] sample these 32-bit words (flat image addresses, hex) every 5 ms
                         for <s> seconds: a row every 0.5 s, then each word's values seen
+    dump:<ptr>:<n>:<f>  n bytes (hex count) at the pointer held in the word at flat address
+                        <ptr> (hex), written to the file f: a table on the game's heap
+    mem:<a>:<n>:<f>     n bytes (hex count) at the flat address a (hex) in the data object
     car:<n>             car n's record (through the pointers at 0x13c24c): position +0 +4 +8
                         (16.16), road node +0x48, across the road +0x80, speed +0x70
     find                find the game's data object in DOSBox's memory (needed before watch;
@@ -168,6 +171,17 @@ try:
             peek(float(p[1]), p[2])
         elif p[0] == "car":
             car(int(p[1]))
+        elif p[0] == "dump":
+            if base is None:
+                find()
+            at = i32(int(p[1], 16))
+            open(p[3], "wb").write(dos(at, int(p[2], 16)))
+            print("0x%x -> 0x%x: 0x%x bytes to %s" % (int(p[1], 16), at, int(p[2], 16), p[3]))
+        elif p[0] == "mem":
+            if base is None:
+                find()
+            open(p[3], "wb").write(os.pread(mem.fileno(), int(p[2], 16), base + int(p[1], 16) - DATA))
+            print("0x%s: 0x%s bytes to %s" % (p[1], p[2], p[3]))
         elif p[0] == "find":
             find()
         sys.stdout.flush()

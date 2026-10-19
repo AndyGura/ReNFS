@@ -26,6 +26,10 @@ add_executable(renfs
   src/eacs.c
   src/tgv.c
   src/movie.c
+  src/sound.c
+  src/config.c
+  src/font.c
+  src/menu.c
 )
 target_include_directories(renfs PRIVATE ${SDL2_INCLUDE_DIRS})
 target_compile_options(renfs PRIVATE ${SDL2_CFLAGS_OTHER})

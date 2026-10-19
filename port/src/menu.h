@@ -1,0 +1,48 @@
+/* What every menu screen shares (0x71208..0x74dcc, NOTES §4.2): the keys, the mouse, the
+   text styles, the yes/no dialog. */
+#ifndef RENFS_MENU_H
+#define RENFS_MENU_H
+
+#include "font.h"
+
+/* 0x727a0: the key held, as the menus read the keyboard: 0x1b Esc, 0x20 Space, 0x0d
+   Enter, 0x4800 up, 0x5000 down, 0x4b00 left, 0x4d00 right, 0x5200 Ins, 0x5300 Del,
+   (F1-F4 0x3b00.. when g_fkeys), then the PC scan codes of Shift, Ctrl, Alt, Y, N, J;
+   0 if none */
+int fe_read_keys(void);
+extern int g_fkeys;
+/* 0x84358: until no key is held */
+void fe_wait_keys_up(void);
+/* ticksince 0x81350: the hundredths since it was last asked */
+unsigned ticksince(void);
+
+/* the mouse: 0x156604 it has been used (moved or pressed), 0x156606 its buttons as last
+   read (1 left, 2 right) */
+extern int g_mouse_active, g_mouse_buttons;
+void fe_mouse_load(void);          /* 0x52020: MOUSE.FSH */
+void fe_mouse_read(void);          /* 0x522e8: the buttons, into g_mouse_buttons */
+void fe_mouse_save(void);          /* mouse_save 0x52348: its place, to see it move */
+void fe_mouse_moved(void);         /* 0x71b24: g_mouse_active once it moves or is pressed */
+void fe_mouse_press(void);         /* 0x52304: the pointer pressed a fifth of a second */
+
+/* the menus' font (fonts/graver18.ffn, set at start-up 0x42250) */
+extern font g_fe_font;
+int fe_font_load(void);
+
+/* 0x71208: the text styles made from the palette now shown; 0x7135c: one chosen,
+   0 beige (normal), 1 yellow (lit), 2 red, 3 white */
+void fe_styles_init(void);
+void fe_style(int n);
+/* 0x71774: text with its shadow (black, 2 pixels right and down); 0x716fc: centred on
+   x; 0x713d0: the same over what is on the screen, inside a window of the text's width
+   + 10 by 45 */
+void fe_text(const char *s, int x, int y);
+void fe_button_text(const char *s, int x, int y);
+void fe_text_centre(const char *s, int x, int y);
+
+/* fe_yes_no_dialog 0x73b04: the question in a box over the screen; 1 yes */
+int fe_yes_no_dialog(const char *question);
+/* "Exit to system ?" (German "Zurück zum system ?") */
+int fe_ask_exit(void);
+
+#endif

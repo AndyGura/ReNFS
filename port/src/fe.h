@@ -17,6 +17,13 @@ void fe_title_screen(void);
    key stopped the one before; returns to 640x480, black */
 int fe_attract_mode(void);
 
+/* fe_enter_name 0x743b4: the player's name asked for (CONFIG.DAT +0); 0 Esc */
+int fe_enter_name(void);
+
+/* fe_game_mode_screen 0x47274: single player, modem, exit (CONTROL/GAMEMOD2.QFS);
+   0 single, 1 exit, 2 nothing chosen in 45 seconds */
+int fe_game_mode_screen(void);
+
 /* fe_outer_loop 0x47000: the movies, the title, the game mode screen, the main menu */
 void fe_outer_loop(void);
 
