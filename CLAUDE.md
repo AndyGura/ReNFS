@@ -124,6 +124,9 @@ A step: the cars' driving every step, their sounds and the gearbox every 2nd, tr
 police every 4th (flags `0x12f1bc`, measured). A race ends through `0x13c178`: 1 finished,
 4 arrested (the second police ticket), 0x10 everyone turned back (NOTES §4.3, §4.8).
 The original in DOSBox: `nfs-dos`, `tools/nfsdos.py` (unseen, keys, memory; NOTES §5).
+Main menu `0x42c30` (NOTES §4.2): the choices in CONFIG.DAT (+0x6d type, +0x91 opponent,
++0x95 track, +0x9b car, +0x5f50 unlocks); typed codes SKCART EARALLYE CASINOVILLE
+CONCEPTCAR ROCKYROAD TURBO NITRO EXPLODE (`0x46e94`), End held = no mercy.
 Menus: held keys, letters blended per pixel, an inverse colour table after every fade up
 (NOTES §4.2).
 
@@ -172,14 +175,16 @@ Data folder: `-data`, else `$RENFS_DATA`, else `./NFSSE`, else `NFSSE` beside th
 (the port's own formats, never the game's files). `RENFS_LANG=de`: the German art;
 `RENFS_NOSOUND=1`: no sound; `RENFS_SNDWAV=f`: what is heard written to a WAV (checking);
 `RENFS_INPUT="<retrace>:<key> .."`: keys and mouse given at those retraces (esc enter
-space up down left right tab y n j f1-f4 click rclick m<x>,<y>; for `--shot` tests);
-`RENFS_SHOTRAW=f`: `--shot` also writes the palette numbers (comparing by entry).
+space up down left right tab y n j f1-f4 bksp del click rclick m<x>,<y>, t<text> typed,
+k<letter> held; for `--shot` tests);
+`RENFS_SHOTRAW=f`: `--shot` also writes the palette numbers (comparing by entry);
+`RENFS_CONFIG=f`: a CONFIG.DAT for the test (the original's, `nfsdos.py mem:156c14:5f52:f`).
 Sound: SDL's device at 44.1 kHz 16-bit stereo, each stream converted by an
 `SDL_AudioStream` and added in the callback. Movies: the sound read ahead (half a second
 queued), the pictures timed by the sound heard, as the original with sound on.
 `src/files.c` (case-insensitive paths), `unpack.c` (all of EA's packers on the CD),
 `fsh.c`, `video.c` (screen, clock, keys), `audio.c`, `eacs.c` (EA sound blocks), `tgv.c`
-and `movie.c` (the movies), `fe.c` (front end screens), `menu.c` (what the menus share:
+and `movie.c` (the movies), `fe.c` (front end screens), `mainmenu.c` (Control Central), `menu.c` (what the menus share:
 keys, mouse, text styles, the yes/no dialog), `font.c` (FFN, letters blended pixel by
 pixel, `nearest_colour`, the inverse table), `sound.c` (the front end's sound bank and
 music), `config.c` (CONFIG.DAT), `main.c`. The menus' look is checked against the

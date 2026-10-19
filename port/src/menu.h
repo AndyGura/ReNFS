@@ -24,6 +24,8 @@ void fe_mouse_read(void);          /* 0x522e8: the buttons, into g_mouse_buttons
 void fe_mouse_save(void);          /* mouse_save 0x52348: its place, to see it move */
 void fe_mouse_moved(void);         /* 0x71b24: g_mouse_active once it moves or is pressed */
 void fe_mouse_press(void);         /* 0x52304: the pointer pressed a fifth of a second */
+void fe_mouse_hide(void);          /* 0x71afc: a key used, the pointer hidden until the
+                                      screen is drawn again */
 
 /* the menus' font (fonts/graver18.ffn, set at start-up 0x42250) */
 extern font g_fe_font;
@@ -51,8 +53,8 @@ int fe_text_field(char *text, int maxlen, int cx, int y, int names);
 /* fe_enter_name 0x743b4: "Please Enter Name" in a box, the name (8 letters at most,
    CONFIG.DAT +0) typed; 1 Enter, 0 Esc */
 int fe_enter_name(char *name);
-/* 0x15d12a, 0x15d12e: cleared by a new name; the main menu reads them (to be named when
-   it is written) */
-extern unsigned long g_name_marks[2];
+/* 0x15d12a: what the main menu's codes turn on for the race (4 "No mercy", End held on
+   head to head; 8 TURBO); 0x15d12e beside it. A new name clears both */
+extern unsigned long g_cheat_flags, g_cheat_flags_b;
 
 #endif

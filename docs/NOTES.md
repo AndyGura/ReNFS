@@ -638,7 +638,84 @@ libraries `0x80000`..`0x94000` and `0x95000`..`0xb0000`, Watcom's runtime `0x940
   - `fe_outer_loop` `0x47000`: state 2; when going round again: music fade and wait, the
     attract mode, the first time CONFIG.DAT (state 3 if it fails), `music_choose`; the
     title when state is 2 or 3; state = the game mode screen; 0: `0x7469c`, the main menu,
-    the settings saved; until 1.
+    the settings saved; until 1. The main menu's result is the next state: 0 the game mode
+    screen, 2 (2 minutes untouched) the title then the game mode screen, 1 quit.
+    `fe_new_session` `0x7469c` copies the name into the tournament's records and clears
+    them (`tourn_clear_records` `0x745f4`, 0x15d0d8 / 0x15d0e8 / 0x15d0fa), 0x15d134 = 0.
+
+- **`fe_main_menu` `0x42c30`, "Control Central" (2026-10-19; the port's
+  `port/src/mainmenu.c` equals the original in every screen tried: the start, car, track
+  and race type changes, SKCART, the opponent, the buttons, Esc — 1 to 24 pixels, all
+  DOSBox's colour noise)**. Network parts (0x15d136) left out.
+  - Art `CONTROL/CENTRAL.QFS` (bgnd, cham = Chat greyed, the frames Trb3 opponent, Tlb1
+    player, Brb4 location, Blb2 race type, arrows Aro1..Aro8, buttons Ra1l optl chal canl,
+    Coml/Netl/Modl network; `!pal`), its inverse table `CENTRAL.INV` (`fe_load_inv`
+    `0x747b8`) but `pal_fade_up` rebuilds it anyway. Each panel is its own file
+    `CONTROL/<name>.QFS`, shape "0000", loaded again only when its key changes (0xec500/4/6
+    track, 0xec502 player, 0xec4fc opponent, 0xec4fe race type; 0x14 = none;
+    `mm_pictures_free` `0x424c0`). Names: tracks 0x41c80 (city coast alpine springs
+    avalley bsienna vridge tpolis lvegas moon), mirrored with `m` 0x41ca8, rally with `r`
+    0x41ccc; player 0x41cf0 (rx71 nsx1 sup1 9111 vet1 vip1 5121 dia1 war1); opponent
+    0x41d20 (rx72 .. dia2, slew = traffic, watch2 = the clock, tourny, war2); tournament:
+    tourny3 / tourny2 / tourny1 by the player's car < 3 / < 6 / else; race type 0x41d50
+    (watch1 headhead single tourny, nomercy).
+  - Drawing, into the off-screen window 0x156658 and shown (`screen_show_begin` `0x8378c`,
+    `drawshapeatpos`, `screen_show_end` `0x83740`), then the pointer (`mouse_draw`, always):
+    bgnd, cham, track, `flad` (tournament track done), player, opponent, race type, then
+    the chosen one: a panel's frame and its arrow under the mouse with colour 255
+    see-through (`drawshape_see_through` `0x815e4`), a button opaque. The first time it
+    draws twice, fades up, builds the inverse table, the styles, and starts the 2-minute
+    timeout. A change of choice or arrow plays 0x47 (not for "none") and draws all again
+    (the buttons it draws first are covered by that).
+  - The choice (8 = none): 0 opponent, 1 player, 2 location, 3 race type, 4 Race,
+    5 Options, 6 Chat, 7 Cancel, 9 network. The keys put the mouse at 0xec418 / 0xec42c
+    (x 482 175 444 211 45 228 400 570, y 158 197 318 349 454 454 454 454), since the
+    mouse's hit test runs every pass. Hit boxes (inclusive, `mouse_in_rect` `0x71a1c`),
+    in this order: opponent 0x153..0x271 x 0x61..0xda (race types 1 and 2 only; arrows x
+    0x155..0x16a and 0x25d..0x26f, y 0x91..0xa8), player 0x13..0x14a x 0x70..0x11a
+    (arrows 0x15..0x28, 0x136..0x148, y 0xba..0xd1), location 0x153..0x225 x
+    0xfc..0x17f (arrows 0x155..0x168, 0x20f..0x223, y 0x131..0x14e), race type
+    0x5a..0x14c x 0x13a..0x180 (arrows 0x5c..0x6b, 0x136..0x145, y 0x154..0x16d), Options
+    0xa5..0x125, Cancel 0x1f8..0x27f, Chat 0x16b..0x1b5 (network), Race 0..0x70, all y
+    0x1ba..0x1d1. A click tests the right arrows one pixel wider.
+  - Keys (the held-key rule of the menus; any key hides the pointer, `fe_mouse_hide`
+    `0x71afc`, until the next drawing): Up 0→4, 1→4 (time trial, tournament) else 0,
+    2..4 → one less, 5..7 → 3, 8 → 1. Down 0→1, 1→2, 2→3, 3→4, 4..7 → 1 (time trial,
+    tournament) else 0, 8 → 1. Left / Right on a panel change its value (sound 0x48),
+    on the buttons Race → Options → Cancel → Race. Enter / Space / a click: on an arrow
+    the value, on a car picture the showcase (`fe_showcase` `0x17724`), the location the
+    track's records (`fe_track_select_tournament` `0x76380`), Race the race (or "Track
+    already completed" in a tournament), Options `0x53a30`, Cancel back (0). Esc back (0),
+    the right button "Exit game ?" / "Spiel verlassen ?". 2 minutes untouched (not in a
+    tournament): result 2.
+  - Values (CONFIG.DAT): +0x6d race type (0 time trial, 1 head to head, 2 single race,
+    3 tournament), +0x91 opponent (0-7 cars, 8 traffic, 9 clock, 10 tournament, 11
+    Warrior), +0x95 track (8 Lost Vegas, 9 never offered), +0x9b player car (11
+    Warrior), +0xb3 race length 0/1/2 → +0xb1 laps 4/8/16, or 2/6/12 on tracks 4..7.
+    `car_setup` `0x73a80`: +0x99 = 0 or 2 and +0x8f = 1 or 2 by the car (tables in the
+    port). The player's car steps 0..7 (11 after 7 once the Warrior is unlocked); in a
+    tournament only within the track's class (tracks 0,3: 0-2; 1,4,5: 3-5; else 6-7) and
+    the track sets the car (0xec440 = 0 3 6 0 3 3 6 6 7 3). The opponent steps 0..7, or
+    0..8 (traffic) in a single race. `mm_race_type_changed` `0x425b0`: time trial opp 9,
+    head to head the player's car if the opponent was 8..10, single race opp 8,
+    tournament: no mirror / rally, track 9 or a locked 8 → 0, its car, opp 10, length 1,
+    8 laps (6 on 4..7). `mm_race_type_step` `0x4235c` (a tournament running asks "Quit
+    tournament ?" first). Tracks: `mm_track_next` `0x4287c` goes normal → mirrored (if
+    unlocked, not a tournament) → rally (likewise) → `mm_track_plus_one` `0x42910` (the
+    next, of 9 with Lost Vegas else 8); `mm_track_previous` `0x42984` the other way.
+  - Unlocks: +0x5f50 (kept in CONFIG.DAT) ≥ 1 mirrored tracks, the Warrior and Lost Vegas;
+    ≥ 2 rally tracks too. **The typed codes** (`cheat_code_step` `0x46e94`, one letter
+    each time a letter key goes down, 0x12ccaa; the strings stored as letter + 99 from
+    0xec48c, their positions 0xec4d8..): SKCART mirrored tracks (and shows one), EARALLYE
+    rally tracks, EXPLODE 0xf74a4, CASINOVILLE Lost Vegas (silent), CONCEPTCAR the
+    Warrior as the car, TURBO 0x15d12a |= 8, NITRO 0x12cca0, ROCKYROAD +0x5f50 between 1
+    and 2 with its unlocks (silent). Not in a tournament; TURBO and NITRO not in a network
+    game. **End held** on head to head: "nomercy" picture and 0x15d12a |= 4, cleared on
+    release.
+  - The CD's CONFIG.DAT has type 1, opponent 7, track 1, car 6, 8 laps, length 1; the
+    DOSBox install has none, so the original there starts from `cfg_defaults` `0x38ea8`
+    (track 0). The port tests take the original's live state (`nfsdos.py
+    mem:156c14:5f52:...`, `RENFS_CONFIG=`).
 
 ### 4.3 The race
 

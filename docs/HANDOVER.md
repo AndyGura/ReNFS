@@ -125,13 +125,26 @@ Ghidra project and `build/decomp`, one command). The git history was started aga
   Exit with the mouse and the keys, the move and choice sounds, the music chosen as the
   original does it, 45 s idle goes back to the movies, Esc asks "Exit to system ?".
   Single player asks for the name as the original does (typed, Backspace, Del, Esc;
-  equal to the original's pictures), then ends the port for now (the main menu is next). Modem is left out (no
+  equal to the original's pictures), then the main menu. Modem is left out (no
   network). Under the hood: the menus' font and letter blending, the mouse pointer, the
   inverse colour table, CONFIG.DAT read from the CD.
 
+- **The port's main menu ("Control Central") equals the original's** (five runs of
+  keys compared screen by screen: 1 to 24 pixels each, DOSBox's colour noise). The
+  player's car, the opponent, the race type and the track change with the arrows, the
+  keys or the mouse; the mirrored and rally tracks, Lost Vegas and the Warrior unlock by
+  their typed codes (SKCART checked against the original), End held on head to head shows
+  "No mercy", Esc / Cancel go back, the right button asks "Exit game ?", 2 minutes untouched
+  shows the title. Race, Options, the cars' showcase and the track records do nothing yet.
+
 ## Waiting for Danik
 
-Nothing. Decided 2026-10-18: menus 640x480 on the MiSTer (interlaced at 15 kHz),
+- **Which settings a first start uses.** The CD carries a CONFIG.DAT (head to head,
+  Ferrari 512TR against the Diablo, Coastal); an installed copy has none, so the original
+  installed starts from its built-in defaults (City). The port reads the CD's for now.
+  Either is easy; it only changes what the first main menu shows.
+
+Decided 2026-10-18: menus 640x480 on the MiSTer (interlaced at 15 kHz),
 races 320x200 / 320x240; commit locally as the work goes.
 
 ## Next, in order
@@ -144,8 +157,8 @@ races 320x200 / 320x240; commit locally as the work goes.
    `ORIP`, textures, FFN, EA sound, the packers, PBS/PDN first reading, INFO, INV, BAMF,
    TGV, RPL, CONFIG.DAT). What is still open inside them is listed in NOTES §3.4.
 3. **The port's skeleton: done** (movies, title, game mode screen, exit dialog). Name entry
-   done too. Next in it: the main menu (`fe_main_menu` `0x42c30`: `control/central.qfs`,
-   `control/ani.qfs`, its state machine), the widget routines `0x71208`.. on the way.
+   and the main menu done too. Next in it: the settings written back (the port's own
+   file, NOTES §3.16), the options screen `0x53a30`, then the race from Race.
 4. Front end (menus, car and track choice), then the race (track, cars, physics, HUD,
    sound), then the rest (replays, championship/tournament, cops, the showcase).
 5. MiSTer (`~/MiSTer-ReNFS`): the skill's steps 5–8 — `MISTER_HYBRID`, `mister_port.[ch]`,

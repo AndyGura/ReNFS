@@ -46,7 +46,7 @@ void (*g_retrace_hook)(void);
 /* RENFS_INPUT: keys and the mouse played in at given retraces, for pictures without a
    window: "<retrace>:<what>" separated by spaces; <what> is a key (up down left right
    enter esc space y n j tab f1..f4 bksp del), "click", "rclick" (held 6 retraces),
-   "m<x>,<y>", or "t<text>": those letters typed */
+   "m<x>,<y>", "t<text>": those letters typed, or "k<letter>": that letter's key held */
 typedef struct {
     unsigned long at;
     int scan, buttons, x, y;
@@ -62,6 +62,8 @@ static const struct { const char *name; int scan; } g_script_keys[] = {
     { "j", 0x24 }, { "f1", 0x3b }, { "f2", 0x3c }, { "f3", 0x3d }, { "f4", 0x3e },
     { "bksp", 0x0e }, { "del", 0x53 },
 };
+
+static const SDL_Scancode g_pc_keys[0x59][2];
 
 static void script_parse(const char *s)
 {
@@ -84,6 +86,11 @@ static void script_parse(const char *s)
             ;
         else if (what[0] == 't' && what[1])
             snprintf(e->text, sizeof e->text, "%s", what + 1);
+        else if (what[0] == 'k' && what[1] >= 'a' && what[1] <= 'z' && !what[2]) {
+            for (int k = 0; k < 0x59; k++)
+                if ((int)g_pc_keys[k][0] == SDL_SCANCODE_A + (what[1] - 'a'))
+                    e->scan = k;
+        }
         else {
             for (size_t k = 0; k < sizeof g_script_keys / sizeof g_script_keys[0]; k++)
                 if (!strcmp(what, g_script_keys[k].name))

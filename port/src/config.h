@@ -12,8 +12,21 @@ extern unsigned char g_config[CONFIG_SIZE];
 int config_load(void);
 /* a word of it (the menus' choices are 16-bit, at odd places) */
 int config_word(int at);
+void config_set_word(int at, int v);
 
 #define CFG_MENU_MUSIC 0x73    /* 0 none, 1 all twelve in turn, 2 and 4-9 rock, 3 and 10-15 techno */
 #define CFG_SFX_VOLUME 0x79    /* 0..127, the menus' sounds (fe_play_sound 0x72510) */
+
+/* the main menu's choices (fe_main_menu 0x42c30) */
+#define CFG_RACE_TYPE 0x6d     /* 0 time trial, 1 head to head, 2 single race, 3 tournament */
+#define CFG_CAR_SETUP_B 0x8f   /* 1 or 2 by the player's car (0x73a80) */
+#define CFG_OPPONENT 0x91      /* 0-7 the cars, 8 traffic (single race), 9 the clock (time
+                                  trial), 10 the tournament, 11 the Warrior */
+#define CFG_TRACK 0x95         /* 0 city .. 7 transtropolis, 8 Lost Vegas, 9 (moon, never) */
+#define CFG_CAR_SETUP_A 0x99   /* 0 or 2 by the player's car (0x73a80) */
+#define CFG_CAR 0x9b           /* the player's car, 0-7, 11 the Warrior */
+#define CFG_LAPS 0xb1          /* from the race length and the track */
+#define CFG_RACE_LENGTH 0xb3   /* 0, 1, 2 */
+#define CFG_UNLOCKED 0x5f50    /* ROCKYROAD: 1 mirrored tracks, Warrior, Lost Vegas; 2 also rally */
 
 #endif

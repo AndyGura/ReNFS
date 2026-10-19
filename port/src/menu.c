@@ -86,6 +86,14 @@ void fe_mouse_moved(void)
         g_mouse_active = 1;
 }
 
+void fe_mouse_hide(void)
+{
+    if (g_mouse_active) {
+        mouse_show(0);
+        g_mouse_active = 0;
+    }
+}
+
 void fe_mouse_press(void)
 {
     if (g_mouse_fsh.d)
@@ -413,7 +421,7 @@ int fe_text_field(char *text, int maxlen, int cx, int y, int names)
     return result > 0;
 }
 
-unsigned long g_name_marks[2];
+unsigned long g_cheat_flags, g_cheat_flags_b;
 
 int fe_enter_name(char *name)
 {
@@ -440,7 +448,7 @@ int fe_enter_name(char *name)
     r = fe_text_field(name, 8, 320, 230, 1);
     fe_play_sound(0x48);
     if (r)
-        g_name_marks[0] = g_name_marks[1] = 0;
+        g_cheat_flags = g_cheat_flags_b = 0;
     for (int y = 0; y < BH; y++)
         memcpy(g_fb + (BY + y) * g_fb_w + BX, saved + y * BW, BW);
     return r;

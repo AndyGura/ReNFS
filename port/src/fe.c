@@ -1,5 +1,6 @@
 /* The front end. */
 #include "fe.h"
+#include "mainmenu.h"
 #include "font.h"
 #include "config.h"
 #include "files.h"
@@ -300,9 +301,9 @@ void fe_outer_loop(void)
         if (state == 2)
             again = 1;
         if (state == 0) {
-            /* fe_main_menu 0x42c30, then the settings saved: next */
-            fprintf(stderr, "renfs: the main menu is not written yet\n");
-            state = 1;
+            /* 0x7469c (a new session: the tournament's records cleared) comes with the
+               tournament; the settings saved after (cfg_save_config_dat 0x3a134): next */
+            state = fe_main_menu();        /* 2: the title, then the game mode again */
         }
     } while (state != 1 && !g_quit);
     music_fade_out();

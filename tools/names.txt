@@ -62,7 +62,7 @@
 0x46f20 fe_title_screen
 0x47274 fe_game_mode_screen
 0x42c30 fe_main_menu
-0x4235c fe_confirm_quit_tournament
+0x4235c mm_race_type_step
 0x42acc fe_confirm_kick_player
 0x105dc fe_audio_options
 0x32d08 fe_graphics_options
@@ -165,7 +165,7 @@
 0x71ad4 mouse_set
 0x52348 mouse_save
 0x71b24 mouse_moved
-0x71afc fe_show_if_changed
+0x71afc fe_mouse_hide
 0x71c20 fe_service_music
 0x72510 fe_play_sound
 0x7188c pal_clear
@@ -173,7 +173,7 @@
 0x7198c pal_fade_down
 0x71918 pal_fade_up
 0x747ec fe_load_art
-0x747b8 fe_print_s2
+0x747b8 fe_load_inv
 0x80b00 fixsin
 0x80b70 fixcos
 0x504c4 race_init_car_kinds
@@ -329,3 +329,19 @@
 0x522e8 mouse_buttons
 0x52304 mouse_press
 0x84304 key_get
+0x4287c mm_track_next
+0x42984 mm_track_previous
+0x42910 mm_track_plus_one
+0x425b0 mm_race_type_changed
+0x424c0 mm_pictures_free
+0x73a80 car_setup
+0x46e94 cheat_code_step
+0x815e4 drawshape_see_through
+0x814e0 drawshape_see_through_at
+0x812bc drawshape_paste
+0x81600 drawshape_centred
+0x8378c screen_show_begin
+0x83740 screen_show_end
+0x83f18 load_file
+0x7469c fe_new_session
+0x745f4 tourn_clear_records
