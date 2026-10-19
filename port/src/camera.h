@@ -24,5 +24,7 @@ void camera_init(int eye_height);
 void camera_set_car(race_camera *cam, const race_car *c, int mode);
 /* the camera this frame (0x136b0) */
 void camera_update(race_camera *cam);
+/* a shake: the wave's step `phase` (0xec28c) times the amount, / 16 (0x3e900) */
+int shake_wave(int amount, int phase);
 
 #endif

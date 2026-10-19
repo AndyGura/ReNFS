@@ -67,8 +67,7 @@ void camera_set_car(race_camera *cam, const race_car *c, int mode)
     set_mode(cam, mode);
 }
 
-/* a shake: the wave's step `phase` (0xec28c) times the amount, / 16 (0x3e900) */
-static int shake(int amount, int phase)
+int shake_wave(int amount, int phase)
 {
     return exe_i32(0xec28c + 4 * phase) * amount / 16;
 }
@@ -85,8 +84,8 @@ void camera_update(race_camera *cam)
         vec3 e;
 
         cam->tilt[0] = g_cam_pitch_bias + 256 * (c->body_pitch >> 8)
-                     - shake(c->pitch_shake, c->pitch_phase);
-        cam->tilt[2] = 128 * (c->body_roll >> 8) - shake(c->roll_shake, c->roll_phase);
+                     - shake_wave(c->pitch_shake, c->pitch_phase);
+        cam->tilt[2] = 128 * (c->body_roll >> 8) - shake_wave(c->roll_shake, c->roll_phase);
         mat_turn(0, -c->pitch, x);
         mat_turn(2, -c->roll, z);
         mat_turn(1, -c->yaw, y);

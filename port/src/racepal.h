@@ -23,5 +23,9 @@ void pal_apply_remaps(void);
 void race_colours(const unsigned char *marks, int n, int mode);
 /* one bank now (0x55ee0): each colour to its nearest (nearest_colour), 255 kept */
 void pal_remap(unsigned char *bank, const unsigned char *pal);
+/* a car's pictures now (0x55ff0): its colours 0..0xf9 to their nearest; 0xfe its mark's
+   entry (if it has one); 0xfa..0xfd kept when lights (the police car's flashing lights in
+   a chase); the rest as the previous re-colouring left them */
+void car_pics_remap(unsigned char *bank, const unsigned char *pal, int mark, int lights);
 
 #endif

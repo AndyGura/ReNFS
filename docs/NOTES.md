@@ -1449,6 +1449,91 @@ pictures' bytes equal to d2 when re-coloured through the original's inverse tabl
 a drawing wrapper (`0x34dc0`..`0x350fe`) that sets a see-through shape to 0x7b to paint it
 opaque and puts 0x45 back.)
 
+### 4.10 The cars drawn (2026-10-19)
+
+**Ported (`port/src/cardraw.c`, `model.c`), equal by palette entry to the original on
+e1, e3, e4, e5, r1a and r1b (`tools/cars_emu.py`: the original's sky `0x4a9d0`, `0x597e4`
+and `0x5a4f0` with the cars in, run on the snapshot, against the port's; left out on
+both sides: the walls `0x59294`, the 3D roadside objects `0x66738`, the cars' shadows
+`0x8a094` and the racers' markers `0x66b98`).**
+
+**Which road rows have a car.** The race's step (`0x51f8f`) lists the cars on the road in
+`0x13c224` (count `0x13c220`): for each car of the order `0x13c298` with `+0x51a` & 4 and
+`+0x50e` ≠ 0, `+0x341` = `+0x345` = its node, `+0x349` its `+0x39d`, `+0x34d` its angles.
+Each frame `0x678a4` clears `0x14e5d0[35]` and, for every car not in state 6 (`+0x512`),
+takes node = `+0x341`, one less when `+0x39d` − 0x29999 < 0 (near the start of its node),
+plus 4 · length below 0, **writes it back to `+0x341`** (a second frame between two steps
+takes one more off) and marks `0x14e5d0[node − camera's node]` (wrapped) when < 35; then
+`0x677f8` marks the eleven rows round each car for `0x679ec` (the player's own car's rows:
+nothing in the driver's view).
+
+**`cars_at_node` `0x6837c(node)`**, called by the road painter as each row is reached far
+to near: d = node (+ 4 · `0x13bb8c` when below the camera's) − the camera's node; if d < 35
+and `0x14e5d0[d]`, the list `0x13c224` is walked from its end, skipping state 6 and cars
+whose `+0x341` ≠ node. The player's car in camera mode 0 goes to `0x6829c` (nothing drawn).
+Any other: `0x68258` then `0x66d08(car, 0)`.
+- `0x68258`: with its own matrix (`+0x20`, the physics' `+0x24`) `+0x351` = `ea_atan2(m[6],
+  m[8]) << 8`; then `0x67f1c(car, 0)` and, if seen, the shadow `0x8a094(4, [0x14e594])`.
+- `0x67f1c`: `+0x391` = rotate((car − camera) >> 9, the matrix `[0x143df8]`); seen if
+  0x20 ≤ z ≤ 0x1900 and |x| ≤ z. Then `0x38548(car, 1)` (the shadow's centre `+0x359`, its
+  axes `+0x36d`, `+0x379`) and the shadow's four corners (−a+b, −a−b, a−b, a+b, each axis
+  >> 10) rotated, offset and projected (`0x83b5c`) into `[0x14e594]`.
+- `0x66d08`: none if z < 0x20, z > 0x5a00 or 2z < |x|. Far (`+0x78e`) = z > 0x1900 and slot
+  (`+0x516`) ≠ 2. Its turn: `+0x24` if `+0x20`, else Z·X·Y of the library's turns X =
+  (shake(`+0x42d`, `+0x428`) + pitch + `+0x369`) >> 14, Z = (shake(`+0x429`, `+0x427`) +
+  roll + `+0x365` − `+0x365`/4) >> 14, Y = `+0x351` >> 14; times the camera's matrix into
+  `0x14e598`. z < 0x219: instance flag 2 (polygons with a corner nearer than 30 left out)
+  on both models, else cleared. Then `0x66880`, the marker `0x66b98` when `0x12da20` ≥ 1,
+  and `0x64a74` for the player.
+- `0x66880`: far: the model `+0x666` placed (`0x957ec`), transformed, projected (`0x98090`),
+  sorted and drawn. Near: a racer (slot < `0x13c18c`, `0xea81c` = `0xea820` = 0) has its
+  mark's entry `0x14e5bc[slot]` set (setpalette) to `0xf6f5c` + 3 · `+0x48a` (`0xf6f83`
+  when braking, `+0x3b9` > 10); else the police lights flash in 0xfa... Then the model
+  `+0x52e` placed and its groups in order: inside (`+0x5be`, count `+0x5c2`, list `+0x5c6`),
+  surface (`+0x5d6`..), outside (`+0x5ca`..), convex (`+0x5e2`..), each one whose index is
+  (unsigned) < 8 sorted then drawn.
+
+**EA's 3D library** (`0x94000`..`0x9a000`, `0xaa000`..`0xac000`): its own camera `0xf9678` is
+never turned (identity); the near plane `0xf9674` = 30 (`0x66101`). A point in the view =
+rotate(pt, M) + pos (`orip_transform` `0x98137`); onto the screen `0x94c80` (shift 16). The
+sort `orip_sort` `0x982e1`: key = z(corner 0) + z(corner 1), Shell's sort, the farthest
+first, **in place** (the order is kept from frame to frame: a test must copy it).
+`orip_draw_poly` `0x98482`: flag 2 and a corner z ≤ 30 → nothing (nor its chain); unless
+flags & 0x500, (area > 0) must equal !(flags & 0x200); texture (flags >> 16) & 0xff; with
+0x80 and a picture: routine bits 3..6 = 1 see-through; 3 corners → triangle, the picture's
+points in whole pixels (`0x905e0`/`0x8fad0`); flags & 0x1000 → quad, points << 16
+(`0x91360`/`0x90b30`); else the whole picture (0,0)..(w·65536 − 1, h·65536 − 1)
+(`0x91bf0`/`0x91b90`). No picture: one colour (`0xaa990`, not ported: none in these races).
+0x800: the polygon after the corners follows. The turns `0x98860`/`0x988c8`/`0x98930` are
+the transpose of the port's `mat_turn`, `fix_sin`/`fix_cos` of (a & 0x3ff) without steps
+between. Groups: names of 8 letters, any case; 28 bytes, +0x10 the first index into the
+index table (+0x50), +0x14 the count. A car's instance (`0x95522`): every polygon listed
+(`0x981f7` tests polygon 0's 0x400 each time: all or none); textures by their 4-letter
+SHPI names (`0x9759a`); racers (id ≥ 200) have "frntires" and "rertires" showing the
+"tire4" part's picture; mirrored tracks turn 0x200 over on every polygon.
+
+**The cars' pictures in the race's colours: `0x65020`**, in `race_main` after
+`race_colours` and before `pal_apply_remaps`: for each car i of `0x13c24c`, `0x55ff0(+0x51e,
++0x522, i)` and `0x55ff0(+0x656, +0x65a, i)` (the near and far pictures with their own
+"!PAL"); cars 0 and 1 then `0x976c0(+0x52e)` (each texture's one colour `+0xc` matched
+again: `nearestcolour`). `0x55ff0(bank, pal, i)`: `0x95d20(0, 0xfa, pal)` (entries 0..0xf9
+of the map `0xf9520` only); 0xfe = the mark `0x14e5bc[i]` when there is one; 0xfa..0xfd =
+themselves when `0x12dd08` and i = 2 (the police car's lights in a chase); then every
+picture not named `!..` through the map. **The map is shared**: entries a re-colouring
+does not fill keep what the last one left: for the first cars 0xfa..0xfe come from the
+dashboard's palette (`race_colours` re-colours the dashboard just before), later cars
+keep the police car's 0xfa..0xfd and the last mark in 0xfe. (`0x13ca48`, another map of
+the race's colours made by `0x5591c`, gets the same five entries.) `0x12dd08` = 1 (set by
+`0x653a4`) in the snapshots' races: one racer against the player with the police on
+(`0x12da30` = 1, `0x12da34`). **Equal byte for byte on all 11 snapshots
+(`tools/racepal_emu.py`)**: before this the port drew the cars in their own palette's
+numbers (the rival nearly black).
+
+**In the port's race (`--race cy1`)**: the two racers on the grid, standing (`+0x351` = the
+grid's yaw), the list made each frame (the step's job), the rows marked, the cars painted
+as the road reaches them. At the standing start the rival is beside the player, out of
+the windscreen's view, in the original too (e1).
+
 ## 5. The original in DOSBox (2026-10-19)
 
 - The game for DOSBox is a COPY of the installed game in `~/dosgames/nfs` (`NFSSE/` +

@@ -3,6 +3,7 @@
 #include "race.h"
 #include "camera.h"
 #include "car.h"
+#include "cardraw.h"
 #include "dash.h"
 #include "exe.h"
 #include "files.h"
@@ -95,6 +96,12 @@ int race_test(const char *name)
     video_mode(320, 200);
     pal_apply_pieces();
     race_colours(marks, RACE_CARS, 0);
+    /* (race_colours 0x2e74c goes on with the dashboard's pictures, then tints its palette)
+       then the cars' pictures; in these races one racer against the player with the police
+       on (0x12da30 = 1, 0x12da34), the chase of 0x6577c */
+    pal_remap(g_dash.file.d, g_dash.pal);
+    pal_tint(0, 0x100, g_dash.pal);
+    cars_remap(list, RACE_CARS, marks, 1);
     pal_apply_remaps();
 
     /* the views and the camera in the driver's seat; the racers on the grid, the player
@@ -111,6 +118,20 @@ int race_test(const char *name)
     memset(&cam, 0, sizeof cam);
     camera_set_car(&cam, &cars[0], 0);
 
+    /* the cars on the road: only the racers so far, standing (their turn the one the grid
+       gives, +0x351) */
+    for (i = 0; i < RACERS; i++) {
+        cars[i].slot = i;
+        cars[i].yaw_drawn = cars[i].yaw;
+        g_cars[i] = &cars[i];
+    }
+    g_ncars = RACERS;
+    g_player = 0;
+    g_racers = RACERS;
+    memcpy(g_car_marks, marks, RACERS);
+    g_camera = &cam;
+    g_road_paint.cars = cars_at_node;
+
     while (!g_quit && key_get() != 0x1b) {
         const int *m;
 
@@ -124,8 +145,12 @@ int race_test(const char *name)
         }
         cam.flags = 0;
 
+        cars_list();           /* (the race's step does this) */
+
         m = view_select(&cam, 0);
         view_matrix(&cam);
+        g_camera_m = m;
+        cars_seen(cam.node);
         w = g_view_now->win;
         near = road_transform(&cam.pos, m, cam.node);
         win.x = w->x;
@@ -140,6 +165,8 @@ int race_test(const char *name)
         video_retrace();
     }
 
+    g_road_paint.cars = 0;
+    g_ncars = 0;
     for (i = 0; i < RACE_CARS; i++)
         car_free(&cars[i]);
     dash_free();

@@ -386,6 +386,11 @@ static void tri_pixels(const raster_tex *t, const int uv[6], const int *p0, cons
     tri(t, uv16, xy16);
 }
 
+void raster_tri(const raster_tex *t, const int uv[6], const int xy[6])
+{
+    tri_pixels(t, uv, xy, xy + 2, xy + 4);
+}
+
 void raster_quad_whole(const raster_tex *t, const int xy[8])
 {
     int w = t->w - 2, h = t->h - 2;

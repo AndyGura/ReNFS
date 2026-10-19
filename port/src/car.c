@@ -5,6 +5,7 @@
 #include "racepal.h"
 #include "files.h"
 #include "exe.h"
+#include "roaddraw.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -55,6 +56,43 @@ static unsigned char *car_palette(unsigned char *bank, const char *name)
     return pal;
 }
 
+/* the polygon groups drawn one after the other (0xe3d10 ..), and the wheels' pictures */
+static const char *const group_names[4] = {"inside", "surface", "outside", "convex"};
+
+/* the near and far models made drawable with their pictures (0x65c11 ..), their groups,
+   and a racer's wheels showing their fourth picture (0x65e61 ..) */
+static int car_models(race_car *c, int id)
+{
+    const unsigned char *lo = c->cfm, *hi = c->cfm + c->cfm_len;
+    int k, front, rear, tire4;
+
+    if (!model_make(&c->near_m, ww_entry(c->cfm, 0), lo, hi, ww_entry(c->cfm, 1)) ||
+        !model_make(&c->far_m, ww_entry(c->cfm, 2), lo, hi, ww_entry(c->cfm, 3))) {
+        car_free(c);
+        return 0;
+    }
+    if (g_road_mirror) {
+        model_mirror(&c->near_m);
+        model_mirror(&c->far_m);
+    }
+    for (k = 0; k < 4; k++) {
+        c->groups[k].index = model_group(&c->near_m, group_names[k], &c->groups[k].count,
+                                         &c->groups[k].list);
+        if (c->groups[k].index < 0)
+            c->groups[k].count = 0;
+    }
+    if (id >= 200) {
+        front = model_find_texture(&c->near_m, "frntires");
+        rear = model_find_texture(&c->near_m, "rertires");
+        tire4 = model_find_texture(&c->near_m, "tire4");
+        if (tire4 >= 0) {
+            model_set_texture(&c->near_m, front, c->near_m.tex[tire4].shape);
+            model_set_texture(&c->near_m, rear, c->near_m.tex[tire4].shape);
+        }
+    }
+    return 1;
+}
+
 int car_load(race_car *c, int id)
 {
     const char *name;
@@ -74,6 +112,7 @@ int car_load(race_car *c, int id)
         name = (const char *)exe_at((unsigned)exe_i32(0xf6e70 + 4 * id), 1);
     snprintf(path, sizeof path, "SIMDATA/CARFAMS/%s%s.CFM", id >= 100 && id < 200 ? "M" : "", name);
     c->cfm = file_load(path, &len);
+    c->cfm_len = len;
     if (!c->cfm || ww_count(c->cfm) < 4) {
         fprintf(stderr, "renfs: %s is missing or not a car\n", path);
         car_free(c);
@@ -81,20 +120,36 @@ int car_load(race_car *c, int id)
     }
     /* the pictures near (entry 1) and far (entry 3): their whole palettes and the body's
        colours, all tinted in place */
-    bank = ww_entry(c->cfm, 1);
-    car_palette(bank, "!PAL");
+    bank = c->pics[0] = ww_entry(c->cfm, 1);
+    c->pics_pal[0] = car_palette(bank, "!PAL");
     c->colours = car_palette(bank, "!xxx");
     if (c->police)
         c->colours = 0;
-    bank = ww_entry(c->cfm, 3);
-    car_palette(bank, "!PAL");
+    bank = c->pics[1] = ww_entry(c->cfm, 3);
+    c->pics_pal[1] = car_palette(bank, "!PAL");
+    if (!car_models(c, id))
+        return 0;
     return 1;
 }
 
 void car_free(race_car *c)
 {
+    model_free(&c->near_m);
+    model_free(&c->far_m);
     free(c->cfm);
     c->cfm = c->colours = 0;
+}
+
+void cars_remap(race_car *const *cars, int n, const unsigned char *marks, int chase)
+{
+    int i;
+
+    for (i = 0; i < n; i++) {
+        car_pics_remap(cars[i]->pics[0], cars[i]->pics_pal[0], marks[i], chase && i == 2);
+        car_pics_remap(cars[i]->pics[1], cars[i]->pics_pal[1], marks[i], chase && i == 2);
+        /* (cars 0 and 1 then have their models' one-colour polygons matched again, 0x976c0:
+           none drawn yet) */
+    }
 }
 
 void cars_queue_colours(race_car *const *cars, int n, unsigned char *marks)

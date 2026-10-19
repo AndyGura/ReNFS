@@ -158,9 +158,19 @@ Ghidra project and `build/decomp`, one command). The git history was started aga
   **`renfs --race cy1` draws City 1 from the starting grid by itself** (`race.c`): the
   512TR standing in slot 7, the driver's view, sky and road; the same picture by palette
   entry as the original's road and sky at the standing start (r1a).
-  Not yet: the circuits' sky ring (`0x4ace8`), the roadside walls (`0x59294`, other
-  tracks than the cities), 3D roadside models, the cars, the mirror, the dashboard and
-  HUD, the physics, the race's setup from the front end.
+  **The cars drawn** (`cardraw.c`, `model.c`: EA's 3D library, the rows a car is on, each
+  car placed, turned and its polygon groups sorted and painted) and **their pictures in
+  the race's colours** (`0x65020`, a shared colour map): equal by palette entry on e1, e3,
+  e4, e5, r1a, r1b (`tools/cars_emu.py`), every car's pictures equal byte for byte on all
+  11 snapshots (`tools/racepal_emu.py`). The e snapshots (`build/snap/e*.bin`) are a race
+  at 320x200 taken with `NFS_DOS_DIR=$PWD/build/dosnfs` (its CONFIG.DAT +0x7f = 1: low
+  detail); `~/dosgames/nfs` gives 640x480. `--race cy1` draws the racers too (at the
+  standing start the rival is out of view, in the original as well).
+  Not yet: the cars' shadows (`0x8a094` → the polygon filler `0x8a04c`/`0x8bc98`, the
+  corners `0x38548`), the racers' markers `0x66b98`, one-colour polygons (`0xaa990`), the
+  police lights, the circuits' sky ring (`0x4ace8`), the roadside walls (`0x59294`, other
+  tracks than the cities), 3D roadside models (`0x66738`, the same library), the mirror,
+  the dashboard and HUD, the physics, the race's setup from the front end.
 
 **Progress page for Danik**: https://claude.ai/artifact/VZdxTpYC3oLXYeBVJpoDoM (every step,
 its percent done and weight). Update its steps file after each finished step.
@@ -188,8 +198,8 @@ races 320x200 / 320x240; commit locally as the work goes.
    the main menu, the settings kept and the options screen done too. Next: the screens
    behind the options (credits, audio, graphics, controls, load / save), Danik chose
    (2026-10-19): **the race next**, the remaining menus later. In the race, the
-   port now makes a first frame of its own (`--race cy1`). Next: the cars drawn
-   (`0x679ec` a row's cars, `0x6837c`, the CFM models), the dashboard picture under the
+   port now makes a first frame of its own (`--race cy1`), the cars in it. Next: the
+   cars' shadows (`0x8a094`, the filler `0x8bc98`), the dashboard picture under the
    view (`0x2e8bc`'s shapes, the BAMF lists), the mirror (`0x4fed8`, `0x5aa84`), then the
    player's car driving (the physics, 33.3 steps a second), the fade table `0x8a390`.
    Open: who writes `0x136618` (28 sections drawn: a detail setting?). The walls `0x59294`

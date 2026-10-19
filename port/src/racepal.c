@@ -100,25 +100,57 @@ static unsigned rd32(const unsigned char *p)
     return (unsigned)p[0] | (unsigned)p[1] << 8 | (unsigned)p[2] << 16 | (unsigned)p[3] << 24;
 }
 
-void pal_remap(unsigned char *bank, const unsigned char *pal)
+/* the colour map the re-colourings share (0xf9520): what one leaves in entries it does not
+   fill, the next finds there */
+static unsigned char g_map[256];
+
+/* entries from..to-1 of the map: each colour of pal to its nearest (0x95d20: 6 bits to 8
+   rounded, 0xa2f10; then 0xaa1f0) */
+static void map_fill(int from, int to, const unsigned char *pal)
 {
-    unsigned char map[256];
-    int i, n, k;
-    /* 0x95d20: 6 bits to 8 rounded (0xa2f10), then the nearest of each (0xaa1f0) */
-    for (i = 0; i < 255; i++) {
+    int i;
+    for (i = from; i < to; i++) {
         unsigned r = (pal[3 * i] * 255u + 32) / 63, g = (pal[3 * i + 1] * 255u + 32) / 63,
                  b = (pal[3 * i + 2] * 255u + 32) / 63;
-        map[i] = (unsigned char)nearest_colour((unsigned long)(r & 0xff) << 16 | (g & 0xff) << 8 | (b & 0xff));
+        g_map[i] = (unsigned char)nearest_colour((unsigned long)(r & 0xff) << 16 | (g & 0xff) << 8 | (b & 0xff));
     }
-    map[255] = 255;
+}
+
+/* every picture of the bank not named "!..", last first, through the map */
+static void map_bank(unsigned char *bank)
+{
+    int i, n, k;
     for (i = (int)rd32(bank + 8) - 1; i >= 0; i--) {
         unsigned char *s = bank + rd32(bank + 20 + 8 * i);
         if (bank[16 + 8 * i] == '!')
             continue;
         n = (s[4] | s[5] << 8) * (s[6] | s[7] << 8);
         for (k = 0; k < n; k++)
-            s[16 + k] = map[s[16 + k]];
+            s[16 + k] = g_map[s[16 + k]];
     }
+}
+
+void pal_remap(unsigned char *bank, const unsigned char *pal)
+{
+    map_fill(0, 255, pal);
+    g_map[255] = 255;
+    map_bank(bank);
+}
+
+void car_pics_remap(unsigned char *bank, const unsigned char *pal, int mark, int lights)
+{
+    map_fill(0, 0xfa, pal);
+    if (mark)
+        g_map[0xfe] = (unsigned char)mark;
+    if (lights) {
+        g_map[0xfa] = 0xfa;
+        g_map[0xfb] = 0xfb;
+        g_map[0xfc] = 0xfc;
+        g_map[0xfd] = 0xfd;
+    }
+    /* (0x13ca48, another map of the race's colours made by 0x5591c, gets the same five
+       entries) */
+    map_bank(bank);
 }
 
 void pal_apply_remaps(void)

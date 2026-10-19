@@ -126,6 +126,9 @@ A step: the cars' driving every step, their sounds and the gearbox every 2nd, tr
 police every 4th (flags `0x12f1bc`, measured). A race ends through `0x13c178`: 1 finished,
 4 arrested (the second police ticket), 0x10 everyone turned back (NOTES §4.3, §4.8).
 The original in DOSBox: `nfs-dos`, `tools/nfsdos.py` (unseen, keys, memory; NOTES §5).
+Cars drawn: `cars_at_node` `0x6837c` → `0x66d08` → `0x66880` (NOTES §4.10); their
+pictures re-coloured by `0x65020` through a colour map `0xf9520` that keeps what the last
+re-colouring left. Snapshots e1..e5: a 320x200 race, `NFS_DOS_DIR=$PWD/build/dosnfs`.
 Main menu `0x42c30` (NOTES §4.2): the choices in CONFIG.DAT (+0x6d type, +0x91 opponent,
 +0x95 track, +0x9b car, +0x5f50 unlocks); typed codes SKCART EARALLYE CASINOVILLE
 CONCEPTCAR ROCKYROAD TURBO NITRO EXPLODE (`0x46e94`), End held = no mercy. Options
@@ -194,7 +197,9 @@ pixel, `nearest_colour`, the inverse table), `sound.c` (the front end's sound ba
 music), `config.c` (CONFIG.DAT), `main.c`.
 The race so far: `raster.c` (the quad and triangle painters), `poly.c` (projection, quad cutting),
 `road.c` (the frame's points, into the view), `roaddraw.c` (the road painted far to near,
-the roadside objects; pixel-exact on the snapshots, `tools/roadpic_emu.py`), `track.c`
+the roadside objects; pixel-exact on the snapshots, `tools/roadpic_emu.py`), `model.c`
+(EA's 3D library: ORIP models placed, sorted, painted), `cardraw.c` (the cars as the road
+reaches their rows; pixel-exact, `tools/cars_emu.py`; NOTES §4.10), `track.c`
 (the TRI and its ring of sections), `trackinfo.c`, `trackfam.c`, `racepal.c`, `sky.c`, `view.c` (windows, lens,
 matrices), `car.c` (cars' files, the grid), `camera.c` (the driver's eyes), `dash.c`
 (the dashboard's colours), `race.c` (`--race`: the loading and the frame),
