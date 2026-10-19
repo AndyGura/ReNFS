@@ -17,6 +17,11 @@ static int fixmul(int a, int b)
     return (int)(unsigned)(p >> 16) + (int)((p >> 15) & 1);
 }
 
+int fix_mul(int a, int b)
+{
+    return fixmul(a, b);
+}
+
 /* a / b in 16.16 as the original's two divisions: the whole part, then the remainder */
 static int fixdiv(int a, int b)
 {

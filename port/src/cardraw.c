@@ -2,6 +2,7 @@
 #include "cardraw.h"
 #include "camera.h"
 #include "exe.h"
+#include "polyfill.h"
 #include "track.h"
 #include "video.h"
 #include <string.h>
@@ -57,11 +58,72 @@ static int iabs(int v)
     return v > 0 ? v : -v;
 }
 
-/* the car's place in the view (0x67f1c, 1/128 units); 0 if it is behind, too far or off
-   to the side. (Its shadow's four corners are worked out here too: not ported yet) */
-static int car_place(race_car *c)
+/* (x, z) turned by the angle a (0x1000000 a turn) as 0x3e918 does */
+static void turn2d(int x, int z, int a, int *ox, int *oz)
 {
-    vec3 d;
+    int c = ea_cos(a >> 8), s = ea_sin(a >> 8);
+    *ox = fix_mul(c, x) - fix_mul(s, z);
+    *oz = fix_mul(s, x) + fix_mul(c, z);
+}
+
+static int mul(int a, int b)
+{
+    return (int)((unsigned)a * (unsigned)b);
+}
+
+/* the shadow's centre and its two half axes, laid on the road's slope under the car
+   (0x38548 with 1): along it and across it turned by its yaw (0x384bc), then their
+   heights from the plane through the node's point A, the point B beside it (+0x1c ..
+   twice) and the next node's C (0x382f0) */
+static void shadow_axes(race_car *c)
+{
+    vec3 a, b, ctr = c->pos, pa, pb, pc, u, v, n;
+    const unsigned char *r = node_ptr(c->node);
+    int inv, q;
+
+    turn2d(0, c->half_len, -c->yaw_drawn, &a.x, &a.z);
+    turn2d(-c->half_wid, 0, -c->yaw_drawn, &b.x, &b.z);
+    a.y = b.y = 0;
+    pa.x = node_i32(c->node, 8);
+    pa.y = node_i32(c->node, 12);
+    pa.z = node_i32(c->node, 16);
+    pb.x = pa.x + 2 * (short)(r[0x1c] | r[0x1d] << 8);
+    pb.y = pa.y + 2 * (short)(r[0x1e] | r[0x1f] << 8);
+    pb.z = pa.z + 2 * (short)(r[0x20] | r[0x21] << 8);
+    pc.x = node_i32(c->node + 1, 8);
+    pc.y = node_i32(c->node + 1, 12);
+    pc.z = node_i32(c->node + 1, 16);
+    u.x = pa.x - pb.x;
+    u.y = pa.y - pb.y;
+    u.z = pa.z - pb.z;
+    v.x = pc.x - pb.x;
+    v.y = pc.y - pb.y;
+    v.z = pc.z - pb.z;
+    /* the plane's normal (0x3e880) */
+    n.x = fix_mul(u.y, v.z) - fix_mul(u.z, v.y);
+    n.y = fix_mul(v.x, u.z) - fix_mul(v.z, u.x);
+    n.z = fix_mul(v.y, u.x) - fix_mul(v.x, u.y);
+    /* 1 / n.y in 16.16, in two divisions */
+    q = 0x10000 / n.y;
+    inv = (int)((unsigned)q << 16) + (int)(((long long)(0x10000 % n.y) << 16) / n.y);
+    inv >>= 8;
+    a.y = mul((-mul(a.x >> 8, n.x >> 8) - mul(n.z >> 8, a.z >> 8)) >> 8, inv);
+    b.y = mul((-mul(b.x >> 8, n.x >> 8) - mul(b.z >> 8, n.z >> 8)) >> 8, inv);
+    ctr.y = pa.y + mul((-mul(n.x >> 8, (ctr.x - pa.x) >> 8)
+                        - mul((ctr.z - pa.z) >> 8, n.z >> 8)) >> 8, inv);
+    c->shadow = ctr;
+    c->along = a;
+    c->across = b;
+}
+
+/* the car's place in the view (0x67f1c, 1/128 units); 0 if it is behind, too far or off
+   to the side. Then its shadow's four corners on the screen */
+static int car_place(race_car *c, int xy[8])
+{
+    static const int sa[4] = { -1, -1, 1, 1 }, sb[4] = { 1, -1, -1, 1 };
+    vec3 d, ctr, p, q;
+    scr2 s;
+    int k;
 
     d.x = (c->pos.x - g_camera->pos.x) >> 9;
     d.y = (c->pos.y - g_camera->pos.y) >> 9;
@@ -69,7 +131,27 @@ static int car_place(race_car *c)
     rotate(&d, g_camera_m, &c->seen);
     if (c->seen.z < 0x20 || c->seen.z > 0x1900)
         return 0;
-    return iabs(c->seen.x) <= c->seen.z;
+    if (iabs(c->seen.x) > c->seen.z)
+        return 0;
+    shadow_axes(c);
+    d.x = (c->shadow.x - g_camera->pos.x) >> 9;
+    d.y = (c->shadow.y - g_camera->pos.y) >> 9;
+    d.z = (c->shadow.z - g_camera->pos.z) >> 9;
+    rotate(&d, g_camera_m, &ctr);
+    for (k = 0; k < 4; k++) {
+        p.x = sa[k] * (c->along.x >> 10) + sb[k] * (c->across.x >> 10);
+        p.y = sa[k] * (c->along.y >> 10) + sb[k] * (c->across.y >> 10);
+        p.z = sa[k] * (c->along.z >> 10) + sb[k] * (c->across.z >> 10);
+        rotate(&p, g_camera_m, &q);
+        q.x += ctr.x;
+        q.y += ctr.y;
+        q.z += ctr.z;
+        project(&q, &s);
+        xy[2 * k] = s.x;
+        xy[2 * k + 1] = s.y;
+    }
+    /* (the player's own car then 0x671dc: never from the driver's seat) */
+    return 1;
 }
 
 /* its models (0x66880): a racer's mark in its colour first (its brake lights' when
@@ -134,7 +216,7 @@ static void car_draw(race_car *c)
 
 void cars_at_node(int node)
 {
-    int d = node < g_camera->node ? g_track.length * 4 + node : node, i;
+    int d = node < g_camera->node ? g_track.length * 4 + node : node, i, xy[8];
 
     d -= g_camera->node;
     if (d >= CARS_SEEN || d < 0 || !g_cars_seen[d])
@@ -147,7 +229,8 @@ void cars_at_node(int node)
             continue;          /* the player's own, from the driver's seat (0x6829c) */
         if (c->own_turn)
             c->yaw_drawn = (int)((unsigned)ea_atan2(c->turn[6], c->turn[8]) << 8);
-        car_place(c);          /* (0x68258: its shadow when it is seen) */
+        if (car_place(c, xy))  /* 0x68258: its shadow first, darkening the road */
+            poly_fill(4, xy, poly_shade_rows, 0);
         car_draw(c);
     }
 }

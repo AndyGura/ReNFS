@@ -199,7 +199,8 @@ The race so far: `raster.c` (the quad and triangle painters), `poly.c` (projecti
 `road.c` (the frame's points, into the view), `roaddraw.c` (the road painted far to near,
 the roadside objects; pixel-exact on the snapshots, `tools/roadpic_emu.py`), `model.c`
 (EA's 3D library: ORIP models placed, sorted, painted), `cardraw.c` (the cars as the road
-reaches their rows; pixel-exact, `tools/cars_emu.py`; NOTES §4.10), `track.c`
+reaches their rows, their shadows; pixel-exact, `tools/cars_emu.py`; NOTES §4.10),
+`polyfill.c` (EA's polygon filler `0x8bc71`; exact, `tools/polyfill_emu.py`), `track.c`
 (the TRI and its ring of sections), `trackinfo.c`, `trackfam.c`, `racepal.c`, `sky.c`, `view.c` (windows, lens,
 matrices), `car.c` (cars' files, the grid), `camera.c` (the driver's eyes), `dash.c`
 (the dashboard's colours), `race.c` (`--race`: the loading and the frame),

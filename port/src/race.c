@@ -102,6 +102,7 @@ int race_test(const char *name)
     pal_remap(g_dash.file.d, g_dash.pal);
     pal_tint(0, 0x100, g_dash.pal);
     cars_remap(list, RACE_CARS, marks, 1);
+    shade_make(0x9999);        /* (0x55abc, with the HUD's colours) */
     pal_apply_remaps();
 
     /* the views and the camera in the driver's seat; the racers on the grid, the player

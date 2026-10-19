@@ -1,6 +1,7 @@
 /* The race's palette and what its pictures are turned into. */
 #include "racepal.h"
 #include "font.h"
+#include "polyfill.h"
 #include "video.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -175,4 +176,45 @@ void race_colours(const unsigned char *marks, int n, int mode)
         if (marks[i])
             g_colour_off[marks[i]] = 1;
     inv_build();
+}
+
+/* c (6 bits) times f (16.16), rounded by the last bit out */
+static int scaled(int c, int f)
+{
+    long long p = (long long)c * f;
+    return (int)(p >> 16) + (int)((p >> 15) & 1);
+}
+
+void shade_make(int f)
+{
+    const unsigned char *p8 = video_palette8();
+    int i, k, best, d, r, g, b, pick;
+
+    for (i = 0; i < 256; i++) {
+        r = scaled(p8[3 * i] >> 2, f);
+        g = scaled(p8[3 * i + 1] >> 2, f);
+        b = scaled(p8[3 * i + 2] >> 2, f);
+        if (r > 63)
+            r = 63;
+        if (g > 63)
+            g = 63;
+        if (b > 63)
+            b = 63;
+        /* the nearest of the colours allowed, red twice and green three times as much as
+           blue (0x89da0); the first of equals */
+        best = 9999;
+        pick = 0;
+        for (k = 0; k < 256; k++) {
+            if (g_colour_off[k])
+                continue;
+            d = 2 * (r - (p8[3 * k] >> 2)) * (r - (p8[3 * k] >> 2))
+                + 3 * (g - (p8[3 * k + 1] >> 2)) * (g - (p8[3 * k + 1] >> 2))
+                + (b - (p8[3 * k + 2] >> 2)) * (b - (p8[3 * k + 2] >> 2));
+            if (d < best) {
+                best = d;
+                pick = k;
+            }
+        }
+        g_shade[i] = (unsigned char)pick;
+    }
 }

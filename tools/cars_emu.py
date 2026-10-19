@@ -5,8 +5,8 @@ against the port's sky_draw and road_draw with cars_at_node (port/src/cardraw.c,
 model.c) given the same road, view and cars. The cars are the port's own (car_load from
 the CD), placed and turned as in the snapshot; the order the original's sorts left the
 polygon lists in is copied over, as are the wheels' pictures. Left out on both sides: the
-walls 0x59294, the 3D roadside objects 0x66738, the cars' shadows 0x8a094 and the racers'
-markers 0x66b98. Writes build/shots/cars_<snapshot>_{orig,port,diff}.png.
+walls 0x59294, the 3D roadside objects 0x66738 and the racers' markers 0x66b98 (the
+shadows 0x8a094 are in). Writes build/shots/cars_<snapshot>_{orig,port,diff}.png.
 
     build/venv/bin/python tools/cars_emu.py cy1 build/snap/e3.bin [...]
 """
@@ -23,10 +23,10 @@ from roaddraw_emu import Painters, CARS
 from setup_check import Fam
 
 I, U8, P = ctypes.c_int, ctypes.c_ubyte, ctypes.c_void_p
-SOURCES = ["cardraw.c", "model.c", "camera.c", "car.c", "dash.c", "view.c", "sky.c", "roaddraw.c",
+SOURCES = ["cardraw.c", "model.c", "polyfill.c", "camera.c", "car.c", "dash.c", "view.c", "sky.c", "roaddraw.c",
            "trackinfo.c", "road.c", "poly.c", "raster.c", "track.c", "files.c", "exe.c", "trackfam.c",
            "racepal.c", "font.c", "video.c", "fsh.c", "unpack.c"]
-LEFT_OUT = {0x59294: 3, 0x66738: 0, 0x8a094: 0, 0x66b98: 0}
+LEFT_OUT = {0x59294: 3, 0x66738: 0, 0x66b98: 0}
 
 
 class Model(ctypes.Structure):

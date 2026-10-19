@@ -34,6 +34,8 @@ void project_points(int n, const vec3 *p, scr2 *out, int shift);
 void move_to_near(vec3 *p, int near);
 /* p turned by m (0x83a54): each sum in 64 bits, >> 16 */
 void rotate(const vec3 *p, const int m[9], vec3 *out);
+/* 16.16 times 16.16, rounded by the last bit out (the original's imul, shrd 16, adc) */
+int fix_mul(int a, int b);
 
 /* what paints a finished quad (0x12c0dc; raster_quad unless a test catches it) */
 extern void (*g_paint)(const raster_tex *t, const int uv[8], const int xy[8]);

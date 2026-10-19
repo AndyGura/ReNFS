@@ -28,4 +28,8 @@ void pal_remap(unsigned char *bank, const unsigned char *pal);
    a chase); the rest as the previous re-colouring left them */
 void car_pics_remap(unsigned char *bank, const unsigned char *pal, int mark, int lights);
 
+/* the shade table the cars' shadows darken through (0x55abc: 0x89f98(0x9999), 0x89ff0):
+   each colour of the palette set times f (16.16, 0x9999 = 0.6), to the nearest allowed */
+void shade_make(int f);
+
 #endif

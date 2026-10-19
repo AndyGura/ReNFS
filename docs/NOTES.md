@@ -1529,6 +1529,49 @@ the race's colours made by `0x5591c`, gets the same five entries.) `0x12dd08` = 
 (`tools/racepal_emu.py`)**: before this the port drew the cars in their own palette's
 numbers (the rival nearly black).
 
+**The shadow** (ported, `cardraw.c`, `polyfill.c`; in `tools/cars_emu.py` since
+2026-10-19, still 0 pixels differing on all six). `0x38548(car, 1)`: `0x384bc` turns
+(0, `+0x78`) and (−`+0x7c`, 0) by −`+0x351` (`0x3e918`: x' = cos·x − sin·z, z' = sin·x +
+cos·z, `ea_cos`/`ea_sin` of angle >> 8, each product rounded) into the half axes `+0x36d`
+and `+0x379` (y 0); the centre `+0x359` = the car's place. `0x382f0` lays them on the
+road: A = the node's point (`+8`, `+0xc`, `+0x10` of node `+0x48` & mask), B = A + 2 · the
+node's i16 at `+0x1c`, `+0x1e`, `+0x20`, C = the next node's point; n = (A − B) × (C − B)
+(`0x3e880`, rounded products); inv = 0x10000 / n.y in 16.16 by two divisions, >> 8; then
+each axis' y = ((−(x>>8)(n.x>>8) − (z>>8)(n.z>>8)) >> 8) · inv and the centre's y = A.y +
+the same of (centre − A). In `0x67f1c`: the centre into the view, the corners −a+b, −a−b,
+a−b, a+b (each axis >> 10) turned, offset and projected; `0x8a094(4, corners)`.
+**The darkening table `0xf8118`** (`set_shade_table` `0x89ff0`), made in `0x55abc` after
+the cars' pictures: `0x89f98(0x9999, the palette set, 0x13d488)` → `0x89f3c`: for each
+entry whose `0xf8018` is set (all 256), each 6-bit channel × 0.6 (rounded by the last
+bit, at most 63), the nearest of the allowed colours (`0xf77c8`) by 2·dr² + 3·dg² + db²,
+the first of equals (`0x89da0`; with `0x15ec74` the three are averaged first: grey).
+Equal on d2, r1a, e3. (`0x55abc` also finds the HUD's colours, `0x55790`, `0x13d5a4`..)
+
+**EA's polygon filler** `0x8bc71` (entries `0x8a04c(mode, colour, n, points)` with the
+shade row painter `0xa5dd4`, `0x8a094` its mode 0; the sky ring `0x4ace8` and the markers
+`0x66b98` use it with the one-colour painter `0xa6e80`). Points: n × (x, y) ints. One point,
+or every x the same: a line (`0x8bb3c` → `0xa6c38`, in the colour: a black line for a
+shadow). Corners: the top one the *last* with the least y, the bottom one the *first* with
+the most. Nothing if the height is 0, max x < x0, **min x ≥ x1 − 1**, max y < y0 or min y ≥
+y1 (window `0xf88a4`..`0xf88b0`, the ends outside). Cut (the slower edges) if any corner
+is outside. From the top corner on through the corners to the bottom one, each edge going
+down (`next.y > y`) is made (`0xa631c`, cut: `0xa632b`) and walked (`0x8bf3c`, cut
+`0x8be7e`): both tables get its x on each row. Then back the other way (`0x8c06e`, mode 0
+the convex case `0x8c276`; mode 1 `0x8c09d` the general): row by row while its x lies
+between left and right, then all its later rows go to the side it left by. Rows from
+max(min y, y0) to min(max y, y1 − 1), none if that is one row or less (!), painted
+left..right, both in. An edge (0x38 bytes): x in 32.32, y in 32.32, the bottom end, a
+count, four counts of rows wholly left/right above/below, the slope (minor/major in 0.32:
+majors < 50 from EA's table `0x127ff0` of floor(m · 65536 / M) << 16, `0x127fec` = 50;
+else rounded, a half down), and its kind: 2 vertical, 3/4 diagonal, 5/6 steep (x rounded
+each row), 7/8 shallow (each row the run of x, from y's rounding carry); odd ones go left.
+Cut: above/below first (whole rows; the shallow kinds by dividing by the slope, rounded),
+then the x ends again, then left and right (rows outside counted, filled with x0 / x0 − 1
+or x1 / x1 − 1 so they are empty unless the other side widens them). **Ported
+(`port/src/polyfill.c`), equal to the original on 7,300 random convex polygons from a
+pixel to 2,000 wide, most crossing the window (`tools/polyfill_emu.py`).** Not ported:
+mode 1, the halving of coordinates past 31 bits (`0xa6b39`).
+
 **In the port's race (`--race cy1`)**: the two racers on the grid, standing (`+0x351` = the
 grid's yaw), the list made each frame (the step's job), the rows marked, the cars painted
 as the road reaches them. At the standing start the rival is beside the player, out of
