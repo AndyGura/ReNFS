@@ -1,6 +1,7 @@
 /* ReNFS: The Need for Speed Special Edition (1996), written again from its DOS program.
    main 0x4716c -> startup 0x42054 -> fe_outer_loop 0x47000 (NOTES §4.1). */
 #include "audio.h"
+#include "exe.h"
 #include "fe.h"
 #include "files.h"
 #include "race.h"
@@ -54,6 +55,8 @@ int main(int argc, char **argv)
                         "Give the folder with the CD's files: renfs -data <folder>\n");
         return 1;
     }
+    if (!exe_load())           /* the game's tables, the built-in settings among them */
+        return 1;
     if (!video_init(shot, shot_frames))
         return 1;
 

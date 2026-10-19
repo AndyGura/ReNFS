@@ -54,6 +54,8 @@ stalls, find the code that reads the field.**
   `~/MiSTer-ReNFS`), never game data or decompiled code; nothing is pushed.
 - **After the options screen, the race comes next** (Danik, 2026-10-19); the screens
   behind the options, showcase, records and tournament wait.
+- **A first start uses the game's built-in settings and records** (`cfg_defaults`
+  `0x38ea8`, as an installed original), never the CD's CONFIG.DAT (Danik, 2026-10-19).
 - GitHub: **local only** until Danik says otherwise. Ask before creating
   `ItsDanik/renfs` (branch `mister`) or `ItsDanik/ReNFS_MiSTer`.
 
@@ -194,7 +196,8 @@ queued), the pictures timed by the sound heard, as the original with sound on.
 and `movie.c` (the movies), `fe.c` (front end screens), `mainmenu.c` (Control Central), `options.c` (the options screen), `menu.c` (what the menus share:
 keys, mouse, text styles, the yes/no dialog), `font.c` (FFN, letters blended pixel by
 pixel, `nearest_colour`, the inverse table), `sound.c` (the front end's sound bank and
-music), `config.c` (CONFIG.DAT), `main.c`.
+music), `config.c` (CONFIG.DAT; the built-in defaults, equal byte for byte,
+`tools/config_emu.py`), `main.c`.
 The race so far: `raster.c` (the quad and triangle painters), `poly.c` (projection, quad cutting),
 `road.c` (the frame's points, into the view), `roaddraw.c` (the road painted far to near,
 the roadside objects; pixel-exact on the snapshots, `tools/roadpic_emu.py`), `model.c`

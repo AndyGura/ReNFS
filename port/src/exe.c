@@ -125,7 +125,7 @@ int exe_load(void)
         return 1;
     d = file_load("NFS_DOS.EXE", &len);
     if (!d) {
-        fprintf(stderr, "renfs: NFS_DOS.EXE is missing (the race needs the game's program)\n");
+        fprintf(stderr, "renfs: NFS_DOS.EXE is missing (the game's program, on the CD)\n");
         return 0;
     }
     le = len > 0x40 ? u32(d + 0x3c) : 0;

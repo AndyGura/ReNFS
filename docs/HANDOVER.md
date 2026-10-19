@@ -196,10 +196,8 @@ its percent done and weight). Update its steps file after each finished step.
 
 ## Waiting for Danik
 
-- **Which settings a first start uses.** The CD carries a CONFIG.DAT (head to head,
-  Ferrari 512TR against the Diablo, Coastal); an installed copy has none, so the original
-  installed starts from its built-in defaults (City). The port reads the CD's for now.
-  Either is easy; it only changes what the first main menu shows.
+- Nothing open. (Decided 2026-10-19: a first start uses the game's built-in defaults,
+  `cfg_defaults`, ported and equal byte for byte.)
 
 Decided 2026-10-18: menus 640x480 on the MiSTer (interlaced at 15 kHz),
 races 320x200 / 320x240; commit locally as the work goes.

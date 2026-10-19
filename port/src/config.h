@@ -7,8 +7,8 @@
 
 extern unsigned char g_config[CONFIG_SIZE];
 
-/* cfg_load_config_dat 0x39c40: the port's copy (home/config.dat), else the CD's
-   GAMEDATA/CONFIG/CONFIG.DAT; 0 if neither is there at its size */
+/* cfg_load_config_dat 0x39c40: the port's copy (home/config.dat), else the built-in
+   settings and records (cfg_defaults 0x38ea8); 0 when those were made (a first start) */
 int config_load(void);
 /* cfg_save_config_dat 0x3a134: written whole into home/config.dat (never the game's
    folder) */

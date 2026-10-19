@@ -536,3 +536,6 @@
 0x31cb4 hud_map
 0x32ac0 hud_map_dot
 0x8bb7c atan_1024
+0x74ca0 fe_speed_test
+0x8ee80 cpu_check
+0x89903 atoi

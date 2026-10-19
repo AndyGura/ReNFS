@@ -498,8 +498,33 @@ three settings in its entry). The attract mode (`fe_attract_mode` `0x34284`) put
   text tables (`0xeab80` .., six strings a record: name, time, car, speed, `+0x13`, kind);
   the first five race times on City agree, the slower five are faster on the CD (Slayer
   7:54.5 against 8:09.5 built in, ..). The CD's city segment times add up to its best
-  race time (7,332 + 7,596 + 11,706 = 26,634). The port should seed its records from the
-  CD's file.
+  race time (7,332 + 7,596 + 11,706 = 26,634). **Danik decided (2026-10-19): a first start
+  uses the built-in defaults**, as an installed original does (it never reads the CD's).
+- **`cfg_defaults` `0x38ea8`** (ported: `config.c`, all 24,402 bytes equal to the
+  original's in English and German, `tools/config_emu.py`): the name "Player" / "Spieler"
+  (`0x15d140`); words +0x6d 1 (head to head), +0x6f 0, +0x71 0, +0x7d 1, +0x73 1, +0x77
+  100, +0x75 100, +0x7b 1, +0x79 0x7f, +0x8d 1, +0x95 0 (City), +0x99 0, +0xaf 0, +0x8b 0,
+  +0x8f 2, +0x93 0, +0x97 0, +0xb3 1, +0xb1 4, +0x91 7 (Diablo), +0x9b 6 (512TR). Then
+  `0x8ee80` (the CPU check: `0xf7924` a 486, `0xf7928` a Pentium) and **the speed test
+  `0x74ca0`** sets the detail: below 300 all 0; below 0x1a4 +0x83 1, +0x85 1; below 600
+  +0x83 2, +0x85 2, +0x81 1; from 600 **+0x7f 1 = races at 640x480** (`0x1af78`:
+  `initgraphics(640, 480, 8)`) with +0x85 0, 1, 2 and +0x81 0, 0, 1 below 0x2d0, 900 and
+  above. +0x87, +0x89 0. The detail words are the graphics screen's (`fe_graphics_options`
+  `0x32d08`: `win` `ima` `van` `car` `hor`). The port answers as 0x1a4..599: 320x200, the
+  most detail (races stay 320x200 for now, Danik's choice for the MiSTer).
+  The records from text tables of six strings (name, time, car, speed, +0x13, kind; each
+  number by `atoi` `0x89903`; +0x17 = 1): each track's record 36 from `0xeab80` + 0x18·t;
+  City, Coast, Alpine records 6..15 from `0xeae98`, `0xeaf88`, `0xeb078` and 0..5 from
+  `0xeac58`, `0xeace8`, `0xead78`; the circuits (tracks 3..8) records 6..35 from `0xeb168`,
+  `0xeb438`, `0xeb9d8`, `0xeb708`, `0xebca8`, `0xebf78` (0xf0 a table of ten) and record 0
+  from `0xeae08` + 0x18·t. The three arrays of 100 words from +0x5bb a track cleared; the
+  open roads' six numbers at +0x5a3 a track written as constants. The keys from +0x5f36
+  (0, 0, 0, 0x4b00, 0x4d00, 0x4800, 0x5000, 0x41, 0x5a, 0x20, 0x43, 0x48, 0x4d; German
+  0x59 and 0x4b), the modem's "Custom" +0x5e78, "ATZ" +0x5eaa, "ATD" +0x5ee6, +0x5ea0 9,
+  +0x5ea2 0, +0x5ea4 4, +0x5ea6 1, +0x5f50 0. Nothing else: the rest stays as the BSS
+  leaves it (0). `cfg_load_config_dat` returns 1 when it made them (the front end then
+  goes to the name), and after either corrects joystick keys (+0x5f36.. between 1 and 3,
+  with `0x12f1d8` = 0: not ported).
 
 ### 3.4 Still to read
 
