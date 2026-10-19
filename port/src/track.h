@@ -15,6 +15,7 @@ typedef struct {
     unsigned char *objects;            /* the object kinds, 16 bytes each (0x13bb84) */
     unsigned char *placements;         /* 16 bytes each, to an i32 -1 (0x13bb94) */
     int nplacements;                   /* 0x1365dc */
+    unsigned char *fallen;             /* 2 bytes a placement, 0: standing (0xea5d8) */
     unsigned char *slices;             /* "TrackSlices" (0x136604) */
     int loop;                          /* a circuit (0x13bb80) */
     unsigned sec_mask, node_mask;      /* 0x13bb90, 0x13bb88: -1 on an open road */
@@ -23,7 +24,7 @@ typedef struct {
     unsigned char ring[TRACK_RING];    /* 0x1365e8 */
     int ring_head, ring_next;          /* 0x1365ec, 0x1365f0 */
     int ring_span, ring_ahead;         /* 0x1365f4 (35), 0x1365f8 (30) */
-    int last_section, last_kinds;      /* 0x136610, 0x136614 */
+    int last_node, last_kinds;         /* 0x136610, 0x136614 */
 } track_state;
 
 extern track_state g_track;

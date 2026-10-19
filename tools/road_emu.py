@@ -27,13 +27,16 @@ class Road(ctypes.Structure):
                 ("near", Vec3 * ROAD_POINTS), ("screen", Scr2 * ROAD_POINTS),
                 ("xsets", ctypes.c_int), ("xcount", ctypes.c_int), ("xworld", Vec3 * EXTRA_POINTS),
                 ("xmoved", Vec3 * EXTRA_POINTS), ("xview", Vec3 * EXTRA_POINTS),
-                ("xscreen", Scr2 * EXTRA_POINTS)]
+                ("xscreen", Scr2 * EXTRA_POINTS), ("fill", ctypes.c_int), ("xfill", ctypes.c_int),
+                ("base", ctypes.c_int), ("xfirst", ctypes.c_int), ("xnext", ctypes.c_int),
+                ("xnode", ctypes.c_int)]
 
 
 def lib():
     out = "build/road_test.so"
     subprocess.check_call(["cc", "-O1", "-shared", "-fPIC", "-o", out, "port/src/road.c",
-                           "port/src/poly.c", "port/src/raster.c"])
+                           "port/src/poly.c", "port/src/raster.c", "port/src/track.c",
+                           "port/src/files.c", "port/src/exe.c", "-Iport/src"])
     return ctypes.CDLL(os.path.abspath(out))
 
 

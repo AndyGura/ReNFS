@@ -70,6 +70,11 @@ int track_load(const char *name)
     for (t->nplacements = 0; t->nplacements < 1000 &&
          rd32(t->placements + t->nplacements * 16) != -1; t->nplacements++)
         ;
+    t->fallen = calloc((size_t)rd32(f + 0x16218) + 1, 2);   /* (0x1c630) */
+    if (!t->fallen) {
+        track_free();
+        return 0;
+    }
 
     if (rd16(f + 4) == 0) {                            /* an open road */
         t->sec_mask = t->node_mask = 0xffffffffu;
@@ -86,7 +91,7 @@ int track_load(const char *name)
     t->ring_span = t->ring_ahead + 5;
     t->ring_head = t->ring_next = 0;
     memset(t->ring, 0, sizeof t->ring);
-    t->last_section = t->last_kinds = -1;
+    t->last_node = t->last_kinds = -1;
     track_keep_sections(0);
     /* node 0 takes two words of the head */
     memcpy(t->nodes + 0x14, f + 0x18, 2);
@@ -97,7 +102,9 @@ int track_load(const char *name)
 void track_free(void)
 {
     free(g_track.file);
+    free(g_track.fallen);
     g_track.file = 0;
+    g_track.fallen = 0;
 }
 
 const unsigned char *track_section(int section)

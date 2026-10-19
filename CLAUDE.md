@@ -190,7 +190,11 @@ queued), the pictures timed by the sound heard, as the original with sound on.
 and `movie.c` (the movies), `fe.c` (front end screens), `mainmenu.c` (Control Central), `options.c` (the options screen), `menu.c` (what the menus share:
 keys, mouse, text styles, the yes/no dialog), `font.c` (FFN, letters blended pixel by
 pixel, `nearest_colour`, the inverse table), `sound.c` (the front end's sound bank and
-music), `config.c` (CONFIG.DAT), `main.c`. The menus' look is checked against the
+music), `config.c` (CONFIG.DAT), `main.c`.
+The race so far: `raster.c` (the quad painter), `poly.c` (projection, quad cutting),
+`road.c` (the frame's points, into the view), `track.c` (the TRI and its ring of sections),
+`exe.c`: **the game's fixed tables are read from the CD's `NFS_DOS.EXE`** at the
+original's addresses (checked by a sum of the image), never copied into the port. The menus' look is checked against the
 original's screenshots by palette entry (DOSBox Staging changes colours slightly).
 **Headless tests set `RENFS_HOME` to a scratch folder** (once the port writes settings).
 

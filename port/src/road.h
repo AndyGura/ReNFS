@@ -31,9 +31,20 @@ typedef struct {
     vec3 xmoved[EXTRA_POINTS];         /* 0x13d8f8 */
     vec3 xview[EXTRA_POINTS];          /* 0x131f70 */
     scr2 xscreen[EXTRA_POINTS];        /* 0x1349a0 */
+
+    int fill;                          /* 0x13bb74: world[] filled so far */
+    int xfill;                         /* 0x1365c4: xworld[] filled so far */
+    int base;                          /* 0x13660c: the camera's section */
+    int xfirst;                        /* 0x1365cc: the first placement near it */
+    int xnext;                         /* 0x1365d0: the next placement to take */
+    int xnode;                         /* 0x1365d4: its node (-1: none left) */
 } road_state;
 
 extern road_state g_road;
+
+/* the points of the sections drawn this frame (0x4ffbc): `drawn` sections from section
+   `sec`, the camera at road node `node`; the roadside objects' corners with them */
+void road_gather(int node, int sec, int drawn);
 
 /* the road's direction ahead from the camera's section (0x587b8): what the near plane
    moves points along */

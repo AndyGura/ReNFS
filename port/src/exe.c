@@ -1,0 +1,176 @@
+/* NFS_DOS.EXE: a DOS/4GW stub, then an LE image (NOTES §2). Its objects are runs of
+   4096-byte pages; each page has relocation records, the places that hold one of the
+   program's own addresses. Only "32-bit offset" records (source type 7) are flat
+   addresses; the port applies those, as tools/unle.py --fixups does. */
+#include "exe.h"
+#include "files.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define IMAGE_LEN 0x169a10u            /* code 0x10000.., data + BSS 0xe0000..0x169a10 */
+#define IMAGE_SUM 0x76078ed2u          /* FNV-1a of the image: NFS_DOS.EXE of 1,254,591 bytes */
+#define MAX_PAGES 1024
+
+static unsigned char *g_image;
+
+static unsigned u32(const unsigned char *p)
+{
+    return (unsigned)p[0] | (unsigned)p[1] << 8 | (unsigned)p[2] << 16 | (unsigned)p[3] << 24;
+}
+
+static unsigned u16(const unsigned char *p)
+{
+    return (unsigned)p[0] | (unsigned)p[1] << 8;
+}
+
+static unsigned fnv(const unsigned char *p, unsigned n)
+{
+    unsigned h = 2166136261u, i;
+    for (i = 0; i < n; i++)
+        h = (h ^ p[i]) * 16777619u;
+    return h;
+}
+
+/* the objects' pages at their addresses */
+static int place_pages(const unsigned char *d, unsigned long len, unsigned le,
+                       unsigned char *img, unsigned *page_va, unsigned *base)
+{
+    unsigned npages = u32(d + le + 0x14), objtab = le + u32(d + le + 0x40),
+             nobj = u32(d + le + 0x44), datapages = u32(d + le + 0x80), i, p;
+    if (nobj > 7 || npages > MAX_PAGES || u32(d + le + 0x28) != 4096)
+        return 0;
+    for (i = 0; i < nobj; i++) {
+        const unsigned char *o = d + objtab + i * 24;
+        unsigned b = u32(o + 4), first = u32(o + 0xc), n = u32(o + 0x10);
+        base[i + 1] = b;
+        for (p = 0; p < n; p++) {
+            unsigned page = first - 1 + p, at = datapages + page * 4096, va = b + p * 4096;
+            if (page >= npages || va + 4096 > IMAGE_LEN + 4096)
+                return 0;
+            page_va[page] = va;
+            if (at < len) {                            /* (the last page is short) */
+                unsigned k = at + 4096 <= len ? 4096 : (unsigned)(len - at);
+                if (va + k > IMAGE_LEN)
+                    k = IMAGE_LEN - va;
+                memcpy(img + va, d + at, k);
+            }
+        }
+    }
+    return 1;
+}
+
+static int relocate(const unsigned char *d, unsigned long len, unsigned le,
+                    unsigned char *img, const unsigned *page_va, const unsigned *base)
+{
+    unsigned npages = u32(d + le + 0x14), fpt = le + u32(d + le + 0x68),
+             frt = le + u32(d + le + 0x6c), page;
+    for (page = 0; page < npages; page++) {
+        unsigned o = frt + u32(d + fpt + 4 * page), end = frt + u32(d + fpt + 4 * page + 4);
+        while (o < end && end <= len) {
+            unsigned src = d[o], flags = d[o + 1], n = 1, obj, target = 0, list, k;
+            int one = 0;
+            o += 2;
+            if (flags & 3)
+                return 0;                              /* not a kind this program has */
+            if (src & 0x20)
+                n = d[o++];
+            else {
+                one = (short)u16(d + o);
+                o += 2;
+            }
+            if (flags & 0x40) {
+                obj = u16(d + o);
+                o += 2;
+            } else
+                obj = d[o++];
+            if ((src & 0x0f) != 2) {
+                if (flags & 0x10) {
+                    target = u32(d + o);
+                    o += 4;
+                } else {
+                    target = u16(d + o);
+                    o += 2;
+                }
+            }
+            list = o;
+            if (src & 0x20)
+                o += 2 * n;
+            if ((src & 0x0f) != 7 || obj > 7)
+                continue;
+            for (k = 0; k < n; k++) {
+                int at = (src & 0x20) ? (short)u16(d + list + 2 * k) : one;
+                unsigned va = page_va[page] + (unsigned)at, v = base[obj] + target;
+                if (at < 0 || va + 4 > IMAGE_LEN)      /* (at < 0: done from the page before) */
+                    continue;
+                img[va] = (unsigned char)v;
+                img[va + 1] = (unsigned char)(v >> 8);
+                img[va + 2] = (unsigned char)(v >> 16);
+                img[va + 3] = (unsigned char)(v >> 24);
+            }
+        }
+    }
+    return 1;
+}
+
+int exe_load(void)
+{
+    static unsigned page_va[MAX_PAGES];
+    unsigned base[8] = {0}, le;
+    long len;
+    unsigned char *d, *img;
+    int ok;
+
+    if (g_image)
+        return 1;
+    d = file_load("NFS_DOS.EXE", &len);
+    if (!d) {
+        fprintf(stderr, "renfs: NFS_DOS.EXE is missing (the race needs the game's program)\n");
+        return 0;
+    }
+    le = len > 0x40 ? u32(d + 0x3c) : 0;
+    if (d[0] != 'M' || d[1] != 'Z' || le + 0xb0 > (unsigned long)len || d[le] != 'L' || d[le + 1] != 'E') {
+        fprintf(stderr, "renfs: NFS_DOS.EXE is not the game's program\n");
+        free(d);
+        return 0;
+    }
+    img = calloc(1, IMAGE_LEN);
+    ok = img && place_pages(d, (unsigned long)len, le, img, page_va, base) &&
+         relocate(d, (unsigned long)len, le, img, page_va, base);
+    free(d);
+    if (!ok || fnv(img, IMAGE_LEN) != IMAGE_SUM) {
+        fprintf(stderr, "renfs: NFS_DOS.EXE is not the version this port knows\n");
+        free(img);
+        return 0;
+    }
+    g_image = img;
+    return 1;
+}
+
+const unsigned char *exe_at(unsigned addr, unsigned len)
+{
+    if (!g_image || addr > IMAGE_LEN || len > IMAGE_LEN - addr)
+        return 0;
+    return g_image + addr;
+}
+
+int exe_i32(unsigned addr)
+{
+    const unsigned char *p = exe_at(addr, 4);
+    return p ? (int)u32(p) : 0;
+}
+
+/* 257 entries, a quarter wave: the second quarter read backwards, the second half negated */
+int fix_sin(int a)
+{
+    int i = a & 0xff, v;
+    if (a & 0x100)
+        i = 0x100 - i;
+    v = exe_i32(0xf8448 + 4 * i);
+    return a & 0x200 ? -v : v;
+}
+
+int fix_cos(int a)
+{
+    return fix_sin(a + 0x100);
+}

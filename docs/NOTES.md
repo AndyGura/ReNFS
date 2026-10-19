@@ -1055,6 +1055,44 @@ that packs the four pointers and screen points of a child.
   `0x1349a0`). A section's record `0x136620 + 6·sec`: +0 its kind (byte), +4 its points.
   **Ported (`port/src/road.c`), equal to the original on all points of 5 snapshots
   (`tools/road_emu.py`).**
+- **The frame's points: `0x50070(camera)`** keeps the ring round the camera's section
+  (`0x4ee30`) and, **only when the section changed** (`0x136610`, the node gathered at, /4
+  ≠ the camera's, or < 0; `0x5004c` sets it to −1 to force it), `0x4ffbc(node, node/4,
+  0x136618)`. (Then the cars' part, `[cam+0x3c]`, `0x4fed8`: not read yet.) `/4` is C's,
+  towards 0.
+  `0x4ffbc(node, sec, drawn)`: `0x13660c` = base = node/4, `0x136610` = node, `0x13bb74`
+  (filled) = `0x13bb78` (count) = 0; `0x59998(base & mask)`; then `0x4f7d4(base, sec++, 4,
+  1)` drawn − 1 times, `(base, sec, 4, 0)`, `(base, sec + 1, 1, 0)` (the far edge: one row).
+  `0x59998(s)`: the first placement (16 bytes each, `[0x13bb94]`, `0x1365dc` of them) at
+  node 4s by halves (lo 0, hi n−1; t > node → lo), then back over the run of equal nodes
+  **and one more** (the first test always matches), then on while t > node and < n−1:
+  `0x1365cc`, `0x1365d0` = next, `0x1365d4` = its node; `0x1365c4` (filled) = `0x1365d8`
+  (objects) = `0x1365c0` (points) = 0.
+  `0x4f7d4(base, sec, rows, objects)`: the detail kind = int `0xed284[node byte +7][sec −
+  base]` (8 rows of 32: by the node's type and how far ahead), its record `0xf61bc +
+  0x4c·kind`; at +0x18 a list for each row of the point numbers (0..10) kept, rising,
+  0xff after each row. The kept points of the ring's section (`+12 + 0x84·row + 12·i`) are
+  appended to `0x137434`. With `objects`, while the row's node (masked) = `0x1365d4`: the
+  placement's corners into `0x12f540`, `0x1365d8`++, next placement (at the end: 0, and on
+  a circuit its node unless it is this row's, else −1). A section's record `0x136620 +
+  6·(sec & mask)`: kind byte, word first point, word points; `0x13bb78` += points.
+  A placement: +0 node, +4 kind, +5 angle (256 a turn, negated), +0xa/+0xc/+0xe i16 offset
+  << 8 from the node's position. Its kind (`[0x13bb84]` + 16·kind): +1 type (1: one point;
+  6: a board and a side, 6 points; else a board, 4), +4 width, +8 depth (type 6), +0xc
+  height. Angle a = (−angle << 16) − (node i16 +0x18 << 10), sin/cos of a >> 14 (the
+  table `0xf8448`, 1024 a turn); c = (width/2 >> 8)·(cos >> 8), s likewise. Standing: (x−c,
+  y+h, z−s), (x+c, y+h, z+s), (x+c, y, z+s), (x−c, y, z−s). **Knocked over** (byte
+  `[0xea5d8][2·placement]` ≠ 0; the array, 2 bytes a placement, made at `0x1c630` from the
+  head's `+0x16218`, cleared by the replay's `0x5f138`/`0x5f18c`/`0x5f1e0`): height 0, the
+  top two moved by (cos·h, sin·h) of b + 0x400000 − (the row node's angle), b = −angle <<
+  16 (+0x800000 if < −0x400000). Type 6 adds Q + (cos, sin)(a + 0x400000)·depth, at y + h
+  and y, Q the third corner. **Ported (`road_gather`, `port/src/road.c`), equal on 6
+  snapshots, standing and with every other object knocked over (`tools/gather_emu.py
+  [--fallen]`).**
+- **The game's fixed tables come from the player's `NFS_DOS.EXE`** (`port/src/exe.c`: the
+  LE image laid out and relocated as `unle.py --fixups`, checked by an FNV-1a of the
+  0x169a10 bytes = `0x76078ed2`, identical to `build/nfs_flat.bin`): the port holds none
+  of the game's data, and reads `exe_i32(0xed284 + ..)` at the original's addresses.
 - Projection `0x83b5c(p, out)`: z ≤ `0xf7938` → (0x80000000, 0x80000000) and `0xf7a40`
   |= 1. Else z normalised below 0x400 with a shift (16; ≥ 0x10000: 24 and z >> 8; again
   ≥ 0x10000: +8, >> 8; ≥ 0x1000: +4, >> 4; ≥ 0x800: +2, >> 2; ≥ 0x400: +1, >> 1), r =

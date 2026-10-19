@@ -224,7 +224,7 @@
 0x4eb00 tri_decode_section
 0x4e880 tri_read
 0x4e7d4 tri_open
-0x4f7d4 tri_section_objects
+0x4f7d4 road_section_points
 0x1c630 tri_object_state
 # containers and 3D models (NOTES 3.2, 3.5)
 0x60134 wwww_resolve
@@ -345,3 +345,8 @@
 0x83f18 load_file
 0x7469c fe_new_session
 0x745f4 tourn_clear_records
+0x4ffbc road_gather
+0x59998 road_first_object
+0x50070 road_frame_points
+0x5004c road_force_gather
+0x59a74 road_transform
