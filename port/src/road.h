@@ -38,6 +38,7 @@ typedef struct {
     int xfirst;                        /* 0x1365cc: the first placement near it */
     int xnext;                         /* 0x1365d0: the next placement to take */
     int xnode;                         /* 0x1365d4: its node (-1: none left) */
+    int xcursor;                       /* 0x1365c8: the objects' points not yet painted */
 } road_state;
 
 extern road_state g_road;
