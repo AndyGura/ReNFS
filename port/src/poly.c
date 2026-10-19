@@ -43,16 +43,16 @@ static int scale(int x, int r, int shift)
     return (int)(unsigned)(p >> shift) + (int)((p >> (shift - 1)) & 1);
 }
 
-void project(const vec3 *p, scr2 *out)
+static void project_from(const vec3 *p, scr2 *out, int shift)
 {
-    int z = p->z, shift = 16, r;
+    int z = p->z, r;
     if (z <= g_view.min_z) {
         out->x = out->y = (int)0x80000000;
         g_view.flags |= 1;
         return;
     }
     if (z >= 0x10000) {
-        shift = 24;
+        shift += 8;
         z >>= 8;
     }
     if (z >= 0x10000) {
@@ -76,6 +76,27 @@ void project(const vec3 *p, scr2 *out)
     out->y = g_view.cy - scale(p->y, r, shift);
 }
 
+void project(const vec3 *p, scr2 *out)
+{
+    project_from(p, out, 16);
+}
+
+void project_points(int n, const vec3 *p, scr2 *out, int shift)
+{
+    for (; n > 0; n--)
+        project_from(p++, out++, shift);
+}
+
+void rotate(const vec3 *p, const int m[9], vec3 *out)
+{
+    long long x = p->x, y = p->y, z = p->z;
+    vec3 r;
+    r.x = (int)(unsigned)((x * m[0] + y * m[3] + z * m[6]) >> 16);
+    r.y = (int)(unsigned)((x * m[1] + y * m[4] + z * m[7]) >> 16);
+    r.z = (int)(unsigned)((x * m[2] + y * m[5] + z * m[8]) >> 16);
+    *out = r;
+}
+
 static vec3 mid(const vec3 *a, const vec3 *b)
 {
     vec3 m;
@@ -85,16 +106,21 @@ static vec3 mid(const vec3 *a, const vec3 *b)
     return m;
 }
 
+void move_to_near(vec3 *p, int near)
+{
+    int t = fixdiv(near - p->z, g_view.clip_z);
+    p->x += fixmul(t, g_view.clip_x);
+    p->y += fixmul(t, g_view.clip_y);
+    p->z = near;
+}
+
 /* a midpoint on the screen; one nearer than the near plane is moved onto it first, for
    its projection only */
 static void project_near(const vec3 *m, int near, scr2 *out)
 {
     if (m->z < near) {
         vec3 c = *m;
-        int t = fixdiv(near - m->z, g_view.clip_z);
-        c.x += fixmul(t, g_view.clip_x);
-        c.y += fixmul(t, g_view.clip_y);
-        c.z = near;
+        move_to_near(&c, near);
         project(&c, out);
     } else
         project(m, out);

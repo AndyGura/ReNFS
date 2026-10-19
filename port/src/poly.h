@@ -28,6 +28,12 @@ extern view3d g_view;
 void view_set_focal(int focal);
 /* a point on the screen; too near: both 0x80000000 and flags |= 1 */
 void project(const vec3 *p, scr2 *out);
+/* n of them, the shift starting at `shift` (0x94c80; project() is 16) */
+void project_points(int n, const vec3 *p, scr2 *out, int shift);
+/* a point nearer than `near` put on it, moved along (clip_x, clip_y, clip_z) */
+void move_to_near(vec3 *p, int near);
+/* p turned by m (0x83a54): each sum in 64 bits, >> 16 */
+void rotate(const vec3 *p, const int m[9], vec3 *out);
 
 /* what paints a finished quad (0x12c0dc; raster_quad unless a test catches it) */
 extern void (*g_paint)(const raster_tex *t, const int uv[8], const int xy[8]);

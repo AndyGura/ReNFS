@@ -1024,6 +1024,24 @@ that packs the four pointers and screen points of a child.
   a snapshot (every top-level call, the globals at that moment) and every piece they
   paint (picture, uv, xy) against the port's given the same quads: **equal on 663 pieces
   in 5 snapshots** (standing, and driving: 2026-10-19).
+- **The road into the view: `0x59a74`** (once a frame, before the drawing). The near
+  plane = `0xf6aa8` (62259) >> 11 = 30, kept in the view's `+4` (the `near` of the
+  cutters). With t = (−camera position) >> 11 (camera `[0x143df4]` +0x10..0x18):
+  `0x94db8(n, src, shift, t, dst)` dst = (src >> 11) + t for the `0x13bb78` road points
+  `0x137434` → `0x142578`, and (if `0x1365d8` > 0) the `0x1365c0` other points `0x12f540` →
+  `0x13d8f8`; `0x94e10(n, src, M, dst)` turns them by the view's matrix `[0x143df8]` (9
+  ints) into `0x138c58` (and `0x131f70`) with `0x83a54(p, M, out)`: out.x = (x·M0 + y·M3 +
+  z·M6) >> 16, out.y with M1 M4 M7, out.z M2 M5 M8, each sum in 64 bits, no rounding.
+  EA's `memmove` `0x8ecc4` takes **(src, dst, n)**: the turned points copied back to
+  `0x142578`. Then `0x587b8(node / 4)`: the near plane's direction = point k − point 0 of
+  `0x138c58`, k = that section's points across (`0x136624 + 6·sec`, a word); |z| < 0x1999
+  → z = 0x1999. Then of `0x142578`: the first n − 11·(`0x136618` − 3) points held to |x| ≤
+  `0xf6ab0` (5376, a quarter when z < 2·near) and |y| ≤ `0xf6ab4` (5376) and moved onto
+  the near plane, the rest onto 8 × near. Projected by `0x94c80(n, src, dst, 16)` (=
+  `0x83b5c` with the starting shift an argument) into `0x13a47c` (and `0x131f70` →
+  `0x1349a0`). A section's record `0x136620 + 6·sec`: +0 its kind (byte), +4 its points.
+  **Ported (`port/src/road.c`), equal to the original on all points of 5 snapshots
+  (`tools/road_emu.py`).**
 - Projection `0x83b5c(p, out)`: z ≤ `0xf7938` → (0x80000000, 0x80000000) and `0xf7a40`
   |= 1. Else z normalised below 0x400 with a shift (16; ≥ 0x10000: 24 and z >> 8; again
   ≥ 0x10000: +8, >> 8; ≥ 0x1000: +4, >> 4; ≥ 0x800: +2, >> 2; ≥ 0x400: +1, >> 1), r =
