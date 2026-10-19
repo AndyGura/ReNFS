@@ -1027,10 +1027,41 @@ that packs the four pointers and screen points of a child.
   8 at or below y1; **compared unsigned**, so x < 0 counts as right, and a piece below the
   window is still painted). `0xeaad8` = 2, `0xf6aa4` = 11, both tables 6.4, 4.8, 3.8.
 - Each view has a record (camera `+0x88` the road ahead, `+0x8c` the mirror; `0x1486c(cam,
-  mirror)` makes one current: `0x143dfc`): `+0` the window's width, `+0x14` its own
-  reciprocal table (made current by `0x83ae0`, which changes only `0xf7a14`, not the focal
-  `0xf7a30`), `+0x1c` → the window (x, y, w, h at +8.. +0x1c) whose centre `0x83c18`
-  makes `0xf7a28` / `0xf7a2c`; the road ahead adds `0x129ec0` / `0x129ec4`; both << `0xf456c`.
+  mirror)` makes one current: `0x143dfc`): `+0` the field of view in degrees (85 ahead,
+  96 a second view `0xe8e08`, 70 the mirror), `+4` the near plane, `+0x10` its window,
+  `+0x14` its reciprocal table (made current by `0x83ae0`, which changes only `0xf7a14`),
+  `+0x1c` → the window. See "The views" below.
+- **The views (`port/src/view.c`, checked by `tools/view_emu.py`: equal on all 6
+  snapshots, 2026-10-19).** The windows `0xe85c0`, 17 a resolution (`0x2a8` bytes, 40
+  each): +0 id, +4 squash (0xd999 or 0x1b333), +8 / +0xc the lens's centre moved, +0x10 /
+  +0x14 what the lens covers (320 x 200), +0x18.. +0x24 the part of the screen painted.
+  Layouts `0xe8b10` (+ `0x16c` a resolution, 52 bytes each): +4.. the windows of its
+  modes. At the race's start (`views_init` `0x14630`'s end, `view_heights` `0x145d0`):
+  windows 0 and 1 get the height `0xe8e4c[0x90·res + 12·car]` (car = its `+0x48a`; 127
+  for the 512TR at 320x200), window 2 half; and the first layout's three windows of
+  each resolution get +0xc = h · (spec `+0x370` − 108) / 200 (at 640x480 the difference
+  · 480 / 200, then · h / 480): the car's PBS `+0x370` is its driver's horizon (87 the
+  512TR: −21). `view_setup` `0x14154(rec, mode)`: rec +0x10 = mode, +0x1c = the window;
+  the sky's tables (`0x49a78`: w, fov/2, short((fov<<8)/360·5), squash·w/320); the lens
+  `0x14284` → `0x83c18` (origin x + dx, y + dy) and `0x83c5b`: half = fov/2 in a
+  1024-a-turn (`<< 10 / 360`), centre `0xf7a28` = origin + w/2, `0xf7a2c` = origin + h/2,
+  focal `0xf7a30` = cos·(w/2) / sin (the table `0xf8448`, `tab_sin` `0xa376c`, unsigned),
+  `0xf7a34` = −cos·(h/2) / sin (only the dividing projector `0x83d4f` reads it); then
+  `0x83af4` the reciprocals from `0xf7a30` into the table current. **One table for all
+  views**: `0x14630` gives the mirror `0x128ec0` and the others the table current before,
+  but it runs twice at a race's load (the second time `0x128ec0` is current), so all three
+  share it, and the first frame's `view_set_mode` `0x14568` (`0x143e00` set) rebuilds it
+  for the view ahead (focal 178): the mirror projects with that table, its own focal (46)
+  only in `0xf7a30`. `view_select` `0x1486c` sets the centre and focal again; for the view
+  ahead it adds `0x129ec0` / `0x129ec4` (set only by `0x14860`, which nothing calls) and
+  shifts by `0xf456c` (never written): both nothing. **The camera's matrices**
+  (`camera_matrix` `0x5868c`, after `0x1486c(cam, 0)`): with X, Y, Z the turns by the
+  camera's `+0x40` (pitch), `+0x44` (yaw), `+0x48` (roll) (0x1000000 a turn, `>> 8`
+  into EA's sin `0x80b00`; X = [1 0 0; 0 c −s; 0 s c], Y = [c 0 s; 0 1 0; −s 0 c], Z =
+  [c −s 0; s c 0; 0 0 1]), S = diag(1, the current window's squash, 1), F = diag(±1, 1,
+  1) (−1 on the mirrored tracks `0x12dd28`): camera +0x94 = Y·Z·X·S·F, +0xb8 (the mirror)
+  = Y·Z·X·Y(half a turn). `mat_mul` `0x839f8`: each product `>> 16` on its own
+  (truncated), summed in 32 bits.
 - `port/src/poly.c` (projection, both cutters, the corners, the outcode in `raster.c`) is
   **checked by `tools/poly_emu.py`**: the original's cutters caught inside a real frame on
   a snapshot (every top-level call, the globals at that moment) and every piece they
