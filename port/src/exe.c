@@ -231,3 +231,42 @@ int ea_atan2(int y, int x)
     }
     return a;
 }
+
+/* EA's arctangent (0x8bb7c): a turn of 1024, from the y axis towards x; the smaller over
+   the larger as a 32-bit fraction, rounded to 1/256, into the table of an eighth of a
+   turn (0x12572c) */
+int ea_atan_1024(int x, int y)
+{
+    unsigned ax = (unsigned)(x < 0 ? -x : x), ay = (unsigned)(y < 0 ? -y : y), r;
+    int f = (y < 0 ? 8 : 0) | (x < 0 ? 0x10 : 0), t;
+
+    if (ax == ay)
+        t = 0x80;
+    else {
+        if (ax > ay) {
+            unsigned w = ax;
+            ax = ay;
+            ay = w;
+            f |= 4;
+        }
+        r = (unsigned)(((unsigned long long)ax << 32) / ay);
+        t = *exe_at(0x12572c + (r >> 24) + (r >> 23 & 1), 1);
+    }
+    switch (f) {
+    case 4:
+        return 0x100 - t;
+    case 8:
+        return 0x200 - t;
+    case 0xc:
+        return t + 0x100;
+    case 0x10:
+        return -t;
+    case 0x14:
+        return t - 0x100;
+    case 0x18:
+        return t - 0x200;
+    case 0x1c:
+        return -t - 0x100;
+    }
+    return t;
+}

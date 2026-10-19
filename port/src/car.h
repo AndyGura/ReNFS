@@ -37,6 +37,7 @@ typedef struct {
     int half_len, half_wid;    /* +0x78, +0x7c: half its size, 16.16 */
     int braking;               /* +0x3b9: above 10 its brake lights are on */
     unsigned char bits[3];     /* +0x174 .. +0x176 */
+    vec3 ground;               /* +0x385: the road under it (0x38548 with 0) */
     vec3 seen;                 /* +0x391: from the camera, in the view, 1/128 units */
     int far;                   /* +0x78e: drawn by its far model */
     vec3 shadow, along, across;/* +0x359, +0x36d, +0x379: its shadow on the road */
@@ -45,6 +46,68 @@ typedef struct {
         int index, count;      /* +0x5be ..: inside, surface, outside, convex */
         unsigned *list;
     } groups[4];
+
+    /* what driving needs (drive.c, NOTES §4.6): speeds 16.16 metres a second */
+    unsigned char *spec;       /* +0x479: its physics, the PBS file as load_car_pbs left
+                                  it (read by offset, drive.c) */
+    int steer;                 /* +0x18: the front wheels' turn, 0x1000000 a turn */
+    int progress;              /* +0x4c: how far along the road */
+    int lap;                   /* +0x50 */
+    vec3 vel;                  /* +0x54: in the world */
+    int side_speed;            /* +0x60: across the car, + right */
+    int up_speed;              /* +0x64 */
+    int speed;                 /* +0x68: along the car, + forwards */
+    int wheel_speed;           /* +0x6c: the driven wheels' */
+    int speed_abs;             /* +0x70: the larger of |vel.x|, |vel.z| and a quarter of
+                                  the other */
+    int yaw_rate;              /* +0x74 */
+    int throttle;              /* +0x3b1: 0..255 */
+    int throttle_kept;         /* +0x3b5: given back after a shift */
+    int shift_wait;            /* +0x3bd: steps until the clutch bites, -1 none */
+    int rpm;                   /* +0x3c1 */
+    int rpm_road;              /* +0x3c5: the engine's turns the wheels make */
+    int grip_extra;            /* +0x3c9 */
+    int grip_rear;             /* +0x3cd */
+    int grip_front;            /* +0x3d1 */
+    int shift_last;            /* +0x3d5: the last control's gear request */
+    int push_side, push_up, push_fwd; /* +0x3d9, +0x3dd, +0x3e1: forces from outside:
+                                  the slope's pull (0x38808), other cars */
+    int engine_force;          /* +0x3e5 */
+    int gearbox;               /* +0x3e9: 0 by hand, 1 reverse, 2 neutral, 3 drive */
+    int gear;                  /* +0x3ed: -2 reverse, -1 neutral, 0 first .. */
+    int clutch;                /* +0x3f1: 1 engaged */
+    int handbrake;             /* +0x3f5: the control's bit 15 */
+    int shifting;              /* +0x3f9 */
+    int on_ground;             /* +0x3fd */
+    int air_steps;             /* +0x401: steps in the air; -2 .. -1 just landed */
+    int slide_front, slide_rear; /* +0x405, +0x409 */
+    int wheelspin;             /* +0x40d */
+    int force_side, force_fwd; /* +0x411, +0x415: the last step's */
+    int gear_now, gear_before; /* +0x419, +0x41d */
+    int gear_shown;            /* +0x421: counts down after a shift */
+    unsigned char tyres[2];    /* +0x425, +0x426: front, rear: 1 sliding, 2 at the
+                                  limit, 4 skidding */
+    int mass_front;            /* +0x43d: the weight on the front wheels (0x3fb90) */
+    int weight_shift;          /* +0x44d */
+    int grip_rear_base;        /* +0x451 */
+    int grip_front_base;       /* +0x455 */
+    int yaw_damp;              /* +0x459 */
+    int turn_front, turn_rear; /* +0x461, +0x465 */
+    int tcs, abs;              /* +0x48e, +0x492: the player's traction control, ABS */
+    short downforce[4];        /* +0x49a, +0x49c, +0x49e, +0x4a0 (read as the high
+                                  halves of the words 2 bytes before) */
+    int surface;               /* +0x4a2: of 0x12cc00's */
+    int surface_flag;          /* +0x4a6 */
+    int node_flags[5];         /* +0x4aa, +0x4ae, +0x4c6, +0x4ca, +0x4ce: its node's
+                                  kind (0x4008c) */
+    int tcs_now, abs_now;      /* +0x4b2, +0x4b6 */
+    int horn;                  /* +0x4ba: the control's bit 14 */
+    int turn_target;           /* +0x4f6 */
+    int turn_count;            /* +0x4fa */
+    int auto_mode;             /* +0x4fe: driving itself (0x10180), 0 none */
+    int auto_steer;            /* +0x502 */
+    int dt;                    /* +0x506: a step, 16.16 seconds (1/30) */
+    int rate;                  /* +0x50a: steps a second (30) */
 } race_car;
 
 /* the car's place on the starting grid (0x7c938): grid its slot (0x12dca0[player]),

@@ -20,5 +20,8 @@ int fix_cos(int a);
 int ea_sin(int a);
 int ea_cos(int a);
 int ea_atan2(int y, int x);
+/* EA's other arctangent (0x8bb7c, the first argument pushed last): a turn of 1024, from
+   the y axis towards x */
+int ea_atan_1024(int x, int y);
 
 #endif

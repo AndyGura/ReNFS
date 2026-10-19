@@ -27,6 +27,13 @@ extern unsigned char g_cars_behind[CARS_BEHIND]; /* 0x14e5c5 */
 extern const race_camera *g_camera;          /* 0x143df4 */
 extern const int *g_camera_m;                /* 0x143df8: the matrix being drawn with */
 
+/* the road's plane under the car (0x38548): its half axes along and across it turned by
+   yaw (+0x36d, +0x379, 0x384bc / 0x38434) and the point under its middle, their heights
+   from the plane through the node's point A, the point B beside it (+0x1c .. twice) and
+   the next node's C (0x382f0); the shadow's with the yaw drawn (+0x359), the driving's
+   with its own (+0x385) */
+void car_road_plane(race_car *c, int yaw, vec3 *centre);
+
 /* the cars on the road as the race's step lists them (0x51f8f): each drawn at its own
    node, with its angles */
 void cars_list(void);

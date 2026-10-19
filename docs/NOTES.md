@@ -955,7 +955,7 @@ race_from_menu 0x3770c (from fe_main_menu)
   (4 = active).
 - **The driving kind** `+0x512` picks the routine called every step through the table
   `0x13c1b8` (filled by `race_init_car_kinds` `0x504c4`); `+0x50e` picks one called every
-  second step (flag 4) through `0x13c1e0` (1 = `car_sound_player` `0x10400`, 2 = nothing):
+  second step (flag 4) through `0x13c1e0` (1 = `car_controls_player` `0x10400`, once called car_sound_player; 2 = nothing):
 
   | kind | routine | what | set by |
   |---|---|---|---|
@@ -1005,6 +1005,82 @@ race_from_menu 0x3770c (from fe_main_menu)
   masked by `0x13bb88`; returns 1 if the node changed. −1 stays.
 - Both checked by `tools/camera_emu.py` (every racer's place; every car's node from 12
   behind to 12 ahead, 149 to 193 searches a snapshot): equal on all 6 snapshots.
+
+#### The player's car driven (2026-10-19; ported, `port/src/drive.c`)
+
+Checked by `tools/drive_emu.py`: the original's own code run in Unicorn on the 11
+snapshots against the port's, step for step, every field of the car and every global
+compared after each step. 297 runs (18 variants × scripted keys: gas to 57 m/s, weaving
+into the walls, the handbrake, the manual box, reverse, the joystick) all equal.
+`--coverage` lists the original's instructions never run.
+
+- **A step** (`race_main`): the flags from the step counter `0x145c94` (2 a step): 1
+  every step, 4 when it is a multiple of 4, 0x10 of 8. On flag 4 the controls
+  `car_controls_player` `0x10400`, then `drive_player` `0x382d0` =
+  `car_physics_player` `0x408e0` + `car_check_lap` `0x5056c(car, 1)` + `car_on_road`
+  `0x38808(car, 1)`, then `car_road_offset` `0x51598`.
+- **The keys** are sampled by the timer at each 100 Hz tick into a ring (`0x48f6c` →
+  `0x48bec` → `0x4918c`); `controls_read` `0x49248` gives one word a step. `0x48bec`:
+  steering left alone 0, right alone 0x3c (swapped on a mirrored track), both or none
+  0x20; pedal 5 accelerating, 0x3c braking (the brake wins), else 0x1e; gear up bit 1,
+  else gear down bit 2; B+R+W (scan codes 0x30, 0x13, 0x11) with the automatic both;
+  handbrake bit 8, horn bit 4; word = bits << 12 | pedal << 6 | steer. Both 0x3000 bits
+  set = held at full revs (`0x12ccac[p]` = 1, the bits cleared). The keys' defaults
+  (`0x12d92c`.., copied from the settings `0x15cb4e`..): left 0x4b, right 0x4d,
+  accelerate 0x48, brake 0x50, up 0x1e (A), down 0x2c (Z), handbrake 0x39, horn 0x23 (H).
+- **The gearbox** (`car_shift` `0x48714`): the automatic's lever `+0x3e9` 1 reverse, 2
+  neutral, 3 drive (0 = by hand). **Every car starts in neutral** (`car_reset`, gear −1):
+  the gear-up key puts the automatic into drive; nothing else writes `+0x3e9` in a race
+  (the other writers: the crash and reset paths `0x1cfce` `0x1d536` `0x1db40`,
+  `load_car_pbs`, the replay `0x5cf95`). Before step 300 (the lights) a request is only
+  remembered (`+0x3d5`), never acted on. `0xec5d0` is written 0x100 or 0, always 0 in fact
+  (its condition's register is never set).
+- **`car_physics_player` `0x408e0`**: a step is 1/30 s (`+0x506` = 0x888, `+0x50a` = 30);
+  with two humans and `0x12dd10` set, the leader's step is shortened by half its lead
+  (`+0x4c`), up to `0x12dd10`. Then TCS/ABS; on flag 4 (or in neutral) the revs
+  `0x3ea98` and the automatic's choice `0x3e9c4` / `0x188a0`; the engine `0x3ed68`
+  (torque `0x18a04`: points every 200 rpm; NITRO and the full-revs start); the drive and
+  brake split front/rear; the drags `0x3f260`; the axles `0x3f7b8` (locked `0x3f56c`,
+  rolling `0x3f60c`); the weight shift and the grips; `0x4071c`; the integration, the
+  world speed, the road-frame slip table `0xec320` / `0xec36c`; the body's lean; the yaw
+  torque (another for the rally); the road's edges `0x40230` (`0x401d8` how far the car
+  reaches, `0x3fed4` the wall); `0x4008c` the node's kind; the race's top speed.
+- **`0x4071c` reads the node's +0x12 word** (its slope, high half << 10, signed), of this
+  node and the next: the grip changes with the slope's change. Not the heading +0x16
+  (the first port's mistake: the runs parted at step 287).
+- **The wall** `0x3fed4`: a glancing touch turns the car off it; a hard one goes to
+  `0x78204` → `0x1cb14`, the crash (driving kind 4, the tumbling body `+0xc0` → `+0xc4`).
+  **Not ported yet**: the port counts it (`g_drive.crashed`).
+- **`car_on_road` `0x38808`**: gravity g = (dt >> 2) · 0x9cf5c >> 14, and g / 2 more
+  unless the options word `0x12da28` (the settings' `0x15d12a`) has 0x20 — softer
+  landings after a long jump, except on "tr6" (strcmp `0x83f40` with the track's name
+  `0x12da16`); in the air and landing (`+0x401` the steps in the air); on the road the
+  slope's push (`fix_sin(pitch >> 14) >> 8` · 2511, by 0x2666 while rising) and the
+  car tilted a quarter of the way to the road (`0x3871c`); a landing shakes the dashboard
+  (`0x12ba24`).
+- **`car_check_lap` `0x5056c`**: the finish of an open road `0x13c164` = the head's short
+  at +6 × 4 − 0xb5 (CY1 1739); of a circuit its length × 4 (`0x13bb80` the loop flag,
+  `0x13bb8c` the length). Past the finish, or before the start, the car drives itself
+  (`0x10180`, towards the road six nodes ahead, `0x10010`).
+- **Loading** (`load_car_pbs` `0x50c24`): SIMDATA/CARSPECS/<`0xede84[number]`>.PBS
+  (unpacked); the sum of bytes [0, 0x758) must equal +0x774, else +0x3c = 0; the rally's
+  scaling; `car_torque_load` `0x18990`: +0x3c × (automatic ? 0xf8 : 0x100) / 256, each
+  torque point at 0xb8 + 8i = mulr(mulr(mulr(t << 16, +0x5c), mulr(+0x3c, +0x64)), +0x14);
+  ABS and TCS from the player's choice and the car's +0x334 / +0x338; the downforce 0; the
+  gearbox 2 for the automatic, 0 by hand; `physics_setup` `0x3fb90` (the axles' weights
+  and grips); `car_reset` `0x50830`. The player's record `0x12da48 + 0x4b · slot`: +2 the
+  name, +0xb the car, +0xf automatic (= CONFIG +0x8d), +0x13 TCS (= CONFIG +0x8f == 0),
+  +0x17 ABS (= +0x99 == 0) (read off the snapshot).
+- **The car's size** (`car_setup_body` `0x512e8`): half its length 2 · PDN word 8, half
+  its width 2 · word 0, when words 0, 4, 8 are all set (SIMDATA/CARFAMS/<name>.PDN, the
+  name from `0xf6b10` / `0xf6ca0` / `0xf6e70`, no M); else the CFM model's extents
+  (+0x64a / +0x64e; not ported, every racer's PDN has them).
+- `0x8bb7c` is EA's arctangent: atan(x = the first stack argument, y = the second), 1024
+  a turn from the y axis (`ea_atan_1024`, `exe.c`).
+- **Not yet**: the crash; a circuit's laps counted (CY1 is open); the acceleration test's
+  figures; force feedback and the sounds (`0x52d2c`, `0x52e40`, `0x52ea8`); the replay
+  marks (`0x5c6d4`) and the race's greatest values (`0x2d71c`); the police and the other
+  cars pushing (`+0x3d9`..). `0x3ecc1` is never reached.
 
 ### 4.7 Drawing a frame
 

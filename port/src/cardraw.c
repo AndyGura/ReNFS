@@ -90,18 +90,14 @@ static int mul(int a, int b)
     return (int)((unsigned)a * (unsigned)b);
 }
 
-/* the shadow's centre and its two half axes, laid on the road's slope under the car
-   (0x38548 with 1): along it and across it turned by its yaw (0x384bc), then their
-   heights from the plane through the node's point A, the point B beside it (+0x1c ..
-   twice) and the next node's C (0x382f0) */
-static void shadow_axes(race_car *c)
+void car_road_plane(race_car *c, int yaw, vec3 *centre)
 {
     vec3 a, b, ctr = c->pos, pa, pb, pc, u, v, n;
     const unsigned char *r = node_ptr(c->node);
     int inv, q;
 
-    turn2d(0, c->half_len, -c->yaw_drawn, &a.x, &a.z);
-    turn2d(-c->half_wid, 0, -c->yaw_drawn, &b.x, &b.z);
+    turn2d(0, c->half_len, -yaw, &a.x, &a.z);
+    turn2d(-c->half_wid, 0, -yaw, &b.x, &b.z);
     a.y = b.y = 0;
     pa.x = node_i32(c->node, 8);
     pa.y = node_i32(c->node, 12);
@@ -130,7 +126,7 @@ static void shadow_axes(race_car *c)
     b.y = mul((-mul(b.x >> 8, n.x >> 8) - mul(b.z >> 8, n.z >> 8)) >> 8, inv);
     ctr.y = pa.y + mul((-mul(n.x >> 8, (ctr.x - pa.x) >> 8)
                         - mul((ctr.z - pa.z) >> 8, n.z >> 8)) >> 8, inv);
-    c->shadow = ctr;
+    *centre = ctr;
     c->along = a;
     c->across = b;
 }
@@ -155,7 +151,7 @@ static int car_place(race_car *c, int xy[8], int mirror)
         return 0;
     if (iabs(c->seen.x) > c->seen.z)
         return 0;
-    shadow_axes(c);
+    car_road_plane(c, c->yaw_drawn, &c->shadow);
     d.x = (c->shadow.x - g_camera->pos.x) >> 9;
     d.y = (c->shadow.y - g_camera->pos.y) >> 9;
     d.z = (c->shadow.z - g_camera->pos.z) >> 9;

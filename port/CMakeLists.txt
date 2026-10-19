@@ -9,7 +9,7 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 
-add_compile_options(-Wall -Wextra -O2)
+add_compile_options(-Wall -Wextra -O2 -fwrapv)
 
 # SDL2, linked dynamically (the MiSTer's hybrid framework is built around SDL2)
 find_package(PkgConfig REQUIRED)
@@ -35,7 +35,7 @@ add_executable(renfs
   src/raster.c
   src/poly.c
   src/road.c src/roaddraw.c src/sky.c src/view.c src/car.c src/camera.c src/dash.c src/hud.c src/race.c
-  src/model.c src/cardraw.c src/polyfill.c
+  src/model.c src/cardraw.c src/polyfill.c src/drive.c
   src/track.c
   src/exe.c
   src/trackinfo.c

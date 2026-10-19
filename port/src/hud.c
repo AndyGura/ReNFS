@@ -530,45 +530,6 @@ static void map_point(const map_view *v, int node, int *x, int *y)
     *y = mulr(v->s, dx) + mulr(v->c, dz);
 }
 
-/* EA's arctangent (0x8bb7c): a turn of 1024, from the y axis towards x; the smaller over
-   the larger as a 32-bit fraction, rounded to 1/256, into the table of an eighth of a
-   turn (0x12572c) */
-static int atan_1024(int x, int y)
-{
-    unsigned ax = (unsigned)(x < 0 ? -x : x), ay = (unsigned)(y < 0 ? -y : y), r;
-    int f = (y < 0 ? 8 : 0) | (x < 0 ? 0x10 : 0), t;
-
-    if (ax == ay)
-        t = 0x80;
-    else {
-        if (ax > ay) {
-            unsigned w = ax;
-            ax = ay;
-            ay = w;
-            f |= 4;
-        }
-        r = (unsigned)(((unsigned long long)ax << 32) / ay);
-        t = *exe_at(0x12572c + (r >> 24) + (r >> 23 & 1), 1);
-    }
-    switch (f) {
-    case 4:
-        return 0x100 - t;
-    case 8:
-        return 0x200 - t;
-    case 0xc:
-        return t + 0x100;
-    case 0x10:
-        return -t;
-    case 0x14:
-        return t - 0x100;
-    case 0x18:
-        return t - 0x200;
-    case 0x1c:
-        return -t - 0x100;
-    }
-    return t;
-}
-
 /* a racer's dot (0x32ac0): a square of 4 in its colour under the "pos1" ring, kept off
    the map's top and bottom rows */
 static void map_dot(int x, int y, int colour)
@@ -645,7 +606,7 @@ void hud_map(const hud_map_state *m)
     map_point(&v, seg_end, &x0, &y0);
     map_point(&v, seg_end + 8, &x1, &y1);
     t = y1 - y0;
-    a = atan_1024(x1 - x0, t + (t >> 2));
+    a = ea_atan_1024(x1 - x0, t + (t >> 2));
     c4 = mulr(4, -fix_cos(a));
     s4 = mulr(4, fix_sin(a));
     t = s4 - (s4 >> 2) + (s4 >> 4);

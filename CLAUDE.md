@@ -135,6 +135,8 @@ Main menu `0x42c30` (NOTES §4.2): the choices in CONFIG.DAT (+0x6d type, +0x91 
 +0x95 track, +0x9b car, +0x5f50 unlocks); typed codes SKCART EARALLYE CASINOVILLE
 CONCEPTCAR ROCKYROAD TURBO NITRO EXPLODE (`0x46e94`), End held = no mercy. Options
 `0x53a30`: +0x97 gearbox, +0x99 ABS, +0x8f traction (0 on, 1 off, 2 none).
+Driving (`0x10400` controls every 2nd step, `drive_player` `0x382d0`): the automatic
+starts in neutral (gear up = drive); `0x4071c` reads the node's slope +0x12 (NOTES §4.6).
 Menus: held keys, letters blended per pixel, an inverse colour table after every fade up
 (NOTES §4.2).
 
@@ -185,7 +187,8 @@ Data folder: `-data`, else `$RENFS_DATA`, else `./NFSSE`, else `NFSSE` beside th
 `RENFS_NOSOUND=1`: no sound; `RENFS_SNDWAV=f`: what is heard written to a WAV (checking);
 `RENFS_INPUT="<retrace>:<key> .."`: keys and mouse given at those retraces (esc enter
 space up down left right tab y n j f1-f4 bksp del click rclick m<x>,<y>, t<text> typed,
-k<letter> held; for `--shot` tests);
+k<letter> held; `<from>-<to>:<key>` holds a key through those retraces, several at
+once; for `--shot` tests);
 `RENFS_SHOTRAW=f`: `--shot` also writes the palette numbers (comparing by entry);
 `RENFS_CONFIG=f`: a CONFIG.DAT for the test (the original's, `nfsdos.py mem:156c14:5f52:f`).
 Sound: SDL's device at 44.1 kHz 16-bit stereo, each stream converted by an
@@ -208,7 +211,9 @@ wide line `0x8b195`; exact, `tools/polyfill_emu.py`), `hud.c` (the dashboard ove
 `0x30094`, `0x31684`, the needles, the map `0x31cb4`; pixel-exact, `tools/dash_emu.py`; NOTES §4.11), `track.c`
 (the TRI and its ring of sections), `trackinfo.c`, `trackfam.c`, `racepal.c`, `sky.c` (the sky, the mirror's horizon), `view.c` (windows, lens,
 matrices), `car.c` (cars' files, the grid), `camera.c` (the driver's eyes), `dash.c`
-(the dashboard's file, colours, places and BAMF lists), `race.c` (`--race`: the loading and the frame),
+(the dashboard's file, colours, places and BAMF lists), `drive.c` (the player's car driven: controls, gearbox, engine, tyres, walls, jumps;
+equal step for step, `tools/drive_emu.py`; NOTES §4.6), `race.c` (`--race`: the loading
+and the frame, a step every 3 ticks),
 `exe.c`: **the game's fixed tables are read from the CD's `NFS_DOS.EXE`** at the
 original's addresses (checked by a sum of the image), never copied into the port. The menus' look is checked against the
 original's screenshots by palette entry (DOSBox Staging changes colours slightly).

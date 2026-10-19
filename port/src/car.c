@@ -6,6 +6,7 @@
 #include "files.h"
 #include "exe.h"
 #include "roaddraw.h"
+#include "unpack.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -93,6 +94,36 @@ static int car_models(race_car *c, int id)
     return 1;
 }
 
+/* car_setup_body 0x512e8: the car's size from its PDN (SIMDATA/CARFAMS, loaded by
+   load_car_cfm 0x65874): its first three words are half its width, height and length
+   (the tumbling body's, 0x2c920); the car's +0x78, +0x7c twice its length and width.
+   (A PDN without them, the traffic's, gives the model's size: not here yet) */
+static void car_size(race_car *c, const char *name)
+{
+    char path[80];
+    long len, n;
+    unsigned char *d, *u;
+
+    snprintf(path, sizeof path, "SIMDATA/CARFAMS/%s.PDN", name);
+    d = file_load(path, &len);
+    if (!d)
+        return;
+    u = is_packed(d, len) ? unpack(d, len, &n) : (n = len, d);
+    if (u != d)
+        free(d);
+    if (u && n >= 12) {
+        int w = (int)(u[0] | u[1] << 8 | u[2] << 16 | (unsigned)u[3] << 24);
+        int h = (int)(u[4] | u[5] << 8 | u[6] << 16 | (unsigned)u[7] << 24);
+        int l = (int)(u[8] | u[9] << 8 | u[10] << 16 | (unsigned)u[11] << 24);
+
+        if (w && h && l) {
+            c->half_len = l * 2;
+            c->half_wid = w * 2;
+        }
+    }
+    free(u);
+}
+
 int car_load(race_car *c, int id)
 {
     const char *name;
@@ -129,6 +160,7 @@ int car_load(race_car *c, int id)
     c->pics_pal[1] = car_palette(bank, "!PAL");
     if (!car_models(c, id))
         return 0;
+    car_size(c, name);
     return 1;
 }
 
@@ -138,6 +170,8 @@ void car_free(race_car *c)
     model_free(&c->far_m);
     free(c->cfm);
     c->cfm = c->colours = 0;
+    free(c->spec);
+    c->spec = 0;
 }
 
 void cars_remap(race_car *const *cars, int n, const unsigned char *marks, int chase)

@@ -44,17 +44,19 @@ static int g_cursor_w, g_cursor_h, g_cursor_on;
 void (*g_retrace_hook)(void);
 
 /* RENFS_INPUT: keys and the mouse played in at given retraces, for pictures without a
-   window: "<retrace>:<what>" separated by spaces; <what> is a key (up down left right
-   enter esc space y n j tab f1..f4 bksp del), "click", "rclick" (held 6 retraces),
-   "m<x>,<y>", "t<text>": those letters typed, or "k<letter>": that letter's key held */
+   window: "<retrace>:<what>" or "<from>-<to>:<what>" (held from .. until) separated by
+   spaces; <what> is a key (up down left right enter esc space y n j tab f1..f4 bksp
+   del), "click", "rclick" (held 6 retraces unless a span is given), "m<x>,<y>",
+   "t<text>": those letters typed, or "k<letter>": that letter's key held */
 typedef struct {
-    unsigned long at;
+    unsigned long at, until;
     int scan, buttons, x, y;
     char text[16];
 } scripted;
 static scripted g_script[64];
 static int g_nscript;
-static int g_script_scan, g_script_buttons;
+static int g_script_buttons;
+static unsigned char g_script_held[0x59];
 
 static const struct { const char *name; int scan; } g_script_keys[] = {
     { "esc", 0x01 }, { "enter", 0x1c }, { "space", 0x39 }, { "up", 0x48 }, { "down", 0x50 },
@@ -72,11 +74,17 @@ static void script_parse(const char *s)
         unsigned long at;
         int n = 0;
         scripted *e = &g_script[g_nscript];
-        if (sscanf(s, " %lu:%15s%n", &at, what, &n) != 2)
-            break;
+        unsigned long until = 0;
+
+        if (sscanf(s, " %lu-%lu:%15s%n", &at, &until, what, &n) != 3) {
+            until = 0;
+            if (sscanf(s, " %lu:%15s%n", &at, what, &n) != 2)
+                break;
+        }
         s += n;
         memset(e, 0, sizeof *e);
         e->at = at;
+        e->until = until > at ? until : at + 6;
         e->x = -1;
         if (!strcmp(what, "click"))
             e->buttons = 1;
@@ -106,7 +114,8 @@ static void script_parse(const char *s)
 
 static void script_step(unsigned long retrace)
 {
-    g_script_scan = g_script_buttons = 0;
+    g_script_buttons = 0;
+    memset(g_script_held, 0, sizeof g_script_held);
     for (int i = 0; i < g_nscript; i++) {
         scripted *e = &g_script[i];
         if (e->x >= 0 && retrace == e->at) {
@@ -119,9 +128,9 @@ static void script_step(unsigned long retrace)
             for (const char *t = e->text; *t; t++)
                 key_put((unsigned char)*t);
         }
-        if (retrace >= e->at && retrace < e->at + 6) {
-            if (e->scan)
-                g_script_scan = e->scan;
+        if (retrace >= e->at && retrace < e->until) {
+            if (e->scan > 0 && e->scan < 0x59)
+                g_script_held[e->scan] = 1;
             g_script_buttons |= e->buttons;
         }
     }
@@ -426,7 +435,7 @@ int key_down(int scan)
     const Uint8 *k = SDL_GetKeyboardState(0);
     if (scan <= 0 || scan >= 0x59)
         return 0;
-    if (scan == g_script_scan)
+    if (g_script_held[scan])
         return 1;
     for (int i = 0; i < 2; i++)
         if (g_pc_keys[scan][i] && k[g_pc_keys[scan][i]])

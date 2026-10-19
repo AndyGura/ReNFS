@@ -6,6 +6,7 @@
 #include "cardraw.h"
 #include "config.h"
 #include "dash.h"
+#include "drive.h"
 #include "hud.h"
 #include "exe.h"
 #include "files.h"
@@ -30,32 +31,6 @@ static const int race_ids[RACE_CARS] = { 204, 201, 400, 7, 5, 0, 11, 6, 4 };
 #define RACERS 2
 #define MIRROR_SECTIONS 4      /* 0x13661c */
 #define DRAWN 28               /* the sections drawn ahead (0x136618) */
-
-/* the player's car's physics (SIMDATA/CARSPECS, 30FB): +0x36c the driver's eyes above
-   the road, +0x370 where the horizon is in the view, +0xac the engine's red line */
-static int car_spec(const char *name, int *eye, int *horizon, int *redline)
-{
-    char path[64];
-    long len, n;
-    unsigned char *d, *u;
-
-    snprintf(path, sizeof path, "SIMDATA/CARSPECS/%s.PBS", name);
-    d = file_load(path, &len);
-    if (!d)
-        return 0;
-    u = is_packed(d, len) ? unpack(d, len, &n) : (n = len, d);
-    if (u != d)
-        free(d);
-    if (!u || n < 0x374) {
-        free(u);
-        return 0;
-    }
-    *eye = u[0x36c] | u[0x36d] << 8 | u[0x36e] << 16 | u[0x36f] << 24;
-    *horizon = u[0x370] | u[0x371] << 8 | u[0x372] << 16 | u[0x373] << 24;
-    *redline = u[0xac] | u[0xad] << 8 | u[0xae] << 16 | u[0xaf] << 24;
-    free(u);
-    return 1;
-}
 
 static int quarter(int node)
 {
@@ -82,6 +57,34 @@ static void draw_mirror(race_camera *cam, const int *m)
     g_camera_m = m;
 }
 
+static int S32(const unsigned char *p, int at)
+{
+    return (int)(p[at] | p[at + 1] << 8 | p[at + 2] << 16 | (unsigned)p[at + 3] << 24);
+}
+
+/* a race step for the player's car (race_step 0x6348c, race_update_cars 0x519d8): the
+   flags from the step counter, the keyboard's word (controls_read 0x49248: both gear
+   keys at once hold the engine at full revs), every second step the controls applied,
+   then the driving; the counter on by 2 */
+static void race_step(race_car *player)
+{
+    int st = g_drive.steps;
+    unsigned w = drive_keyboard(g_road_mirror);
+
+    g_drive.flags = (st & 1 ? 0 : 1) | (st & 3 ? 0 : 4) | (st & 7 ? 0 : 0x10);
+    g_drive.revving[g_player] = (w & 0x3000) == 0x3000;
+    if (g_drive.revving[g_player])
+        w &= 0xcfff;
+    g_drive.controls[g_player] = w;
+    /* NITRO's keys: N with a shift or B */
+    g_drive.nitro_keys = key_down(0x31) && (key_down(0x2a) || key_down(0x36) || key_down(0x30));
+    g_drive.clock = (int)clock_ticks();
+    if (g_drive.flags & 4)
+        drive_controls(player);
+    drive_step(player);
+    g_drive.steps = st + 2;
+}
+
 int race_test(const char *name)
 {
     static race_car cars[RACE_CARS];
@@ -95,13 +98,26 @@ int race_test(const char *name)
     hud_map_state map;
     unsigned start;
     int mirror_skip = 0;
+    unsigned done = 0;
     const char *car = "F512TR";
 
     if (!exe_load() || !track_load(name) || !trackinfo_load(name, 1, 0)
-        || !trackfam_load(name, 1, 0) || !car_spec(car, &eye, &horizon, &redline)) {
-        fprintf(stderr, "renfs: the track %s or its car could not be loaded\n", name);
+        || !trackfam_load(name, 1, 0)) {
+        fprintf(stderr, "renfs: the track %s could not be loaded\n", name);
         return 0;
     }
+    config_load();             /* the player's settings, the records the status bar shows */
+    memset(&g_drive, 0, sizeof g_drive);
+    g_drive.state = 1;
+    g_drive.kind = 0;          /* City 1 (0x12da12), its first segment */
+    g_drive.catch_up = 1;      /* (0x12dd10, race_setup_record) */
+    g_drive.laps = 1;
+    /* where the race ends (race_main before 0x506dc): a circuit's laps, an open road's
+       last section less 45 nodes */
+    g_drive.last_node = g_track.loop ? g_track.length * 4
+        : (short)(g_track.head[6] | g_track.head[7] << 8) * 4 - 0xb5;
+    snprintf(g_drive.track, sizeof g_drive.track, "%s", name);
+    drive_default_keys();
     g_view.min_z = exe_i32(0xf7938);
     g_view.far_shift = *exe_at(0xf6aa4, 1);
     g_view.max_level = exe_i32(0xeaad8);
@@ -116,6 +132,15 @@ int race_test(const char *name)
             return 0;
         list[i] = &cars[i];
     }
+    /* the player's car ready to drive (cars_create 0x51388: load_car_pbs, car_reset),
+       with the options' gearbox, traction control and ABS */
+    cars[0].slot = 0;
+    if (!drive_load(&cars[0], config_word(CFG_AUTO), config_word(CFG_TCS) == 0,
+                    config_word(CFG_ABS) == 0))
+        return 0;
+    eye = S32(cars[0].spec, 0x36c);         /* the driver's eyes above the road */
+    horizon = S32(cars[0].spec, 0x370);     /* where the horizon is in the view */
+    redline = S32(cars[0].spec, 0xac);      /* the engine's red line */
     cars_queue_colours(list, RACE_CARS, marks);
     if (!dash_load(car, cars[0].number, 0))
         return 0;
@@ -171,7 +196,6 @@ int race_test(const char *name)
     /* the dashboard as the race starts: the status bar still black (its first 360
        steps), standing with the engine idling (+0x3c1 700 at the start) */
     memset(&g_hud, 0, sizeof g_hud);
-    config_load();             /* the records the status bar shows */
     g_hud.track = 0;           /* City 1 (0x12da12), its first segment */
     g_hud.table = 1;
     g_hud.shown = 1;
@@ -193,6 +217,16 @@ int race_test(const char *name)
 
     while (!g_quit && key_get() != 0x1b) {
         const int *m;
+
+        /* the race's steps: one each three ticks of the clock (the race clock's
+           three-cycle, race_timer_tick 0x4c454), the player's car driven */
+        while (done < (clock_ticks() - start) / 3) {
+            race_step(&cars[0]);
+            done++;
+        }
+        driver.steer = cars[0].steer;
+        driver.rpm = cars[0].rpm;
+        driver.speed = cars[0].speed;
 
         camera_update(&cam);
         /* the road's points (0x50070): its sections kept, gathered again when the
@@ -229,9 +263,7 @@ int race_test(const char *name)
         sky_draw(cam.yaw, m, &win, 0);
         road_objects_start();
         road_draw(DRAWN, cam.node, near, &win);
-        /* the race's steps, a third of the clock's ticks (until the race's own clock,
-           0x4c454's three-cycle, comes with the race's step) */
-        g_hud.steps = (int)((clock_ticks() - start) / 3);
+        g_hud.steps = g_drive.steps;
         map.node = (short)cars[0].node;
         for (i = 0; i < RACERS; i++)
             map.nodes[i] = (short)cars[i].node;

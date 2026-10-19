@@ -190,12 +190,23 @@ Ghidra project and `build/decomp`, one command). The git history was started aga
   equal pixel for pixel on all 11 snapshots and with a car put 2..10 nodes behind
   (`tools/mirror_emu.py`). `--race cy1` shows it. (The views' windows come from their
   layouts, not the program file's +0x10.)
+  **The player's car drives** (`drive.c`; NOTES §4.6 "The player's car driven"): the
+  keys sampled into a control word, the steering and pedals, the gearbox (the automatic
+  starts in neutral as the original: A puts it in drive), the engine and its torque
+  curve, the tyres' grip and sliding, the slope, the road's edges and walls, jumps and
+  landings, the car's physics file and size loaded; **equal to the original step for
+  step in 297 runs** on the 11 snapshots (`tools/drive_emu.py`: gas, weaving into the
+  walls, handbrake, manual, reverse, ABS/TCS, rally, circuit, drag strip, joystick,
+  revving, two players, jumps, NITRO). `--race cy1` drives: arrows, A / Z the gears,
+  space the handbrake (`build/shots/drive_strip.png`). A hard hit on a wall (the crash,
+  `0x1cb14`) is only counted so far.
   Not yet: the status bar's numbers after the start (`0x30d8c`: speed, gear, place,
   time, laps; they wait for the race's timing), the gear gate (`0x2e4f0`, map off), the
   HUD's keys (`0x2f644`), the map at 640x480, the replay's buttons (`0x5c5d0`), the doubled BAMF lists (detail),
   one-colour polygons (`0xaa990`), the police lights, the circuits' sky ring (`0x4ace8`),
   the roadside walls (`0x59294`, other tracks than the cities), 3D roadside models
-  (`0x66738`), the physics, the race's setup from the front end.
+  (`0x66738`), the crash, the opponents' and traffic's driving, the race's setup from
+  the front end.
 
 **Progress page for Danik**: https://claude.ai/artifact/VZdxTpYC3oLXYeBVJpoDoM (every step,
 its percent done and weight). Update its steps file after each finished step.
@@ -222,8 +233,10 @@ races 320x200 / 320x240; commit locally as the work goes.
    behind the options (credits, audio, graphics, controls, load / save), Danik chose
    (2026-10-19): **the race next**, the remaining menus later. In the race, the
    port now makes a first frame of its own (`--race cy1`), the cars, their shadows,
-   the racers' markers, the dashboard, the map and the mirror in it. Next: the player's car driving (the
-   physics, 33.3 steps a second), and with the race's timing the status bar's numbers.
+   the racers' markers, the dashboard, the map and the mirror in it, and the player's car
+   drives (equal step for step). Next: the crash (`0x78204` → `0x1cb14`, driving kind 4,
+   the tumbling body), the status bar's numbers (the race's timing), then the opponents'
+   driving (`drive_opponent` `0x7b34c`), the traffic, cars meeting cars, the sounds.
    Open: who writes `0x136618` (28 sections drawn: a detail setting?). The walls `0x59294`
    and the circuits' sky ring `0x4ace8` can be checked on CY1 memory with made-up input,
    or on snapshots of another track (`tools/nfsdos.py`).
