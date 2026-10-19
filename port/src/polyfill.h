@@ -14,6 +14,12 @@ void poly_fill(int n, const int *xy, poly_rows rows, int colour);
 /* a line from (x0, y0) to (x1, y1), both ends in, cut to the window (0x8bb3c) */
 void poly_line(int x0, int y0, int x1, int y1, int colour);
 
+/* EA's smoothed wide line (0x8b195): from (x0, y0) to (x1, y1) (16.16), w0 wide at the
+   start and w1 at the end, the edges' pixels blended into what is there through
+   blend[k] (k + 1 sixteenths of the colour); kept inside width x height and the window */
+void poly_wide_line(int x0, int y0, int x1, int y1, int colour,
+                    const unsigned char (*blend)[256], int w0, int w1, int width, int height);
+
 /* rows of one colour (0xa6e80, 0x8bc71's) */
 void poly_solid_rows(const int *left, const int *right, int y, int n, int colour);
 

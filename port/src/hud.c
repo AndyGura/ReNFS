@@ -20,10 +20,15 @@
 hud_status g_hud;
 hud_picture g_hud_screen;
 hud_picture g_hud_map_back;
+hud_picture g_hud_view;
+hud_picture g_hud_mirror;
+hud_picture g_hud_map;
 
 fsh_file g_mask;                     /* MASKLO.FSH (0x145604) */
 static unsigned char *g_mask_pal;    /* its "!pal", 6 bits (0x145608) */
 static int g_redraw;                 /* 0x12b8d4: the whole dashboard is due */
+static int g_wheel_shown;            /* 0x12b8d0: the wheel's picture on the screen (0x63
+                                        none), turned left < 0 */
 
 /* the window drawn into (0xf889c): a picture and its clip */
 static hud_picture g_win;
@@ -144,14 +149,19 @@ int hud_load(void)
     g_hud_map_back.w = 0x39;
     g_hud_map_back.h = 0x34;
     g_hud_map_back.pix = calloc(0x39 * 0x34, 1);
-    return g_hud_map_back.pix != 0;
+    g_hud_view.w = 320;                    /* 0x143e30, 0x143e34 */
+    g_hud_view.h = 200;
+    g_hud_view.pix = calloc(320 * 200, 1);
+    g_redraw = 1;
+    return g_hud_map_back.pix && g_hud_view.pix;
 }
 
 void hud_free(void)
 {
     fsh_free(&g_mask);
     free(g_hud_map_back.pix);
-    g_hud_map_back.pix = 0;
+    free(g_hud_view.pix);
+    g_hud_map_back.pix = g_hud_view.pix = 0;
 }
 
 /* a time (1/60 s) as minutes, seconds and tenths in grey digits (0x2d6b4 with 0x2d3ac:
@@ -237,5 +247,166 @@ void hud_redraw(void)
     poly_fill(4, corners, poly_shade_rows, 0);
     window_set(&g_hud_screen);
     status_bar();
+    g_wheel_shown = 0x63;
     g_redraw = 0;
+}
+
+void hud_redraw_due(void)
+{
+    g_redraw = 1;
+}
+
+static int u16(const unsigned char *p)
+{
+    return p[0] | p[1] << 8;
+}
+
+/* a picture through a BAMF list into the window (0x8b8f0): each span from its place in
+   the picture to its place in the window (by 64 KB bank), going on at the start of the
+   next row of both where the window's row ends. Only the 1:1 lists so far */
+static void bamf_copy(const hud_picture *from, const unsigned char *list)
+{
+    const unsigned char *p = list + 0x14;
+    int banks, b, n, i, sr, sc, dr, dc, len, k;
+    unsigned so, d;
+
+    if (!list || memcmp(list, "BAMF", 4) != 0
+        || ((unsigned)u16(list + 0xc) | (unsigned)u16(list + 0xe) << 16) != 0x10000)
+        return;
+    banks = u16(list + 8);
+    for (b = 0; b < banks; b++) {
+        n = u16(p);
+        p += 2;
+        for (i = 0; i < n; i++, p += 8) {
+            so = (unsigned)u16(p) | (unsigned)u16(p + 2) << 16;
+            d = (unsigned)b << 16 | (unsigned)u16(p + 4);
+            len = u16(p + 6);
+            sr = (int)(so / (unsigned)from->w);
+            sc = (int)(so % (unsigned)from->w);
+            dr = (int)(d / (unsigned)g_win.w);
+            dc = (int)(d % (unsigned)g_win.w);
+            while (len > 0 && sr < from->h && dr < g_win.h) {
+                k = dc + len > g_win.w ? g_win.w - dc : len;
+                memmove(g_win.pix + (long)dr * g_win.w + dc, from->pix + (long)sr * from->w + sc, k);
+                len -= k;
+                sr++, dr++;
+                sc = dc = 0;
+            }
+        }
+    }
+}
+
+/* how far the wheel is turned, 0 .. 6 (5 limits at 320x200, 3 never) */
+static int wheel_turn(int steer)
+{
+    int a = steer < 0 ? -steer : steer;
+
+    if (a < 0x74ccc)
+        return a < 0x26666 ? 0 : a < 0x66666 ? 1 : 2;
+    return a < 0x154ccc ? 4 : a < 0x1c6666 ? 5 : 6;
+}
+
+/* a gauge's needle: from its centre (the last point) to t/n of the way from one point
+   to the next, n 1024 or 10 (20 for km/h), the needle EA's smoothed line in the car's
+   colour (0x8b195) a pixel wide (0xea71c, 0xea720 less one at 320x200) */
+static void needle(int (*pt)[2], int count, int i, int t, int n, int number)
+{
+    int cx = pt[count - 1][0], cy = pt[count - 1][1], ex, ey;
+
+    if (n == 1024) {
+        ex = pt[i][0] + ((pt[i + 1][0] - pt[i][0]) * t >> 10);
+        ey = pt[i][1] + ((pt[i + 1][1] - pt[i][1]) * t >> 10);
+    } else {
+        ex = pt[i][0] + (pt[i + 1][0] - pt[i][0]) * t / n;
+        ey = pt[i][1] + (pt[i + 1][1] - pt[i][1]) * t / n;
+    }
+    poly_wide_line(cx << 16, cy << 16, ex << 16, ey << 16, g_needle_colour,
+                   (const unsigned char (*)[256])g_needle_blend,
+                   exe_i32(0xea71c + 20 * number) - 0x10000,
+                   exe_i32(0xea720 + 20 * number) - 0x10000, g_hud_view.w, g_hud_view.h);
+}
+
+/* the speed in three digits, the leading noughts blank (cars 3 and 11) */
+static void speed_digits(int v, int number)
+{
+    int d[3], i, x = number == 3 ? 0x99 : 0x58, y = number == 3 ? 0x98 : 0x62;
+    int step = number == 3 ? 4 : 7, leading = 1;
+
+    for (i = 0; i < 3; i++) {
+        d[i] = v >= 10 ? v % 10 : v;
+        v = v >= 10 ? v / 10 : 0;
+    }
+    for (i = 2; i >= 0; i--, x += step) {
+        const unsigned char *pic;
+
+        if (d[i] == 0 && i > 0 && leading)
+            pic = g_dash.digit[10];
+        else {
+            pic = g_dash.digit[d[i]];
+            leading = 0;
+        }
+        blit(pic, x, y, number == 0xb ? SEE_THROUGH : COPY);
+    }
+}
+
+/* the gauges' needles (0x2fc40): the engine's turns, the speed */
+static void needles(const hud_car *c)
+{
+    int rpm = c->rpm, v;
+    long long p;
+
+    if (rpm > c->redline + 0x3d4)
+        rpm = c->redline + 0x3d4;
+    needle(g_dash.tach_pt, g_dash.tach_n, rpm >> 10, rpm & 0x3ff, 1024, c->number);
+
+    p = (long long)(c->speed < 0 ? -c->speed : c->speed) * (g_hud.kmh ? 0x39999 : 0x23d70);
+    v = ((int)(p >> 16) + (int)((p >> 15) & 1)) >> 16;
+    if (g_dash.digital)
+        speed_digits(v, c->number);
+    else if (v > 0)
+        needle(g_dash.sped_pt, g_dash.sped_n, v / (g_hud.kmh ? 20 : 10), v % (g_hud.kmh ? 20 : 10),
+               g_hud.kmh ? 20 : 10, c->number);
+    else
+        needle(g_dash.sped_pt, g_dash.sped_n, 0, 0, 10, c->number);
+}
+
+void hud_frame(const hud_car *c)
+{
+    int turn = wheel_turn(c->steer), shown = c->steer < 0 ? -turn : turn;
+    /* the wheel's pictures turned left: steering left, or right on a mirrored track */
+    int left = g_hud.mirrored ? c->steer >= 0 : c->steer < 0;
+
+    /* (0x13c17c: nothing; the tickets 0xea81c, 0xea820: 0x30424; 0x306e8: the
+       dashboard's pictures loaded again: not yet) */
+    if (g_redraw)
+        hud_redraw();
+    window_set(&g_hud_screen);
+    bamf_copy(&g_hud_view, g_dash.list[g_hud.detail & 3]);
+    if (g_hud.mirror && g_hud_mirror.pix)          /* 0x5b040 */
+        blit_pixels(g_hud_mirror.pix, g_hud_mirror.w, g_hud_mirror.h,
+                    g_dash.place[0][0], g_dash.place[0][1], COPY);
+    clip_set(0, 0x102, 0, g_hud.running ? 0xc8 : 0xb4);
+    if (shown != g_wheel_shown)
+        blit_own(g_dash.wheel[!left][turn], SEE_THROUGH);
+    g_wheel_shown = shown;
+
+    /* the gauges in the view's picture, then their boxes to the screen */
+    window_set(&g_hud_view);
+    blit_own(g_dash.tach, COPY);
+    blit_own(g_dash.sped, c->number == 0xb ? SEE_THROUGH : COPY);
+    needles(c);
+    blit_own(g_dash.over_tach[!left][turn], SEE_THROUGH);
+    blit_own(g_dash.over_sped[!left][turn], SEE_THROUGH);
+    window_set(&g_hud_screen);
+    clip_set(g_dash.tach_box[0], g_dash.tach_box[0] + g_dash.tach_box[2],
+             g_dash.tach_box[1], g_dash.tach_box[1] + g_dash.tach_box[3]);
+    blit_pixels(g_hud_view.pix, g_hud_view.w, g_hud_view.h, 0, 0, COPY);
+    clip_set(g_dash.sped_box[0], g_dash.sped_box[0] + g_dash.sped_box[2],
+             g_dash.sped_box[1], g_dash.sped_box[1] + g_dash.sped_box[3]);
+    blit_pixels(g_hud_view.pix, g_hud_view.w, g_hud_view.h, 0, 0, COPY);
+
+    /* (0x2e4f0, 0x30214, 0x2f644, 0x30d8c: the status bar's numbers, not yet) */
+    if (g_hud.map && g_hud_map.pix)
+        blit_pixels(g_hud_map.pix, g_hud_map.w, g_hud_map.h, 0x103, 0x7e, COPY);
+    /* (0x5c5d0: the replay's buttons, not yet) */
 }

@@ -1,5 +1,6 @@
 /* The race's palette and what its pictures are turned into. */
 #include "racepal.h"
+#include "exe.h"
 #include "font.h"
 #include "polyfill.h"
 #include "video.h"
@@ -248,4 +249,31 @@ void hud_colours(void)
     memcpy(g_marker_colour, fixed, sizeof fixed);
     g_marker_colour[4] = (unsigned char)hud_nearest(63, 63, 63);   /* 0x13d5c4 */
     g_marker_line = hud_nearest(0, 0, 0);
+}
+
+/* t of the way from a to b (t 16.16, 0xa6040) */
+static int toward(int a, int b, int t)
+{
+    long long p = (long long)(b - a) * t;
+    return (int)(p >> 16) + (int)((p >> 15) & 1) + a;
+}
+
+unsigned char g_needle_blend[16][256];
+int g_needle_colour;
+
+void needle_colours(int number)
+{
+    const unsigned char *p8 = video_palette8();
+    int r = exe_i32(0xea710 + 20 * number), g = exe_i32(0xea714 + 20 * number);
+    int b = exe_i32(0xea718 + 20 * number), k, c, t;
+
+    g_needle_colour = nearest_colour((unsigned long)r << 16 | (unsigned long)g << 8 | (unsigned long)b);
+    for (k = 0; k < 16; k++) {
+        t = (k + 1) << 12;
+        for (c = 0; c < 256; c++)      /* (the palette read back from the card, 0x13cb48) */
+            g_needle_blend[k][c] = (unsigned char)nearest_colour(
+                (unsigned long)toward(p8[3 * c] & 0xfc, r, t) << 16
+                | (unsigned long)toward(p8[3 * c + 1] & 0xfc, g, t) << 8
+                | (unsigned long)toward(p8[3 * c + 2] & 0xfc, b, t));
+    }
 }

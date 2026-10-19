@@ -25,12 +25,32 @@ typedef struct {
     int splits;                /* 0x14ea70: splits shown */
     int best_lap;              /* 0x13c20c */
     int race_type;             /* 0x12da20 */
+    int detail;                /* 0x143e04: which of the dashboard's lists (0: 1:1) */
+    int mirror;                /* 0x143e08: the mirror shown */
+    int map;                   /* 0x12b988: the map shown */
+    int mirrored;              /* 0x12dd28: the track the other way round (the wheel too) */
+    int running;               /* 0xf6b74 = 1: the race running (else the clip to row
+                                  180 for the wheel) */
+    int kmh;                   /* 0x15d140: kilometres an hour, not miles */
 } hud_status;
+
+/* what the dashboard shows of the player's car */
+typedef struct {
+    int steer;                 /* +0x18: the wheel, 16.16, < 0 left */
+    int number;                /* +0x48a: which car */
+    int rpm;                   /* +0x3c1: the engine's turns a minute */
+    int redline;               /* its physics' +0xac: the most the needle shows, less
+                                  980 */
+    int speed;                 /* +0x68: metres a second, 16.16 */
+} hud_car;
 
 extern hud_status g_hud;
 extern fsh_file g_mask;              /* the HUD's pictures (0x145604) */
 extern hud_picture g_hud_screen;     /* the screen (0xa0000 at 320x200) */
 extern hud_picture g_hud_map_back;   /* 0xf4580 */
+extern hud_picture g_hud_view;       /* 0xf4578: the 3D view, painted off the screen */
+extern hud_picture g_hud_mirror;     /* 0xf457c: the mirror's view (none yet) */
+extern hud_picture g_hud_map;        /* 0xf4584: the map (none yet) */
 
 /* the HUD's pictures (load_cockpit_mask 0x5f7c8: SIMDATA/MISC/MASKLO.FSH, MASKLOG.FSH
    in German), their colours queued for re-colouring with the program's 13 at 0xf0 */
@@ -39,5 +59,10 @@ void hud_free(void);
 /* the whole dashboard drawn again, as a view starts (0x30094): the dashboard's picture,
    the map's dim background taken from it, the status bar */
 void hud_redraw(void);
+/* the whole dashboard drawn again at the next frame (0x2d284) */
+void hud_redraw_due(void);
+/* a frame in the driver's seat (0x31684): the view through the windows, the mirror, the
+   wheel, the gauges and the status bar's numbers over it */
+void hud_frame(const hud_car *c);
 
 #endif

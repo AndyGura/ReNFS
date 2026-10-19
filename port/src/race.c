@@ -30,8 +30,8 @@ static const int race_ids[RACE_CARS] = { 204, 201, 400, 7, 5, 0, 11, 6, 4 };
 #define DRAWN 28               /* the sections drawn ahead (0x136618) */
 
 /* the player's car's physics (SIMDATA/CARSPECS, 30FB): +0x36c the driver's eyes above
-   the road, +0x370 where the horizon is in the view */
-static int car_spec(const char *name, int *eye, int *horizon)
+   the road, +0x370 where the horizon is in the view, +0xac the engine's red line */
+static int car_spec(const char *name, int *eye, int *horizon, int *redline)
 {
     char path[64];
     long len, n;
@@ -50,6 +50,7 @@ static int car_spec(const char *name, int *eye, int *horizon)
     }
     *eye = u[0x36c] | u[0x36d] << 8 | u[0x36e] << 16 | u[0x36f] << 24;
     *horizon = u[0x370] | u[0x371] << 8 | u[0x372] << 16 | u[0x373] << 24;
+    *redline = u[0xac] | u[0xad] << 8 | u[0xae] << 16 | u[0xaf] << 24;
     free(u);
     return 1;
 }
@@ -67,11 +68,12 @@ int race_test(const char *name)
     race_camera cam;
     road_window win;
     const view_window *w;
-    int i, eye, horizon, near, gathered = -1;
+    int i, eye, horizon, redline, near, gathered = -1;
+    hud_car driver;
     const char *car = "F512TR";
 
     if (!exe_load() || !track_load(name) || !trackinfo_load(name, 1, 0)
-        || !trackfam_load(name, 1, 0) || !car_spec(car, &eye, &horizon)) {
+        || !trackfam_load(name, 1, 0) || !car_spec(car, &eye, &horizon, &redline)) {
         fprintf(stderr, "renfs: the track %s or its car could not be loaded\n", name);
         return 0;
     }
@@ -90,7 +92,7 @@ int race_test(const char *name)
         list[i] = &cars[i];
     }
     cars_queue_colours(list, RACE_CARS, marks);
-    if (!dash_load(car, 0))
+    if (!dash_load(car, cars[0].number, 0))
         return 0;
     dash_queue_colours();
     if (!hud_load())
@@ -98,6 +100,7 @@ int race_test(const char *name)
     video_mode(320, 200);
     pal_apply_pieces();
     race_colours(marks, RACE_CARS, 0);
+    needle_colours(cars[0].number);     /* (0x8a390, in race_colours) */
     /* (race_colours 0x2e74c goes on with the dashboard's pictures, then tints its palette)
        then the cars' pictures; in these races one racer against the player with the police
        on (0x12da30 = 1, 0x12da34), the chase of 0x6577c */
@@ -139,6 +142,19 @@ int race_test(const char *name)
     g_camera = &cam;
     g_road_paint.cars = cars_at_node;
 
+    /* the dashboard as the race starts: the status bar still black (its first 360
+       steps), standing with the engine idling (+0x3c1 700 at the start) */
+    memset(&g_hud, 0, sizeof g_hud);
+    g_hud.shown = 1;
+    g_hud.race_type = g_race_type;
+    g_hud.running = 1;
+    driver.steer = 0;
+    driver.number = cars[0].number;
+    driver.rpm = 700;
+    driver.redline = redline;
+    driver.speed = 0;
+    hud_redraw_due();
+
     while (!g_quit && key_get() != 0x1b) {
         const int *m;
 
@@ -164,11 +180,13 @@ int race_test(const char *name)
         win.y = w->y;
         win.w = w->cw;
         win.h = w->ch;
-        memset(g_fb, 0, sizeof g_fb);
-        raster_window(g_fb, 320, win.x, win.y, win.x + win.w, win.y + win.h);
+        /* the view painted off the screen (0xf4578), then the dashboard puts it on the
+           screen through its windows (0x31684) */
+        raster_window(g_hud_view.pix, g_hud_view.w, win.x, win.y, win.x + win.w, win.y + win.h);
         sky_draw(cam.yaw, m, &win, 0);
         road_objects_start();
         road_draw(DRAWN, cam.node, near, &win);
+        hud_frame(&driver);
         video_retrace();
     }
 

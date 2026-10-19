@@ -40,13 +40,15 @@ def race_palette(s, name, L, cars):
     marks = (U8 * n)()
     L.cars_queue_colours(keep, n, marks)
     car = s.read(0x12b990, 16).split(b"\0")[0]
-    if not L.dash_load(car, s.i32(0x12c308)):
+    number = struct.unpack("<i", s.raw(s.u32(0x13c24c + 4 * s.i32(0x12dd58)) + 0x48a, 4))[0]
+    if not L.dash_load(car, number, s.i32(0x12c308)):
         sys.exit("no dashboard")
     L.dash_queue_colours()
     if not L.hud_load():       # (load_cockpit_mask 0x5f7c8: its colours and the program's)
         sys.exit("no HUD")
     L.pal_apply_pieces()
     L.race_colours(marks, n, s.i32(0x12da20))
+    L.needle_colours(number)
     return keep, marks
 
 
@@ -115,6 +117,12 @@ def check(path, name, L):
     marks = bytes((U8 * 8).in_dll(L, "g_marker_colour")) + struct.pack("<i", ctypes.c_int.in_dll(L, "g_marker_line").value)
     if marks != s.read(0x13d5e8, 8) + s.read(0x13d5c8, 4):
         print("%s: the markers' colours differ: %s, original %s" % (path, marks.hex(), (s.read(0x13d5e8, 8) + s.read(0x13d5c8, 4)).hex()))
+    needle = struct.pack("<i", ctypes.c_int.in_dll(L, "g_needle_colour").value)[:1] + bytes(
+        (U8 * 4096).in_dll(L, "g_needle_blend"))
+    rec = s.u32(0x12b5f4)
+    theirs = s.raw(rec, 1) + s.raw(rec + 4, 4096)
+    print("   the needles' colours: %s" % ("equal" if needle == theirs else "%d of 4097 differ" % sum(
+        x != y for x, y in zip(needle, theirs))))
     want = s.read(0xf8118, 256)
     print("   shade table: %s" % ("equal" if shade == want else "%d entries differ" % sum(
         x != y for x, y in zip(shade, want))))

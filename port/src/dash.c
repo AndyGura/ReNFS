@@ -1,13 +1,137 @@
-/* The dashboard (NOTES §4.7). */
+/* The dashboard (load_dash 0x2e8d4; NOTES §4.7, §4.11). */
 #include "dash.h"
 #include "racepal.h"
 #include "exe.h"
+#include "files.h"
+#include "trackfam.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 dash_state g_dash;
 
-int dash_load(const char *car, int hires)
+static int s16(const unsigned char *p)
+{
+    return (short)(p[0] | p[1] << 8);
+}
+
+static int i32(const unsigned char *p)
+{
+    return (int)((unsigned)p[0] | (unsigned)p[1] << 8 | (unsigned)p[2] << 16 | (unsigned)p[3] << 24);
+}
+
+static const unsigned char *named(const char *name)
+{
+    shape s;
+
+    if (!fsh_find(&g_dash.file, name, &s)) {
+        fprintf(stderr, "renfs: the dashboard has no picture %.4s\n", name);
+        return 0;
+    }
+    return s.head;
+}
+
+/* a picture by the name in one of the program's tables of names */
+static const unsigned char *table_named(unsigned table, int i)
+{
+    return named((const char *)exe_at((unsigned)exe_i32(table + 4 * i), 4));
+}
+
+/* a picture's attachment block (type 0x7c) along its chain of blocks */
+static const unsigned char *attachment(const unsigned char *head)
+{
+    unsigned next;
+
+    while (head[0] != 0x7c) {
+        next = head[1] | head[2] << 8 | head[3] << 16;
+        if (!next)
+            return 0;
+        head += next;
+    }
+    return head;
+}
+
+/* a picture's points (its attachment block's from +8, x and y), each on the screen from
+   the picture's centre and the corner given: n of them, or (n < 0) as many as the block
+   says (+4), up to -n */
+static int points(const unsigned char *pic, int x, int y, int (*pt)[2], int n)
+{
+    const unsigned char *b = attachment(pic);
+    int i;
+
+    if (!b)
+        return 0;
+    if (n < 0)
+        n = b[4] < -n ? b[4] : -n;
+    for (i = 0; i < n; i++) {
+        pt[i][0] = s16(pic + 8) + i32(b + 8 + 8 * i) + x;
+        pt[i][1] = s16(pic + 10) + i32(b + 12 + 8 * i) + y;
+    }
+    return n;
+}
+
+/* the pictures and places the race's dashboard draws with (the 320x200 kind) */
+static int dash_places(const char *car, int number)
+{
+    char path[64];
+    long len;
+    int i, k;
+
+    g_dash.dash = named("dash");
+    g_dash.tach = named("tach");
+    g_dash.sped = named("sped");
+    if (!g_dash.dash || !g_dash.tach || !g_dash.sped)
+        return 0;
+    for (i = 0; i < 7; i++)
+        for (k = 0; k < 2; k++) {
+            g_dash.wheel[k][i] = table_named(k ? 0xea8d4 : 0xea8b8, i);
+            g_dash.over_tach[k][i] = table_named(k ? 0xea928 : 0xea8f0, i);
+            g_dash.over_sped[k][i] = table_named(k ? 0xea944 : 0xea90c, i);
+            if (!g_dash.wheel[k][i] || !g_dash.over_tach[k][i] || !g_dash.over_sped[k][i])
+                return 0;
+        }
+    g_dash.digital = number == 3 || number == 0xb;
+    if (g_dash.digital)
+        for (i = 0; i < 11; i++)
+            if (!(g_dash.digit[i] = table_named(0xea960, i)))
+                return 0;
+
+    /* the gauges' boxes: their pictures' places and sizes */
+    g_dash.tach_box[0] = s16(g_dash.tach + 0xc);
+    g_dash.tach_box[1] = s16(g_dash.tach + 0xe);
+    g_dash.tach_box[2] = s16(g_dash.tach + 4);
+    g_dash.tach_box[3] = s16(g_dash.tach + 6);
+    g_dash.sped_box[0] = s16(g_dash.sped + 0xc);
+    g_dash.sped_box[1] = s16(g_dash.sped + 0xe);
+    g_dash.sped_box[2] = s16(g_dash.sped + 4);
+    g_dash.sped_box[3] = s16(g_dash.sped + 6);
+
+    /* the dashboard's ten places: 8 and 9 kept from 2 and 3 */
+    if (points(g_dash.dash, s16(g_dash.dash + 0xc), s16(g_dash.dash + 0xe), g_dash.place, 10) < 10)
+        return 0;
+    for (i = 0; i < 2; i++)
+        for (k = 0; k < 2; k++)
+            g_dash.place[8 + i][k] -= g_dash.place[2 + i][k];
+
+    /* the needles' points, round each gauge from its box's corner */
+    g_dash.tach_n = points(g_dash.tach, g_dash.tach_box[0], g_dash.tach_box[1], g_dash.tach_pt, -30);
+    g_dash.sped_n = points(g_dash.sped, g_dash.sped_box[0], g_dash.sped_box[1], g_dash.sped_pt, -30);
+    /* the speedometer's point 12 half way between 11 and 13 */
+    for (k = 0; k < 2; k++)
+            g_dash.sped_pt[12][k] = (g_dash.sped_pt[11][k] + g_dash.sped_pt[13][k]) / 2;
+
+    snprintf(path, sizeof path, "SIMDATA/DASH/%sDL.FMM", car);
+    g_dash.fmm = file_load(path, &len);
+    if (ww_count(g_dash.fmm) < 4) {
+        fprintf(stderr, "renfs: %s is missing\n", path);
+        return 0;
+    }
+    for (i = 0; i < 4; i++)
+        g_dash.list[i] = ww_entry(g_dash.fmm, i);
+    return 1;
+}
+
+int dash_load(const char *car, int number, int hires)
 {
     char path[64];
     shape s;
@@ -35,12 +159,17 @@ int dash_load(const char *car, int hires)
         dash_free();
         return 0;
     }
+    if (!hires && !dash_places(car, number)) {
+        dash_free();
+        return 0;
+    }
     return 1;
 }
 
 void dash_free(void)
 {
     fsh_free(&g_dash.file);
+    free(g_dash.fmm);
     memset(&g_dash, 0, sizeof g_dash);
 }
 

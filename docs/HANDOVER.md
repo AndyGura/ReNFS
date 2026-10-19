@@ -172,10 +172,19 @@ Ghidra project and `build/decomp`, one command). The git history was started aga
   **The racers' markers** (`0x66b98`: the small triangle over each rival, its outline
   drawn by EA's line routine, exact on 10,000 random lines; colours from `0x55abc`):
   0 pixels differing with markers in (8 pixels of marker on e3).
-  Not yet: one-colour polygons (`0xaa990`), the
-  police lights, the circuits' sky ring (`0x4ace8`), the roadside walls (`0x59294`, other
-  tracks than the cities), 3D roadside models (`0x66738`, the same library), the mirror,
-  the dashboard and HUD, the physics, the race's setup from the front end.
+  **The dashboard** (`hud.c`, `dash.c`; NOTES §4.11): the whole picture as a view starts
+  (`0x30094`: the dashboard, the map's dim box, the status bar with its record time) and
+  every frame (`0x31684`): the view painted off the screen and copied through the
+  windscreen's BAMF list, the mirror's picture, the wheel turned by the steering, the two
+  gauges with their needles (EA's smoothed wide line `0x8b195`, exact on 10,000 random
+  lines; its blend table equal), all equal to the original pixel for pixel on e1 and e3
+  with the wheel, engine and speed set seven ways (`tools/dash_emu.py`). `--race cy1`
+  now shows the dashboard over the view.
+  Not yet: the status bar's numbers (`0x2e4f0`, `0x30214`, `0x2f644`, `0x30d8c`), the map
+  (`0x31cb4`), the replay's buttons (`0x5c5d0`), the doubled BAMF lists (detail),
+  one-colour polygons (`0xaa990`), the police lights, the circuits' sky ring (`0x4ace8`),
+  the roadside walls (`0x59294`, other tracks than the cities), 3D roadside models
+  (`0x66738`), the mirror's view, the physics, the race's setup from the front end.
 
 **Progress page for Danik**: https://claude.ai/artifact/VZdxTpYC3oLXYeBVJpoDoM (every step,
 its percent done and weight). Update its steps file after each finished step.
@@ -203,10 +212,10 @@ races 320x200 / 320x240; commit locally as the work goes.
    the main menu, the settings kept and the options screen done too. Next: the screens
    behind the options (credits, audio, graphics, controls, load / save), Danik chose
    (2026-10-19): **the race next**, the remaining menus later. In the race, the
-   port now makes a first frame of its own (`--race cy1`), the cars, their shadows
-   and the racers' markers in it. Next: the dashboard picture under the
-   view (`0x2e8bc`'s shapes, the BAMF lists), the mirror (`0x4fed8`, `0x5aa84`), then the
-   player's car driving (the physics, 33.3 steps a second), the fade table `0x8a390`.
+   port now makes a first frame of its own (`--race cy1`), the cars, their shadows,
+   the racers' markers and the dashboard in it. Next: the status bar's numbers and the
+   map, the mirror's view (`0x4fed8`, `0x5aa84`), then the player's car driving (the
+   physics, 33.3 steps a second).
    Open: who writes `0x136618` (28 sections drawn: a detail setting?). The walls `0x59294`
    and the circuits' sky ring `0x4ace8` can be checked on CY1 memory with made-up input,
    or on snapshots of another track (`tools/nfsdos.py`).

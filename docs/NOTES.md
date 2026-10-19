@@ -1376,8 +1376,8 @@ each tinted (`pal_tint_shape` `0x562e8`: `pal_tint(0, w·h/3)`). The dashboard's
 after, by `0x2e74c`, for its own pictures). On CY1 (r1, d): the ids 204, 201, 400, then
 the traffic (7, 5, 0, 11, 6, 4 in r1). `race_colours` `0x2e74c`: the DAC read back
 (`0x13cb48`), the allowed entries 0..254 less 0x47, 0x5f (with `0x12da20` < 2), 0xfa..0xff
-and the marks `0x14e5bc[i]`, the inverse table; then the fog table `0x8a390` (car `+0x48a`'s
-colour `0xea710`), the dashboard re-coloured and tinted, the DAC again into `0x12ba30`.
+and the marks `0x14e5bc[i]`, the inverse table; then the needles' colour table `0x8a390` (car `+0x48a`'s
+colour `0xea710`, §4.11), the dashboard re-coloured and tinted, the DAC again into `0x12ba30`.
 
 **The port's first race frame (`race.c`, `renfs --race cy1`, 2026-10-19).** The loading
 in `race_main`'s order: the track, its INFO and family, the nine cars' CFMs (r1's ids),
@@ -1669,16 +1669,69 @@ by `0x2d47c(v, x, y, step, n, table)`: n digits, the most significant first, cop
 **Ported (`port/src/hud.c`): equal to the original on e1 (the strip) and e3 (the bar),
 the screen and the map's background (`tools/dash_emu.py`).**
 
-**Each frame** `0x31684(car)` (to be ported): `0x306e8`; the redraw when due; the wheel's
-picture by |steering| (`+0x18`) in 7 steps (the limits at `0x31780`, other ones at
-640x480); the view copied to the screen through the dashboard's
-BAMF list `0x12b8a4[0x143e04]` (`0x8b8f0`; `<car>DL.FMM`, list 0 copies 1:1); the mirror
-(`0x5b040`); the wheel when it changed (`0x12b4e4`/`0x12b500`[i] see-through, the left or
-right one); into the view's picture the gauges (`tach` `0x12b4dc`, `sped` `0x12b4e0`, the
-needles `0x2fc40`, the wheel's parts over them `0x12b51c`.. ) then their two rectangles
-(`0x12b884`.., from `tach` and `sped`'s places and sizes) copied to the screen; the
-status bar's numbers (`0x2e4f0`, `0x30214`, `0x2f644`, `0x30d8c`) and the map (`0xf4584` at
-(0x103, 0x7e)).
+**Each frame** `0x31684(car)` (ported, `hud_frame`): nothing with `0x13c17c`; the
+tickets (`0xea81c`, `0xea820`: `0x30424`, not read); `0x306e8` (the dashboard loaded again
+when `0x12b5f0` = 0, else nothing); the redraw when `0x12b8d4` or `0x12b8d8`. The wheel's
+turn by |steering| (`+0x18`): below 0x26666 0, 0x66666 1, 0x74ccc 2 (3 never), 0x154ccc 4,
+0x1c6666 5, else 6 (640x480: 0x21999, 0x70000, 0xc8000, 0x133333, 0x1b0000 → 0..4, 5 above).
+The screen's window; **the view through the windows**: `0x8b8f0(view's pixels, list
+0x12b8a4[0x143e04])` (`0x12d9d9` = 3: another list, not read): a BAMF's spans, each from
+its offset in the picture (÷ its width) to bank·65536 + its offset in the window (÷ the
+window's width), going on at column 0 of the next row of both when the window's row ends
+(only 1:1 lists ported; the doubled ones step through `0x94aed` with `0x9471c`/`0xa6240`).
+**The mirror** (`0x5b040`, with `0x143e08`): its picture `0xf457c` copied at place 0
+(`0x12b604`). Then the clip `0x5885c(0, 0, 0x102, 200)` (180 when `0xf6b74` ≠ 1) and the
+wheel see-through at its place when the signed turn ≠ `0x12b8d0`: turned left
+(`0x12b4e4`[i], `wstr wl06 wl12 wl18 wl26 wl34 wl45` at `0xea8b8`) when steering left, or
+right on a mirrored track (`0x12dd28`), else `0x12b500`[i] (`0xea8d4`). Into the view's
+picture (clip its whole): `tach` copied at its place, `sped` too (see-through for car 11),
+**the needles** `0x2fc40`, the wheel's parts over the gauges see-through (`0x12b51c`/
+`0x12b538`, or `0x12b554`/`0x12b570`: `0xea8f0`.. `0xea944`); back on the screen, the
+two gauges' boxes (`0x12b884`, `0x12b894`: x, y, w, h of `tach` and `sped`) as clips and
+the view's picture copied at (0, 0) through each. Then `0x2e4f0(car)`, `0x30214`,
+`0x2f644`, `0x30d8c(car)` (the status bar's numbers: not yet), the map `0xf4584` at
+(0x103, 0x7e) with `0x12b988`, `0x5c5d0` (the replay's buttons, `0x7ef14`: not yet).
+`0x83908` between the steps is EA's timer service, nothing drawn.
+**Ported: every frame equal to the original's, on e1 and e3 with the wheel, engine and
+speed set seven ways (`tools/dash_emu.py`, the routines not yet ported left out of both).**
+
+**load_dash's places** (`0x2e8d4` from `0x2ee4b`): a picture's attachment block is the
+first of its chain of blocks (`+1`, 24 bits: the next) of type 0x7c: `+4` a count, from
+`+8` pairs of 32-bit x, y. Each point on the screen = the picture's centre (`+8`, `+0xa`)
++ the pair + its corner (`+0xc`, `+0xe`; for the gauges their box's x, y). `dash`: 10
+places `0x12b604` (0, 1 the mirror's corners; 8 and 9 then made relative to 2 and 3),
+`tach` its count `0x12b5f8` of points `0x12b65c`, `sped` `0x12b5fc` at `0x12b74c` (then
+point 12 the halfway of 11 and 13), `gate` 9 at `0x12b83c`. The lists:
+`SIMDATA/DASH/<car>DL.FMM` (`DH`), a wwww of 4, into `0x12b8a4`.. Cars 3 and 11 show the
+speed in digits (`0x12b5bc`, `num0`..`num9`, `numb` at `0xea960`).
+
+**The needles** `0x2fc40(car)`: the engine's turns `+0x3c1`, at most the physics' `+0xac`
+(the red line, 7240 the 512TR) + 0x3d4; point i = turns >> 10, t = turns & 1023: the end
+= point i + (point i+1 − point i)·t >> 10, from the last point (the centre). The speed:
+|`+0x68`| × 0x23d70 (mph; 0x39999 km/h with `0x15d140`), rounded, >> 16; per 10 mph (20
+km/h) a point, the part between by `idiv` (truncated). In digits (cars 3, 11: at (0x99,
+0x98) 4 apart, or (0x58, 0x62) 7 apart; see-through for 11): three, the two leading
+noughts blank (`numb`). Each needle `0x8b195(centre, end (16.16), the colour record
+0x12b5f4, widths 0xea71c, 0xea720 + 20·car, less 0x10000 at 320x200)`.
+**The colour record** `0x8a390(r, g, b, palette)` (made by `race_colours` `0x2e74c` from
+the car's `0xea710`: 0xff, 0, 0 for most, 0xff, 0x40, 0 for car 2): byte 0 the nearest
+colour, 1..3 r g b, from +4 16 tables of 256: k + 1 sixteenths of the way (`0xa6040`:
+a + (b − a)·t rounded) from each colour of the palette read back (`0x13cb48`, ·4) to
+r g b, each the nearest (`0x80c80`, through the inverse table). (Called "the fog table"
+before: it is the needles'.) **Equal to the original's on e1, e3, e5.**
+**EA's smoothed wide line** `0x8b195(x0, y0, x1, y1, record, w0, w1)`: steep (|dy| >
+|dx|) it steps a row at a time from the top end, the sides x ∓ w/2 of that end, their
+steps the slope ∓ (w1 − w0) / (2·rows); shallow the same by columns. Cut to the bounds
+`0x15ecc0`..`0x15ec90` across x and `0x15ecbc`..`0x15ec98` in y (0, and the view's size,
+set in `0x2e74c`) by `0x8a507` / `0x8a76f` (a quirk: after a cut of the sides the steep
+one checks its y against the x bounds). Each step: the side pixels blended through table
+(16ths covered) − 1, the ones between the colour. Steps that may leave the window are
+painted through the window's clip (`0x8a9d7`, `0x8adb2`; the near side only when inside
+it, `0xa6060`, `0x96090`, the middle by `0x8a2a0`), the others straight into the rows
+(`0x8ac1c`, `0x8aff7`). One pixel for both sides: blended by (both − 16), which below 1
+reads before the table in the fast painter (never for the needles, a pixel wide or more).
+**Ported (`poly_wide_line`): equal on 10,000 random lines of a pixel wide and more
+(`tools/polyfill_emu.py wide`).**
 
 ## 5. The original in DOSBox (2026-10-19)
 

@@ -200,11 +200,12 @@ The race so far: `raster.c` (the quad and triangle painters), `poly.c` (projecti
 the roadside objects; pixel-exact on the snapshots, `tools/roadpic_emu.py`), `model.c`
 (EA's 3D library: ORIP models placed, sorted, painted), `cardraw.c` (the cars as the road
 reaches their rows, their shadows, the racers' markers; pixel-exact, `tools/cars_emu.py`;
-NOTES §4.10), `polyfill.c` (EA's polygon filler `0x8bc71` and lines `0x8bb3c`; exact,
-`tools/polyfill_emu.py`), `track.c`
+NOTES §4.10), `polyfill.c` (EA's polygon filler `0x8bc71`, lines `0x8bb3c`, the smoothed
+wide line `0x8b195`; exact, `tools/polyfill_emu.py`), `hud.c` (the dashboard over the view:
+`0x30094`, `0x31684`, the needles; pixel-exact, `tools/dash_emu.py`; NOTES §4.11), `track.c`
 (the TRI and its ring of sections), `trackinfo.c`, `trackfam.c`, `racepal.c`, `sky.c`, `view.c` (windows, lens,
 matrices), `car.c` (cars' files, the grid), `camera.c` (the driver's eyes), `dash.c`
-(the dashboard's colours), `race.c` (`--race`: the loading and the frame),
+(the dashboard's file, colours, places and BAMF lists), `race.c` (`--race`: the loading and the frame),
 `exe.c`: **the game's fixed tables are read from the CD's `NFS_DOS.EXE`** at the
 original's addresses (checked by a sum of the image), never copied into the port. The menus' look is checked against the
 original's screenshots by palette entry (DOSBox Staging changes colours slightly).

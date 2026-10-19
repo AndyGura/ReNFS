@@ -5,9 +5,10 @@ edges) shaded through a random table by the original's 0x8a094 (0x8bc71 with the
 painter 0xa5dd4), run on a snapshot, and by the port's poly_fill (port/src/polyfill.c)
 on the same screen. Prints how many polygons differ and the first few.
 With `solid` the polygons are filled in one colour (0x8bc71, the racers' markers), with
-`line` random lines are drawn (0x8bb3c, their outlines).
+`line` random lines are drawn (0x8bb3c, their outlines), with `wide` smoothed wide lines
+through a random blend table (0x8b195, the gauges' needles).
 
-    build/venv/bin/python tools/polyfill_emu.py build/snap/e3.bin [count] [seed] [shade|solid|line]
+    build/venv/bin/python tools/polyfill_emu.py build/snap/e3.bin [count] [seed] [shade|solid|line|wide]
 """
 import ctypes, math, os, random, struct, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -16,6 +17,7 @@ import roadpic_emu as R
 
 U8 = ctypes.c_ubyte
 PTS = R.SCREEN + 0x70000
+BLEND = R.SCREEN + 0x60000
 
 
 def lib():
@@ -63,7 +65,14 @@ def main():
     s.write(0xf8118, shade)
     ctypes.memmove(ctypes.addressof((U8 * 256).in_dll(L, "g_shade")), shade, 256)
     fbuf = (U8 * (W * H))()
-    bad = 0
+    blend = bytes(rng.randrange(256) for _ in range(16 * 256))
+    mu.mem_write(BLEND, bytes([rng.randrange(256), 0, 0, 0]) + blend)
+    cblend = (U8 * (16 * 256)).from_buffer_copy(blend)
+    s.write(0x15ecc0, struct.pack("<i", 0))
+    s.write(0x15ec90, struct.pack("<i", W << 16))
+    s.write(0x15ecbc, struct.pack("<i", 0))
+    s.write(0x15ec98, struct.pack("<i", H << 16))
+    bad = painted = 0
     for k in range(count):
         clip = rng.choice([(0, 0, 320, 127), (0, 0, 320, 200), (16, 10, 300, 120)])
         s.write(0xf88a4, struct.pack("<4i", *clip))
@@ -82,7 +91,21 @@ def main():
         mu.mem_write(PTS, struct.pack("<%di" % (2 * len(pts)), *[v for p in pts for v in p]))
         flat = [v for p in pts for v in p]
         xy = (ctypes.c_int * (2 * len(pts)))(*flat)
-        if mode == "line":
+        if mode == "wide":
+            colour = mu.mem_read(BLEND, 1)[0]
+            ends = [rng.randrange(-40 << 16, 360 << 16), rng.randrange(-40 << 16, 240 << 16)]
+            if rng.random() < 0.7:     # short ones, as the needles
+                ends += [ends[0] + rng.randrange(-30 << 16, 30 << 16), ends[1] + rng.randrange(-30 << 16, 30 << 16)]
+            else:
+                ends += [rng.randrange(-40 << 16, 360 << 16), rng.randrange(-40 << 16, 240 << 16)]
+            # (below a pixel wide the original reads the bytes before its table)
+            ws = [rng.choice((0x10000, 0x20000, rng.randrange(0x10000, 0x60000))) for _ in range(2)]
+            if rng.random() < 0.5:
+                ws[1] = ws[0]
+            s.call(0x8b195, *ends, BLEND, *ws)
+            L.poly_wide_line(*ends, colour, cblend, *ws, W, H)
+            pts = [(ends[0] / 65536, ends[1] / 65536), (ends[2] / 65536, ends[3] / 65536), ws]
+        elif mode == "line":
             s.call(0x8bb3c, *flat, colour)
             L.poly_line(*flat, colour)
         elif mode == "solid":
@@ -93,14 +116,16 @@ def main():
             L.poly_fill(len(pts), xy, L.poly_shade_rows, 0)
         want = bytes(mu.mem_read(R.SCREEN, W * H))
         got = bytes(fbuf)
+        painted += sum(1 for a, b in zip(want, screen) if a != b) if k < 50 else 0
         if got != want:
             bad += 1
             if bad <= 5:
                 d = [i for i in range(W * H) if got[i] != want[i]]
                 print("shape %d %s window %s: %d pixels differ, first (%d, %d)" % (
                     k, pts, clip, len(d), d[0] % W, d[0] // W))
-    print("%d %s: %s" % (count, "lines" if mode == "line" else "polygons",
-                         "%d differ" % bad if bad else "all equal"))
+    print("%d %s: %s (the first 50 changed %d pixels)" % (
+        count, "lines" if mode in ("line", "wide") else "polygons",
+        "%d differ" % bad if bad else "all equal", painted))
 
 
 if __name__ == "__main__":

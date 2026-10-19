@@ -3,17 +3,29 @@
 the whole picture as a view starts (0x30094: the dashboard's picture, the map's dim
 background, the status bar) run on the snapshot's memory into its screen (0xa0000, 320
 a row), and the port's hud_redraw from a screen of the same colour, with the race's
-pictures and colours made by the port (as tools/cars_emu.py). Writes
-build/shots/dash_<snap>_{orig,port,diff}.png; `frame` also shows the original's whole
-frame (0x31684 after the redraw) as dash_<snap>_frame.png.
+pictures and colours made by the port (as tools/cars_emu.py). Then a whole frame in the
+driver's seat (0x31684 against hud_frame) with the wheel turned several ways, on the
+snapshot's view, mirror and map pictures, the routines not yet ported left out on both
+sides (LEFT_OUT). Writes build/shots/dash_<snap>_{orig,port,diff}.png and
+dash_<snap>_frame<k>_{orig,port}.png.
 
-    build/venv/bin/python tools/dash_emu.py cy1 build/snap/e3.bin [...] [frame]
+    build/venv/bin/python tools/dash_emu.py cy1 build/snap/e3.bin [...]
 """
 import ctypes, os, struct, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from snap_emu import Snap
+from snap_emu import Snap, game
+from unicorn import UC_HOOK_CODE
+from unicorn.x86_const import UC_X86_REG_ESP, UC_X86_REG_EIP
 import roadpic_emu as R
 import cars_emu
+
+# not yet ported: the status bar's numbers, the replay's buttons
+LEFT_OUT = {0x2e4f0: 0, 0x30214: 0, 0x2f644: 0, 0x30d8c: 0, 0x5c5d0: 0}
+# the wheel (straight, a little and far each way, all the way), the engine's turns and the
+# speed (metres a second, 16.16) of each frame; the first the snapshot's own
+STEERS = [None, -0x30000, 0x30000, 0x70000, -0x100000, 0x180000, -0x200000, 0, 0]
+RPMS = [None, 900, 1500, 3333, 5000, 6100, 7000, 9999, 0]
+SPEEDS = [None, 0x10000, -0x50000, 0x123456, 0x1c0000, 0x250000, 0x400000, 0x7fffff, 0]
 
 I = ctypes.c_int
 U8 = ctypes.c_ubyte
@@ -26,31 +38,101 @@ class Picture(ctypes.Structure):
 
 STATUS = [("shown", 0x12b940), ("steps", 0x145c94), ("mode", 0x12b8cc), ("table", 0x12dd24),
           ("track", 0x12da12), ("segment", 0x12da0e), ("circuit", 0x13bb80), ("ahead", 0x14ea6c),
-          ("splits", 0x14ea70), ("best_lap", 0x13c20c), ("race_type", 0x12da20)]
+          ("splits", 0x14ea70), ("best_lap", 0x13c20c), ("race_type", 0x12da20),
+          ("detail", 0x143e04), ("mirror", 0x143e08), ("map", 0x12b988), ("mirrored", 0x12dd28),
+          ("running", 0xf6b74), ("kmh", None)]
 
 
 class Status(ctypes.Structure):
     _fields_ = [(n, I) for n, _ in STATUS]
 
+
+class HudCar(ctypes.Structure):
+    _fields_ = [("steer", I), ("number", I), ("rpm", I), ("redline", I), ("speed", I)]
+
 W, H, VGA = 320, 200, 0xa0000
+
+
+def picture(s, at):
+    """an off-screen picture (0xf4578 ..): its size and pixels"""
+    rec = s.u32(at)
+    w, h = struct.unpack("<2I", s.raw(rec, 8))
+    return w, h, bytes(s.raw(struct.unpack("<I", s.raw(rec + 0x2c, 4))[0] + 0x10, w * h))
 
 
 def map_back(s):
     """the map's background (0xf4580): its picture's pixels"""
-    rec = s.u32(0xf4580)
-    w, h = struct.unpack("<2I", s.raw(rec, 8))
-    return bytes(s.raw(struct.unpack("<I", s.raw(rec + 0x2c, 4))[0] + 0x10, w * h))
+    return picture(s, 0xf4580)[2]
 
 
-def original(s, frame=False):
-    """the screen after the redraw (and one frame), from a screen of FILL"""
+def player(s):
+    return s.u32(0x13c24c + 4 * s.i32(0x12dd58))
+
+
+def left_out(s):
+    def hook(mu, addr, size, k):
+        sp = mu.reg_read(UC_X86_REG_ESP)
+        ret = struct.unpack("<I", bytes(mu.mem_read(sp, 4)))[0]
+        mu.reg_write(UC_X86_REG_ESP, sp + 4 + 4 * k)
+        mu.reg_write(UC_X86_REG_EIP, ret)
+    for at, k in LEFT_OUT.items():
+        s.mu.hook_add(UC_HOOK_CODE, hook, k, begin=game(at), end=game(at))
+
+
+def original(s):
+    """the screen after the redraw, from a screen of FILL"""
     s.mu.mem_write(VGA, bytes([FILL]) * (W * H))
     s.write(0x12b8d4, struct.pack("<I", 1))
-    if frame:
-        s.call(0x31684, eax=s.u32(0x13c24c + 4 * s.i32(0x12dd58)))
-    else:
-        s.call(0x30094)
+    s.call(0x30094)
     return bytes(s.mu.mem_read(VGA, W * H))
+
+
+def original_frames(path):
+    """the screen after a frame from a screen of FILL (the dashboard drawn again first),
+    then after one more with each turn of the wheel"""
+    s = Snap(path)
+    left_out(s)
+    car = player(s)
+    s.mu.mem_write(VGA, bytes([FILL]) * (W * H))
+    s.write(0x12b8d4, struct.pack("<I", 1))
+    got = []
+    for k in range(len(STEERS)):
+        for at, v in ((0x18, STEERS[k]), (0x3c1, RPMS[k]), (0x68, SPEEDS[k])):
+            if v is not None:
+                s.mu.mem_write(car + at, struct.pack("<i", v))
+        s.call(0x31684, eax=car)
+        got.append(bytes(s.mu.mem_read(VGA, W * H)))
+    return got
+
+
+def port_frames(s, L):
+    """the same frames by the port, after hud_redraw's screen"""
+    for at, name in ((0xf4578, "g_hud_view"), (0xf457c, "g_hud_mirror"), (0xf4584, "g_hud_map")):
+        w, h, pix = picture(s, at)
+        p = Picture.in_dll(L, name)
+        if name != "g_hud_view":
+            keep = ctypes.create_string_buffer(pix, len(pix))
+            KEEP.append(keep)
+            p.w, p.h, p.pix = w, h, ctypes.addressof(keep)
+        else:
+            ctypes.memmove(p.pix, pix, w * h)
+    scr = Picture.in_dll(L, "g_hud_screen")
+    ctypes.memset(scr.pix, FILL, W * H)
+    L.hud_redraw_due()
+    a = player(s)
+    g = lambda at, o: struct.unpack("<i", s.raw(at + o, 4))[0]
+    car = HudCar(g(a, 0x18), g(a, 0x48a), g(a, 0x3c1), g(g(a, 0x479), 0xac), g(a, 0x68))
+    got = []
+    for k in range(len(STEERS)):
+        for f, v in (("steer", STEERS[k]), ("rpm", RPMS[k]), ("speed", SPEEDS[k])):
+            if v is not None:
+                setattr(car, f, v)
+        L.hud_frame(ctypes.byref(car))
+        got.append(ctypes.string_at(scr.pix, W * H))
+    return got
+
+
+KEEP = []
 
 
 def port(s, name, L):
@@ -58,12 +140,12 @@ def port(s, name, L):
     ctypes.memmove(ctypes.addressof((U8 * 0x5f52).in_dll(L, "g_config")), s.read(0x156c14, 0x5f52), 0x5f52)
     st = Status.in_dll(L, "g_hud")
     for n, a in STATUS:
-        setattr(st, n, s.i32(a))
+        setattr(st, n, s.i32(a) if a else struct.unpack("<h", s.read(0x15d140, 2))[0])
     scr = Picture.in_dll(L, "g_hud_screen")
     ctypes.memset(scr.pix, FILL, W * H)
     L.hud_redraw()
     back = Picture.in_dll(L, "g_hud_map_back")
-    got = ctypes.string_at(scr.pix, W * H), ctypes.string_at(back.pix, back.w * back.h)
+    got = ctypes.string_at(scr.pix, W * H), ctypes.string_at(back.pix, back.w * back.h), port_frames(s, L)
     for c in cars:
         L.car_free(ctypes.byref(c))
     return got
@@ -76,20 +158,18 @@ def palette(s):
 
 def main():
     name, args = sys.argv[1], sys.argv[2:]
-    frame = "frame" in args
     os.makedirs("build/shots", exist_ok=True)
     L = cars_emu.lib()
     L.files_init(b"NFSSE", None)
     if not L.exe_load():
         sys.exit("no NFS_DOS.EXE")
-    for path in (a for a in args if a != "frame"):
+    for path in args:
         s = Snap(path)
         tag = os.path.splitext(os.path.basename(path))[0]
         pal = palette(s)
-        if frame:
-            R.png("build/shots/dash_%s_frame.png" % tag, original(Snap(path), True), pal)
+        frames = original_frames(path)
         want, want_back = original(s), map_back(s)
-        got, got_back = port(s, name, L)
+        got, got_back, got_frames = port(s, name, L)
         R.png("build/shots/dash_%s_orig.png" % tag, want, pal)
         R.png("build/shots/dash_%s_port.png" % tag, got, pal)
         diff = [255 if a != b else 0 for a, b in zip(want, got)]
@@ -98,6 +178,12 @@ def main():
         db = sum(1 for a, b in zip(want_back, got_back) if a != b)
         print("%s: %d pixels differ%s; the map's background: %d differ" % (
             tag, len(d), " (first %d, %d)" % (d[0] % W, d[0] // W) if d else "", db))
+        for k, (a, b) in enumerate(zip(frames, got_frames)):
+            d = [i for i in range(W * H) if a[i] != b[i]]
+            R.png("build/shots/dash_%s_frame%d_orig.png" % (tag, k), a, pal)
+            R.png("build/shots/dash_%s_frame%d_port.png" % (tag, k), b, pal)
+            print("  frame %d (the wheel %s, rpm %s, speed %s): %d pixels differ%s" % (
+                k, STEERS[k], RPMS[k], SPEEDS[k], len(d), " (first %d, %d)" % (d[0] % W, d[0] // W) if d else ""))
 
 
 if __name__ == "__main__":

@@ -32,6 +32,13 @@ void car_pics_remap(unsigned char *bank, const unsigned char *pal, int mark, int
    each colour of the palette set times f (16.16, 0x9999 = 0.6), to the nearest allowed */
 void shade_make(int f);
 
+/* the gauges' needles' colour (0x8a390, from race_colours 0x2e74c: the car's (number
+   +0x48a) at 0xea710) and its 16 blends into each colour of the palette set, from 1/16
+   of it to all of it, each the nearest allowed */
+void needle_colours(int number);
+extern unsigned char g_needle_blend[16][256];
+extern int g_needle_colour;
+
 /* the HUD's colours (0x55abc, before the shade table): the palette's nearest to some
    fixed ones (0x55790); so far the racers' markers' */
 void hud_colours(void);

@@ -508,3 +508,15 @@
 0x2d284 dash_redraw_due
 0x5f240 hud_find_pictures
 0x314e4 hud_frame
+0x5b040 mirror_copy
+0x2fc40 dash_needles
+0x8b195 wide_line_smooth
+0x8a507 wide_line_cut_steep
+0x8a76f wide_line_cut_shallow
+0x8a9d7 wide_line_rows_cut
+0x8ac1c wide_line_rows
+0x8adb2 wide_line_cols_cut
+0x8aff7 wide_line_cols
+0x8a390 blend_colour_make
+0xa6040 lerp_fixed
+0x96090 get_pixel

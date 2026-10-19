@@ -852,3 +852,217 @@ void poly_shade_rows(const int *left, const int *right, int y, int n, int colour
             p[x] = g_shade[p[x]];
     }
 }
+
+/* EA's smoothed wide line (0x8b195): stepped a row at a time when it is steep, a column
+   at a time when it is shallow; on each the span from one side to the other, the end
+   pixels blended into what is there by how much of them it covers (in 16ths), the ones
+   between in the colour. A cut of it into the bounds first (0x8a507, 0x8a76f); then the
+   steps that may leave the window are painted pixel by pixel through the window
+   (0x8a9d7, 0x8adb2), the others straight into the rows (0x8ac1c, 0x8aff7). */
+typedef struct {
+    int steep;
+    int a, a_end;              /* along: y (steep) or x, 16.16 */
+    int lo, hi;                /* the sides across, 16.16 */
+    int s_lo, s_hi;            /* their steps */
+    int amin, amax, cmin, cmax;    /* the bounds along and across, 16.16 */
+    int xmin, xmax;            /* the bounds in x, 16.16 (the cut's checks along) */
+    int wc0, wc1;              /* the window across */
+    int colour;
+    const unsigned char (*blend)[256];
+} wide;
+
+/* a times b, 16.16, rounded by the last bit out */
+static int fmul(int a, int b)
+{
+    int64_t p = (int64_t)a * b;
+    return (int)(uint32_t)(p >> 16) + (int)((p >> 15) & 1);
+}
+
+static int fdiv(int a, int b)
+{
+    return (int)(((int64_t)a << 16) / b);
+}
+
+/* 0 nothing to draw; else 1, or 2 when it may leave the bounds across */
+static int wide_cut(wide *w)
+{
+    int d, partial;
+
+    if (w->a_end < w->amin || w->a >= w->amax)
+        return 0;
+    if (w->a < w->amin) {
+        d = w->amin - w->a;
+        w->lo += fmul(w->s_lo, d);
+        w->hi += fmul(w->s_hi, d);
+        w->a = w->amin;
+    }
+    if (w->a_end > w->amax)
+        w->a_end = w->amax;
+    partial = w->lo < w->cmin || w->hi >= w->cmax;
+    if (w->hi < w->cmin) {
+        if (w->s_hi <= 0)
+            return 0;
+        d = fdiv(w->cmin - w->hi, w->s_hi);
+        w->a += d;
+        if (w->a >= w->xmax || w->a < w->xmin)
+            return 0;
+        w->hi = w->cmin;
+        w->lo += fmul(w->s_lo, d);
+        partial = 1;
+    }
+    if (w->lo >= w->cmax) {
+        if (w->s_lo >= 0)
+            return 0;
+        d = fdiv(w->cmax - w->lo + 1, w->s_lo);
+        w->a += d;
+        if (w->a >= w->xmax || w->a < w->xmin)
+            return 0;
+        w->hi += fmul(w->s_hi, d);
+        w->lo = w->cmax - 1;
+        partial = 1;
+    }
+    return 1 + partial;
+}
+
+/* the pixel at (along, across) */
+static int wide_get(const wide *w, int a, int c)
+{
+    int x = w->steep ? c : a, y = w->steep ? a : c;
+
+    return x >= g_wx0 && x < g_wx1 && y >= g_wy0 && y < g_wy1 ? raster_row(y)[x] : 0;
+}
+
+static void wide_put(const wide *w, int a, int c, int colour)
+{
+    plot(w->steep ? c : a, w->steep ? a : c, colour);
+}
+
+static void wide_blend(const wide *w, int a, int c, int level)
+{
+    wide_put(w, a, c, w->blend[level - 1][wide_get(w, a, c)]);
+}
+
+/* the steps that may leave the window, until one lies inside it (0x8a9d7, 0x8adb2) */
+static void wide_cut_steps(wide *w)
+{
+    int at = w->a >> 16, l, r, fl, fr;
+
+    for (; w->a < w->a_end; w->lo += w->s_lo, w->hi += w->s_hi, w->a += 0x10000, at++) {
+        r = w->hi >> 16;
+        l = w->lo >> 16;
+        if ((w->wc0 <= l && w->wc1 > r) || (w->wc0 > l && w->wc0 > r)
+            || (w->wc1 <= l && w->wc1 <= r))
+            return;
+        fl = (0x10000 - (w->lo & 0xffff)) >> 12;
+        fr = (w->hi & 0xffff) >> 12;
+        if (r == l) {
+            fr += fl - 16;
+            if (fr > 0)
+                wide_blend(w, at, r, fr);
+            continue;
+        }
+        if (fl && w->wc0 < l)
+            wide_blend(w, at, l, fl);
+        if (l + 1 < r) {
+            if (w->steep)
+                raster_fill(l + 1, at, r - l - 1, 1, w->colour);
+            else
+                raster_fill(at, l + 1, 1, r - l - 1, w->colour);
+        }
+        if (fr && w->wc1 > r)
+            wide_blend(w, at, r, fr);
+    }
+}
+
+/* the steps inside the bounds, straight into the rows (0x8ac1c, 0x8aff7) */
+static void wide_steps(wide *w)
+{
+    int at = w->a >> 16, l, n, fl, fr, lvl;
+    unsigned char *p;
+    long step;
+
+    for (; w->a < w->a_end && w->hi < w->cmax && w->lo >= w->cmin;
+         w->lo += w->s_lo, w->hi += w->s_hi, w->a += 0x10000, at++) {
+        fr = (w->hi & 0xffff) >> 12;
+        l = w->lo >> 16;
+        n = (w->hi >> 16) - l;
+        fl = (0x10000 - (w->lo & 0xffff)) >> 12;
+        if (w->steep) {
+            p = raster_row(at) + l;
+            step = 1;
+        } else {
+            p = raster_row(l) + at;
+            step = raster_row(1) - raster_row(0);
+        }
+        if (n == 0) {
+            lvl = fr + fl - 16;
+            if (lvl > 0)       /* (below 1 the original reads before its table) */
+                *p = w->blend[lvl - 1][*p];
+            continue;
+        }
+        if (fl)
+            *p = w->blend[fl - 1][*p];
+        for (p += step, n--; n; p += step, n--)
+            *p = (unsigned char)w->colour;
+        if (fr)
+            *p = w->blend[fr - 1][*p];
+    }
+}
+
+void poly_wide_line(int x0, int y0, int x1, int y1, int colour,
+                    const unsigned char (*blend)[256], int w0, int w1, int width, int height)
+{
+    int dx = x1 - x0, dy = y1 - y0, dw, h;
+    wide w;
+
+    if ((dx < 0 ? -dx : dx) < 0x10000 && (dy < 0 ? -dy : dy) < 0x10000)
+        return;
+    raster_clip(&g_wx0, &g_wy0, &g_wx1, &g_wy1);
+    w.colour = colour;
+    w.blend = blend;
+    w.xmin = 0;
+    w.xmax = width << 16;
+    w.steep = (dy < 0 ? -dy : dy) > (dx < 0 ? -dx : dx);
+    if (w.steep) {
+        dw = (w1 - w0) / (2 * (dy >> 16));
+        if (dy < 0) {
+            w.a = y1, w.a_end = y0, h = w1 / 2;
+            w.lo = x1 - h, w.hi = x1 + h;
+        } else {
+            w.a = y0, w.a_end = y1, h = w0 / 2;
+            w.lo = x0 - h, w.hi = x0 + h;
+        }
+        dx /= dy >> 16;
+        w.s_lo = dx - dw;
+        w.s_hi = dx + dw;
+        w.amin = 0, w.amax = height << 16;
+        w.cmin = 0, w.cmax = width << 16;
+        w.wc0 = g_wx0, w.wc1 = g_wx1;
+    } else {
+        dw = (w1 - w0) / (2 * (dx >> 16));
+        if (dx < 0) {
+            w.a = x1, w.a_end = x0, h = w1 / 2;
+            w.lo = y1 - h, w.hi = y1 + h;
+        } else {
+            w.a = x0, w.a_end = x1, h = w0 / 2;
+            w.lo = y0 - h, w.hi = y0 + h;
+        }
+        dy /= dx >> 16;
+        w.s_lo = dy - dw;
+        w.s_hi = dy + dw;
+        w.amin = 0, w.amax = width << 16;
+        w.cmin = 0, w.cmax = height << 16;
+        w.wc0 = g_wy0, w.wc1 = g_wy1;
+    }
+    switch (wide_cut(&w)) {
+    case 0:
+        return;
+    case 2:
+        wide_cut_steps(&w);
+    }
+    if (w.a < w.a_end) {
+        wide_steps(&w);
+        if (w.a < w.a_end)
+            wide_cut_steps(&w);
+    }
+}
