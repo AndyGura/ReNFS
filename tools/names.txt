@@ -350,3 +350,16 @@
 0x50070 road_frame_points
 0x5004c road_force_gather
 0x59a74 road_transform
+0x80e24 findshape_or_0
+0x5b1dc find_any_case
+0x5b270 mark_see_through
+0x5b2f8 fill_sizes
+0x55ea0 pal_queue_piece
+0x55f58 pal_apply_pieces
+0x55e68 pal_queue_remap
+0x55fa8 pal_apply_remaps
+0x55ee0 pal_remap
+0x560bc pal_set_tint
+0x560ec pal_tint
+0x41b68 atofixed
+0x38c50 info_read_line

@@ -37,6 +37,9 @@ add_executable(renfs
   src/road.c
   src/track.c
   src/exe.c
+  src/trackinfo.c
+  src/racepal.c
+  src/trackfam.c
 )
 target_include_directories(renfs PRIVATE ${SDL2_INCLUDE_DIRS})
 target_compile_options(renfs PRIVATE ${SDL2_CFLAGS_OTHER})

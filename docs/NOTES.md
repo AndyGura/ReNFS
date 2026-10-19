@@ -1142,6 +1142,62 @@ Still to name: the opponents' routines under `drive_opponent` (`0x7cf98` 2.6 KB,
 not 0: the replay?), `0x2a918`, the second drawing pass `0x5a4f0`, the widget block
 `0x71208`..`0x74dcc`, Watcom's runtime.
 
+### 4.9 The race's palette and its textures (2026-10-19)
+
+One palette for everything in a race, made of **pieces**: `pal_queue_piece` `0x55ea0(start,
+count, pal)` lists them (50 at most, 0x13c7f0), `0x55f58` sets them all (setpalette) after
+the loading, once, in `race_main`. In CY1 (d2): 0x90+0x60 the road's palette, 0x30+0x17
+and 0x48+0x17 the two racers' cars (`car+0x526`, `0x64e14`: starts and counts `0xf6ea0`,
+`0xf6ec8`), 0x47 and 0x5f one entry each (`0xf6f5c` + 3 · car`+0x48a`: the cars'
+indicators?), 0x60..0x8f six traffic cars of 8, 0xfa+4 (`0xf6de0`, the program's), 0+0x30
+(`0x12b5ec`, `0x2e8bc`: the dashboard?), 0xf0+0xd (the program's `0xf6d18`). The pictures
+that come with palettes of their own are **re-coloured**: `pal_queue_remap` `0x55e68(bank,
+pal)` lists them (100 at most, 0x13ce48), `0x55fa8` does them after the pieces are set and
+the race's inverse table is made (`0x2e74c`): `0x55ee0(bank, pal)` = `0x95d20(0, 0xff,
+pal)` (6 bits to 8: (v·255 + 32) / 63, `0xa2f10`; then `nearestcolour` of each of entries
+0..254 into `0xf9520`, `0xaa1f0`), 255 stays 255 (`0xf961f`), and every shape of the bank
+not named `!..` has its w·h pixels mapped. Both lists stay in memory after use (the counts
+go to 0): a snapshot shows every piece and every bank (14 pieces, 64 banks in d2).
+**The tint**: every loaded palette goes through `pal_tint` `0x560ec(from, to, pal)` in place
+(6-bit triples): c = c · scale / 256 (red `0x13d58c`, green `0x13d594`, blue `0x13d598`,
+negative → 0), then c += (max − c) · towards >> 16 (`0x13d590`, ≤ 0x10000; max = the
+brightest scaled channel), then c = c · bright >> 16 (`0x13d588`), both rounded by the
+last bit out, clamped 0..63. `0x560bc` sets the five from the track's tints (§3.11):
+group `0x12c340` (the family switch, below). CY1's usual family: 255 255 255 0 0xff00, so
+every channel one lower (63 → 62).
+**`load_track_info` `0x49dc0`** ends with that, and: at 320x200 (`0x143e2c` = 0) the ring's
+y offset and height × 200 / 480; `0x12efc4` = `0x12efb4` (0 if the track is not a `tr` and
+the family is 1). The file is read only when `0xec5d8` = 1 and the family is not 1 (else
+the built-in rows, `0xec5dc` + 0x84 · (cl1 cl2 cl3 al1 al2 al3 cy1 cy2 cy3 tr1..tr7)).
+Its decimals (`0x41b68`): spaces, '-', the whole part by atoi, the fraction's digits
+counted, its zeros skipped and four digits kept after them, (atoi << 16) / 10^digits
+unsigned. A line starting `#`, LF or CR is skipped; at the end of the file the last line
+is read again. **Ported (`port/src/trackinfo.c`), equal on the snapshots; the file path
+equal to `tools/trackinfo.py` on all 16 tracks.**
+**The family switch `0x12c340`**: 1 if `0x12dd2c` or `0x12dd28`, else `0x12dd30[track]`
+(main sets all nine to 1; the track screen `0x77254` toggles one between 1 and another
+value). 1: `simdata\etrackfm\<track>_001.fam` (`0x156334`; `g..` in German); else
+`simdata\ntrackfm\<track>_T01.fam`, `_M01` with `0x12dd28`, `_R01` with `0x12dd2c` (not
+track 3) (`load_track_fam` `0x60078`).
+**`load_track_textures` `0x5b34c`** (entries: 0 the texture banks, 1 the roadside pictures,
+2 the horizon): clears `0x140cd8` (144 × 8). One bank: `0x5b270` (see-through marks), the
+palette its `!pal` (or `01A0`'s next block), texture 3t + k = "tt" + 'A'+k + '0'..'7' for
+t < 48 (`0x5b2f8`: only if slot 0 is empty; the name's last digit counts up; a missing one
+= the slot before, the first 0), then "ga<k>0".. replaces textures 3q + k (q = the TRI
+head's i16 +0x28 / 3) where the bank has them. Several banks: bank i's "A000".., "B000"..,
+"C000".. = textures 3i, 3i+1, 3i+2 (CY1's ETRACKFM has 17); the palette = bank 0's `!pal`.
+A name is looked for in capitals, then in small letters (`0x5b1dc`, which rewrites the
+name in place; findshape `0x80e24` compares the four bytes). An 8-bit palette (`!pal` type
+0x24) is shifted to 6 bits in place. The roadside pictures `0x141ed8` (4 equal slots): one
+bank's "<i>00" (i < 64, 0 if missing), or bank i's "0000". Then: tint the road palette,
+piece (0x90, 0x60, it), the horizon's `!pal` tinted and its bank queued for re-colouring
+with it, every road bank and every picture bank queued with the road palette.
+**Ported (`port/src/trackfam.c`, `racepal.c`): every slot, both palettes and all 142
+pictures' bytes equal to d2 when re-coloured through the original's inverse table
+(`tools/setup_check.py`).** (In r1a picture 16's type is 0x7b: the snapshot paused inside
+a drawing wrapper (`0x34dc0`..`0x350fe`) that sets a see-through shape to 0x7b to paint it
+opaque and puts 0x45 back.)
+
 ## 5. The original in DOSBox (2026-10-19)
 
 - The game for DOSBox is a COPY of the installed game in `~/dosgames/nfs` (`NFSSE/` +
