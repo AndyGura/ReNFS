@@ -40,8 +40,12 @@ extern unsigned char g_needle_blend[16][256];
 extern int g_needle_colour;
 
 /* the HUD's colours (0x55abc, before the shade table): the palette's nearest to some
-   fixed ones (0x55790); so far the racers' markers' */
+   fixed ones (0x55790), and the racers' markers' */
 void hud_colours(void);
+extern int g_hud_colour[17];               /* 0x13d5a4 ..: see hud_colours */
+enum { HUD_RED = 0, HUD_WHITE = 8, HUD_BLACK = 9 };
+extern int g_hud_slate;                    /* 0x12b9fc */
+extern int g_map_frame;                    /* 0x12ba08: the map's frame, dark grey */
 extern unsigned char g_marker_colour[8];   /* 0x13d5e8: each racer's marker, by slot */
 extern int g_marker_line;                  /* 0x13d5c8: their outline, the nearest black */
 

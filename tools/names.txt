@@ -533,3 +533,6 @@
 0x2e100 hud_laps
 0x2df78 hud_miles
 0x2d8c0 hud_accel_test
+0x31cb4 hud_map
+0x32ac0 hud_map_dot
+0x8bb7c atan_1024

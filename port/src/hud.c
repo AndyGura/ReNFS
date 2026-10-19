@@ -12,6 +12,7 @@
 #include "polyfill.h"
 #include "racepal.h"
 #include "raster.h"
+#include "track.h"
 #include "video.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -33,6 +34,8 @@ static int g_radar_shown;            /* 0x12b938: the radar's level on the scree
 static int g_bar_at;                 /* 0x12b944: the status bar drawn again after this
                                         step */
 static int g_bar_black;              /* 0x12b94c: its strip to be blacked first */
+static int g_map_back_taken;         /* 0x12ba0c: the map's background taken */
+static int g_cop_flash;              /* 0x12ba04: the police's dot, 0..10 */
 
 /* the window drawn into (0xf889c): a picture and its clip */
 static hud_picture g_win;
@@ -156,9 +159,13 @@ int hud_load(void)
     g_hud_view.w = 320;                    /* 0x143e30, 0x143e34 */
     g_hud_view.h = 200;
     g_hud_view.pix = calloc(320 * 200, 1);
+    g_hud_map.w = 0x3a;
+    g_hud_map.h = 0x36;
+    g_hud_map.pix = calloc(0x3a * 0x36, 1);
     g_redraw = 1;
     g_bar_black = 1;
-    return g_hud_map_back.pix && g_hud_view.pix;
+    g_map_back_taken = 0;
+    return g_hud_map_back.pix && g_hud_view.pix && g_hud_map.pix;
 }
 
 void hud_free(void)
@@ -166,7 +173,8 @@ void hud_free(void)
     fsh_free(&g_mask);
     free(g_hud_map_back.pix);
     free(g_hud_view.pix);
-    g_hud_map_back.pix = g_hud_view.pix = 0;
+    free(g_hud_map.pix);
+    g_hud_map_back.pix = g_hud_view.pix = g_hud_map.pix = 0;
 }
 
 /* a time (1/60 s) as minutes, seconds and tenths in grey digits (0x2d6b4 with 0x2d3ac:
@@ -252,6 +260,7 @@ void hud_redraw(void)
     window_set(&g_hud_map_back);
     poly_fill(4, corners, poly_shade_rows, 0);
     poly_fill(4, corners, poly_shade_rows, 0);
+    g_map_back_taken = 1;
     window_set(&g_hud_screen);
     status_bar();
     g_wheel_shown = 0x63;
@@ -479,4 +488,206 @@ void hud_frame(const hud_car *c)
     if (g_hud.map && g_hud_map.pix)
         blit_pixels(g_hud_map.pix, g_hud_map.w, g_hud_map.h, 0x103, 0x7e, COPY);
     /* (0x5c5d0: the replay's buttons, not yet) */
+}
+
+/* the map (0x31cb4), 58 x 54 at 320x200: positions in 1/2^20 of the world's units round
+   the viewed car's node, turned by its heading, x the other way on a mirrored track */
+#define MAP_SHIFT 20
+#define MAP_X 0x1d                     /* its centre: 1 + 0x1c */
+#define MAP_Y 0x1d                     /* the road's; the dots' 1 + 0x19 */
+#define MAP_DOT_Y 0x1a
+
+/* a times b, 16.16, rounded by the last bit out */
+static int mulr(int a, int b)
+{
+    long long p = (long long)a * b;
+    return (int)(p >> 16) + (int)((p >> 15) & 1);
+}
+
+static int rd32(const unsigned char *p)
+{
+    return (int)((unsigned)p[0] | (unsigned)p[1] << 8 | (unsigned)p[2] << 16 | (unsigned)p[3] << 24);
+}
+
+static const unsigned char *map_node(int node)
+{
+    return g_track.nodes + (long)(node & (int)g_track.node_mask) * 0x24;
+}
+
+typedef struct {
+    int px, pz, c, s, mir;
+} map_view;
+
+static void map_point(const map_view *v, int node, int *x, int *y)
+{
+    const unsigned char *r = map_node(node);
+    int dx = (rd32(r + 8) >> MAP_SHIFT) - v->px, dz = (rd32(r + 0x10) >> MAP_SHIFT) - v->pz;
+
+    *x = (mulr(v->c, dx) - mulr(v->s, dz)) * v->mir;
+    *y = mulr(v->s, dx) + mulr(v->c, dz);
+}
+
+/* EA's arctangent (0x8bb7c): a turn of 1024, from the y axis towards x; the smaller over
+   the larger as a 32-bit fraction, rounded to 1/256, into the table of an eighth of a
+   turn (0x12572c) */
+static int atan_1024(int x, int y)
+{
+    unsigned ax = (unsigned)(x < 0 ? -x : x), ay = (unsigned)(y < 0 ? -y : y), r;
+    int f = (y < 0 ? 8 : 0) | (x < 0 ? 0x10 : 0), t;
+
+    if (ax == ay)
+        t = 0x80;
+    else {
+        if (ax > ay) {
+            unsigned w = ax;
+            ax = ay;
+            ay = w;
+            f |= 4;
+        }
+        r = (unsigned)(((unsigned long long)ax << 32) / ay);
+        t = *exe_at(0x12572c + (r >> 24) + (r >> 23 & 1), 1);
+    }
+    switch (f) {
+    case 4:
+        return 0x100 - t;
+    case 8:
+        return 0x200 - t;
+    case 0xc:
+        return t + 0x100;
+    case 0x10:
+        return -t;
+    case 0x14:
+        return t - 0x100;
+    case 0x18:
+        return t - 0x200;
+    case 0x1c:
+        return -t - 0x100;
+    }
+    return t;
+}
+
+/* a racer's dot (0x32ac0): a square of 4 in its colour under the "pos1" ring, kept off
+   the map's top and bottom rows */
+static void map_dot(int x, int y, int colour)
+{
+    clip_set(1, 0x39, 6, 0x30);
+    raster_fill(x - 2, y + 1, 4, 4, colour);
+    blit(named(&g_mask, "pos1"), x - 3, y, SEE_THROUGH);
+    clip_set(1, 0x39, 1, 0x35);
+}
+
+/* the nodes between two racers, the shorter way (round a circuit too) */
+static int map_apart(int d)
+{
+    int a = abs(d), b = abs(d + g_track.nodes_len), c = abs(g_track.nodes_len - d);
+
+    return a < b && a < c ? a : b < c ? b : c;
+}
+
+void hud_map(const hud_map_state *m)
+{
+    int track = g_hud.track, range = (short)exe_i32(0xea694 + 4 * track);
+    int count = g_hud.race_type > 1 ? 8 : g_hud.race_type == 0 ? 1 : 2;
+    int i, k, node, x, y, x0, y0, x1, y1, a, c4, s4, t;
+    int seg_end = track < 3 ? (short)(exe_at(0xeaab4 + 2 * (track * 3 + g_hud.segment), 2)[0]
+                                      | exe_at(0xeaab4 + 2 * (track * 3 + g_hud.segment), 2)[1] << 8)
+                            : 0;
+    const unsigned char *r = map_node(m->node);
+    map_view v;
+
+    if (!g_hud.map)
+        return;
+    v.mir = g_hud.mirrored ? -1 : 1;
+    v.px = rd32(r + 8) >> MAP_SHIFT;
+    v.pz = rd32(r + 0x10) >> MAP_SHIFT;
+    a = (int)((unsigned)(short)(r[0x18] | r[0x19] << 8) << 10) >> 14;
+    v.c = fix_cos(a);
+    v.s = fix_sin(a);
+
+    window_set(&g_hud_map);
+    if (m->driver) {
+        if (g_map_back_taken)
+            blit_pixels(g_hud_map_back.pix, g_hud_map_back.w, g_hud_map_back.h, 1, 1, COPY);
+    } else
+        blit(named(&g_mask, "mpbd"), 1, 1, SEE_THROUGH);
+    /* the frame (0x8a0f0) */
+    raster_fill(0, 0, 0x3a, 1, g_map_frame);
+    raster_fill(0x39, 1, 1, 0x34, g_map_frame);
+    raster_fill(0, 1, 1, 0x34, g_map_frame);
+    raster_fill(0, 0x35, 0x3a, 1, g_map_frame);
+    clip_set(1, 0x39, 1, 0x35);
+
+    /* the road: from `range` nodes behind, then 16 apart (City-like circuit: 13.5),
+       open roads kept to their first node and 60 past the segment's end */
+    node = (short)(m->node - range);
+    if (node < 0)
+        node = track < 3 ? 0 : (short)(node + g_track.nodes_len);
+    map_point(&v, node, &x0, &y0);
+    for (i = (short)exe_i32(0xea6b8 + 4 * track); i <= exe_i32(0xea6dc + 4 * track); i++) {
+        node = (short)(track == 3 ? (i * 0x6c >> 3) + (short)m->node : m->node + i * 16);
+        if (track < 3) {
+            if (node < 0)
+                node = 0;
+            else if (node > seg_end + 0x3c)
+                node = (short)(seg_end + 0x3c);
+        } else if (node < 0)
+            node = (short)(node + g_track.nodes_len);
+        map_point(&v, node, &x, &y);
+        poly_line(MAP_X + x0, MAP_Y - y0, MAP_X + x, MAP_Y - y, g_hud_colour[HUD_WHITE]);
+        x0 = x;
+        y0 = y;
+    }
+
+    /* the segment's end (the circuits' start): a short red bar across the road */
+    map_point(&v, seg_end, &x0, &y0);
+    map_point(&v, seg_end + 8, &x1, &y1);
+    t = y1 - y0;
+    a = atan_1024(x1 - x0, t + (t >> 2));
+    c4 = mulr(4, -fix_cos(a));
+    s4 = mulr(4, fix_sin(a));
+    t = s4 - (s4 >> 2) + (s4 >> 4);
+    poly_line(x0 + 1 + (c4 >> 1) + 0x1c, MAP_Y - (y0 + (t >> 1)),
+              x0 + 1 - (c4 - (c4 >> 1)) + 0x1c, MAP_Y - (y0 - (t - (t >> 1))),
+              g_hud_colour[HUD_RED]);
+
+    /* the racers, the last first: a dot on the map, else an arrow at its edge, above
+       when ahead of the player (behind: below) */
+    for (k = count - 1; k >= 0; k--) {
+        int apart = (short)map_apart((short)(m->node - m->nodes[k]));
+        int colour = g_marker_colour[k], bx, ahead;
+
+        if (apart <= range) {
+            map_point(&v, m->nodes[k], &x, &y);
+            if ((x < 0 ? -x : x) < 0x1c && (y < 0 ? -y : y) < 0x17) {
+                map_dot(MAP_X + x, MAP_DOT_Y - y, colour);
+                continue;
+            }
+        }
+        bx = g_hud.race_type == 1 ? 1 + 0x2e : 1 + 0x31 - 7 * k;
+        ahead = g_hud.race_type == 1 ? m->place == 1 : m->places[k] > m->place;
+        if (ahead) {
+            int tri[6] = { bx + 1, 0x31, bx + 5, 0x31, bx + 3, 0x33 };
+            poly_fill(3, tri, poly_solid_rows, colour);
+            blit(named(&g_mask, "aro1"), bx, 0x30, SEE_THROUGH);
+        } else {
+            int tri[6] = { bx + 1, 4, bx + 5, 4, bx + 3, 2 };
+            poly_fill(3, tri, poly_solid_rows, colour);
+            blit(named(&g_mask, "aru1"), bx, 0, SEE_THROUGH);
+        }
+    }
+
+    /* the police, near enough: its dot flashing */
+    if (m->cop) {
+        int apart = (short)(m->node - m->cop_node);
+
+        apart = (short)(apart < 0 ? -apart : apart);
+        if (apart < 0x140) {
+            map_point(&v, m->cop_node, &x, &y);
+            if ((x < 0 ? -x : x) < 0x1c && (y < 0 ? -y : y) < 0x1d) {
+                if (++g_cop_flash > 10)
+                    g_cop_flash = 0;
+                map_dot(MAP_X + x, MAP_DOT_Y - y, g_marker_colour[g_cop_flash > 5 ? 0 : 6]);
+            }
+        }
+    }
 }

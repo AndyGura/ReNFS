@@ -36,6 +36,18 @@ typedef struct {
     int radar_flash;           /* 0x12b9f8: its big light lit */
 } hud_status;
 
+/* what the map shows (0x31cb4) */
+typedef struct {
+    int node;                  /* the viewed car's road node (+0x48 of 0x13c24c[0x12dd54]) */
+    int nodes[8];              /* each racer's */
+    int place;                 /* 0x12b8c8: the player's place */
+    unsigned char places[8];   /* 0x12bd33: each racer's */
+    int cop;                   /* the police car on the map (0x13c254 +0x51a & 4, the
+                                  police on 0x12dd08, head to head) */
+    int cop_node;
+    int driver;                /* in the driver's seat (camera mode 0, 0x12ba2c = 0) */
+} hud_map_state;
+
 /* what the dashboard shows of the player's car */
 typedef struct {
     int steer;                 /* +0x18: the wheel, 16.16, < 0 left */
@@ -66,5 +78,8 @@ void hud_redraw_due(void);
 /* a frame in the driver's seat (0x31684): the view through the windows, the mirror, the
    wheel, the gauges and the status bar's numbers over it */
 void hud_frame(const hud_car *c);
+/* the map's picture (0x31cb4, before the frame): the road round the viewed car turned
+   to its heading, the segment's end, the racers and the police */
+void hud_map(const hud_map_state *m);
 
 #endif

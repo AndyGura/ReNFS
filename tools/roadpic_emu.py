@@ -20,7 +20,7 @@ W, H = 320, 200
 LEFT_OUT = {0x679ec: 2, 0x6837c: 0, 0x59294: 3, 0x66738: 0}
 
 
-def png(path, pix, pal):
+def png(path, pix, pal, W=W, H=H):
     rows = b"".join(b"\0" + bytes(c for p in pix[y * W:(y + 1) * W] for c in pal[p]) for y in range(H))
     chunk = lambda t, d: struct.pack(">I", len(d)) + t + d + struct.pack(">I", zlib.crc32(t + d))
     open(path, "wb").write(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", W, H, 8, 2, 0, 0, 0)) +

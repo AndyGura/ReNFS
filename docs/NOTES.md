@@ -1761,6 +1761,34 @@ reads before the table in the fast painter (never for the needles, a pixel wide 
 **Ported (`poly_wide_line`): equal on 10,000 random lines of a pixel wide and more
 (`tools/polyfill_emu.py wide`).**
 
+**The map** `0x31cb4` (from `race_draw_frame` before `0x31684`; nothing with `0x12b988`
+= 0, which `race_load_track` `0x5ba52` sets to 1, the mirror `0x143e08` to 0). At 320x200
+into its 58x54 picture `0xf4584` (640x480: other places, `0x12c308`): the background
+(the driver's seat, `*0x143df4` = 0 and `0x12ba2c` = 0: the map's dim background
+`0xf4580` copied at (1, 1) once `0x12ba0c` says it was taken; else `mpbd` see-through),
+a frame of `0x12ba08` (`0x8a0f0`: four fills), the clip (1..0x39, 1..0x35). Positions:
+the nodes' x, z (`+8`, `+0x10`) >> 20 less the viewed car's node's (`0x13c24c[0x12dd54]
++0x48`), turned by that node's heading (`+0x18` >> 4: a turn of 1024, `0xf8448`), x
+negated on a mirrored track; y up. **The road** in white (`0x13d5c4`) as lines (`0x8bb3c`)
+from `0xea694`[track] nodes behind (480 for CY1) through 16 nodes apart for i =
+`0xea6b8`..`0xea6dc`[track] (−29..30), round the map's centre (29, 29); on the City-like
+track 3 i·13.5 apart; open roads (track < 3) kept to node 0 and at most 60 past the
+segment's end `0xeaab4`[track·3 + segment], circuits wrapped by `0x12ba00`. **The
+segment's end** (circuits: node 0): a red (`0x13d5a4`) bar 4 across the road, its angle
+from the end and 8 nodes on by EA's arctangent `0x8bb7c` (the smaller over the larger as
+a 32-bit fraction, rounded to 1/256, the byte table `0x12572c`; octants by sign and
+which is larger). **The racers**, the last first (8 in the types above 1, 2 head to
+head, 1 a time trial): within the range (the shorter way round) and |x| < 0x1c, |y| <
+0x17 a dot `0x32ac0` (a 4x4 square of its marker colour `0x13d5e8`[i] at (x−2, y+1),
+`pos1` over it at (x−3, y), clipped to rows 6..0x30) at (29 + x, 26 − y); else an
+arrow at the edge: at x 0x2f head to head, else 0x32 − 7i; at the bottom (`aro1`, a
+triangle under it) when the player's place `0x12b8c8` is 1 head to head / the racer's
+`0x12bd33`[i] is behind it, else at the top (`aru1`). **The police** (car 2 `0x13c254`
+with `+0x51a` & 4, `0x12dd08`, head to head): within 0x140 nodes and |y| < 0x1d a dot
+flashing by `0x12ba04` (0..10: colour of marker 0 above 5, else marker 6).
+**Ported (`hud_map`): equal on e1, e3, e5 at the snapshot's node and 8 others, mirrored,
+with the police flashing and from outside (18 maps each, `tools/dash_emu.py`).**
+
 ## 5. The original in DOSBox (2026-10-19)
 
 - The game for DOSBox is a COPY of the installed game in `~/dosgames/nfs` (`NFSSE/` +

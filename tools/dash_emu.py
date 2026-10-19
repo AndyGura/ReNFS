@@ -28,6 +28,12 @@ NUMBERS = 0x30d8c
 STEERS = [None, -0x30000, 0x30000, 0x70000, -0x100000, 0x180000, -0x200000, 0, 0]
 RPMS = [None, 900, 1500, 3333, 5000, 6100, 7000, 9999, 0]
 SPEEDS = [None, 0x10000, -0x50000, 0x123456, 0x1c0000, 0x250000, 0x400000, 0x7fffff, 0]
+# the map with the viewed car where it is, then on other nodes (the police's dot flashes
+# from one map to the next)
+MAP_NODES = [None, None, 0, 5, 100, 333, 700, 1200, 2000, 2399]
+# then the track mirrored, the police on the map (its dot flashing), the view from outside
+MAP_MORE = [("mirrored", None), ("cop", None), ("cop", -20), ("cop", -300), ("cop", None),
+            ("cop", None), ("cop", None), ("outside", 50)]
 # the race's steps (the start's lights) and the radar's level and flash
 STEPS = [None, 0, 59, 60, 179, 250, 299, 300, 359]
 RADARS = [None, 0, 1, 2, 3, 5, 7, 7, 0]
@@ -51,6 +57,11 @@ STATUS = [("shown", 0x12b940), ("steps", 0x145c94), ("mode", 0x12b8cc), ("table"
 
 class Status(ctypes.Structure):
     _fields_ = [(n, I) for n, _ in STATUS]
+
+
+class MapState(ctypes.Structure):
+    _fields_ = [("node", I), ("nodes", I * 8), ("place", I), ("places", U8 * 8), ("cop", I),
+                ("cop_node", I), ("driver", I)]
 
 
 class HudCar(ctypes.Structure):
@@ -124,7 +135,7 @@ def port_frames(s, L):
     for at, name in ((0xf4578, "g_hud_view"), (0xf457c, "g_hud_mirror"), (0xf4584, "g_hud_map")):
         w, h, pix = picture(s, at)
         p = Picture.in_dll(L, name)
-        if name != "g_hud_view":
+        if name == "g_hud_mirror":
             keep = ctypes.create_string_buffer(pix, len(pix))
             KEEP.append(keep)
             p.w, p.h, p.pix = w, h, ctypes.addressof(keep)
@@ -153,6 +164,83 @@ def port_frames(s, L):
 KEEP = []
 
 
+def node(s, a):
+    return struct.unpack("<h", s.raw(a + 0x48, 2))[0]
+
+
+def map_state(s):
+    """what the map shows, from the snapshot"""
+    m = MapState()
+    m.node = node(s, s.u32(0x13c24c + 4 * s.i32(0x12dd54)))
+    for k in range(8):
+        a = s.u32(0x13c24c + 4 * k)
+        m.nodes[k] = node(s, a) if a else 0
+    m.place = s.i32(0x12b8c8)
+    m.places[:] = s.read(0x12bd33, 8)
+    cop = s.u32(0x13c254)
+    m.cop = int(bool(cop and s.raw(cop + 0x51a, 1)[0] & 4 and s.i32(0x12dd08) and s.i32(0x12da20) == 1))
+    m.cop_node = node(s, cop) if cop else 0
+    m.driver = int(s.u32(0x143df4) and s.raw(s.u32(0x143df4), 4) == bytes(4) and s.i32(0x12ba2c) == 0)
+    return m
+
+
+def original_map(path, picks):
+    """the map (0x31cb4) on the snapshot, then with the viewed car on other nodes, then the
+    other cases"""
+    s = Snap(path)
+    got = []
+    viewed = s.u32(0x13c24c + 4 * s.i32(0x12dd54))
+    for n in picks:
+        if n is not None:
+            s.mu.mem_write(viewed + 0x48, struct.pack("<h", n))
+        s.call(0x31cb4)
+        got.append(picture(s, 0xf4584)[2])
+    cop = s.u32(0x13c254)
+    for what, n in MAP_MORE:
+        if what == "mirrored":
+            s.write(0x12dd28, struct.pack("<i", 1 - s.i32(0x12dd28)))
+        elif what == "cop":
+            s.mu.mem_write(cop + 0x51a, bytes([s.raw(cop + 0x51a, 1)[0] | 4]))
+            s.write(0x12dd08, struct.pack("<i", 1))
+            if n is not None:
+                s.mu.mem_write(cop + 0x48, struct.pack("<h", node(s, viewed) + n))
+        else:
+            s.write(0x12ba2c, struct.pack("<i", 1))
+            s.mu.mem_write(viewed + 0x48, struct.pack("<h", n))
+        s.call(0x31cb4)
+        got.append(picture(s, 0xf4584)[2])
+    return got
+
+
+def port_map(s, L, picks):
+    w, h, pix = picture(s, 0xf4584)
+    p = Picture.in_dll(L, "g_hud_map")
+    assert (p.w, p.h) == (w, h), (p.w, p.h, w, h)
+    ctypes.memmove(p.pix, pix, w * h)
+    m = map_state(s)
+    got = []
+    for n in picks:
+        if n is not None:
+            m.node = m.nodes[s.i32(0x12dd54)] = n
+        L.hud_map(ctypes.byref(m))
+        got.append(ctypes.string_at(p.pix, w * h))
+    st = Status.in_dll(L, "g_hud")
+    for what, n in MAP_MORE:
+        if what == "mirrored":
+            st.mirrored = 1 - st.mirrored
+        elif what == "cop":
+            m.cop = int(st.race_type == 1)
+            if n is not None:
+                m.cop_node = ctypes.c_short(m.node + n).value
+        else:
+            m.driver = 0
+            m.node = m.nodes[s.i32(0x12dd54)] = n
+        L.hud_map(ctypes.byref(m))
+        got.append(ctypes.string_at(p.pix, w * h))
+    st.mirrored = s.i32(0x12dd28)
+    return got
+
+
 def port(s, name, L):
     cars, _ = cars_emu.load_cars(s, name, L)
     ctypes.memmove(ctypes.addressof((U8 * 0x5f52).in_dll(L, "g_config")), s.read(0x156c14, 0x5f52), 0x5f52)
@@ -164,6 +252,9 @@ def port(s, name, L):
     L.hud_redraw()
     back = Picture.in_dll(L, "g_hud_map_back")
     got = ctypes.string_at(scr.pix, W * H), ctypes.string_at(back.pix, back.w * back.h), port_frames(s, L)
+    if not L.track_load(name.encode()):
+        sys.exit("no track")
+    got += (port_map(s, L, MAP_NODES),)
     for c in cars:
         L.car_free(ctypes.byref(c))
     return got
@@ -187,7 +278,8 @@ def main():
         pal = palette(s)
         frames = original_frames(path)
         want, want_back = original(s), map_back(s)
-        got, got_back, got_frames = port(s, name, L)
+        maps = original_map(path, MAP_NODES)
+        got, got_back, got_frames, got_maps = port(s, name, L)
         R.png("build/shots/dash_%s_orig.png" % tag, want, pal)
         R.png("build/shots/dash_%s_port.png" % tag, got, pal)
         diff = [255 if a != b else 0 for a, b in zip(want, got)]
@@ -203,6 +295,15 @@ def main():
             print("  frame %d (wheel %s, rpm %s, speed %s, step %s, radar %s): %d pixels differ%s" % (
                 k, STEERS[k], RPMS[k], SPEEDS[k], STEPS[k], RADARS[k], len(d), " (first %d, %d)" % (d[0] % W, d[0] // W) if d else ""))
 
+        w, h, _ = picture(s, 0xf4584)
+        for k, (a, b) in enumerate(zip(maps, got_maps)):
+            d = [i for i in range(w * h) if a[i] != b[i]]
+            R.png("build/shots/dash_%s_map%d_orig.png" % (tag, k), a, pal, w, h)
+            R.png("build/shots/dash_%s_map%d_port.png" % (tag, k), b, pal, w, h)
+            print("  map %d (%s): %d pixels differ%s" % (
+                k, ("node %s" % MAP_NODES[k]) if k < len(MAP_NODES) else "%s %s" % MAP_MORE[k - len(MAP_NODES)], len(d), " (first %d, %d)" % (d[0] % w, d[0] // w) if d else ""))
+
 
 if __name__ == "__main__":
     main()
+

@@ -243,12 +243,23 @@ static int hud_nearest(int r, int g, int b)
 
 void hud_colours(void)
 {
-    /* (0x13d5a4.. the HUD's other ones, from (63, 0, 0) on, wait for the dashboard) */
+    /* 0x13d5a4 on, 4 apart: red, dark red, green, dark green, blue, dark blue, yellow,
+       dark yellow, white, black, four greys, orange, magenta, cyan (6 bits) */
+    static const unsigned char rgb[17][3] = {
+        { 63, 0, 0 }, { 32, 0, 0 }, { 0, 63, 0 }, { 0, 32, 0 }, { 0, 0, 63 }, { 0, 0, 32 },
+        { 63, 63, 0 }, { 32, 32, 0 }, { 63, 63, 63 }, { 0, 0, 0 }, { 6, 6, 6 },
+        { 16, 16, 16 }, { 32, 32, 32 }, { 48, 48, 48 }, { 63, 20, 0 }, { 63, 0, 63 },
+        { 0, 63, 63 } };
     static const unsigned char fixed[8] = { 0xf5, 0xf8, 0xf0, 0xfa, 0, 0xf9, 0xfc, 0xfb };
+    int i;
 
+    for (i = 0; i < 17; i++)
+        g_hud_colour[i] = hud_nearest(rgb[i][0], rgb[i][1], rgb[i][2]);
+    g_hud_slate = hud_nearest(10, 14, 18);         /* 0x12b9fc */
+    g_map_frame = hud_nearest(26, 26, 26);         /* 0x12ba08 */
     memcpy(g_marker_colour, fixed, sizeof fixed);
-    g_marker_colour[4] = (unsigned char)hud_nearest(63, 63, 63);   /* 0x13d5c4 */
-    g_marker_line = hud_nearest(0, 0, 0);
+    g_marker_colour[4] = (unsigned char)g_hud_colour[HUD_WHITE];
+    g_marker_line = g_hud_colour[HUD_BLACK];
 }
 
 /* t of the way from a to b (t 16.16, 0xa6040) */
@@ -257,6 +268,8 @@ static int toward(int a, int b, int t)
     long long p = (long long)(b - a) * t;
     return (int)(p >> 16) + (int)((p >> 15) & 1) + a;
 }
+
+int g_hud_colour[17], g_hud_slate, g_map_frame;
 
 unsigned char g_needle_blend[16][256];
 int g_needle_colour;

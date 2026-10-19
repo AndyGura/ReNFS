@@ -181,10 +181,12 @@ Ghidra project and `build/decomp`, one command). The git history was started aga
   with the wheel, engine and speed set seven ways (`tools/dash_emu.py`), and the start's
   lights and the radar detector's (equal with steps 0..359, radar 0..7). `--race cy1`
   now shows the dashboard over the view, the lights counting down, then the status bar.
+  **The map** (`0x31cb4`, `hud_map`): the road round the car turned to its heading, the
+  segment's end, the racers' dots or arrows, the police's flashing dot; equal on e1, e3,
+  e5 in 18 cases each (other nodes, mirrored, the police, from outside).
   Not yet: the status bar's numbers after the start (`0x30d8c`: speed, gear, place,
   time, laps; they wait for the race's timing), the gear gate (`0x2e4f0`, map off), the
-  HUD's keys (`0x2f644`), the map
-  (`0x31cb4`), the replay's buttons (`0x5c5d0`), the doubled BAMF lists (detail),
+  HUD's keys (`0x2f644`), the map at 640x480, the replay's buttons (`0x5c5d0`), the doubled BAMF lists (detail),
   one-colour polygons (`0xaa990`), the police lights, the circuits' sky ring (`0x4ace8`),
   the roadside walls (`0x59294`, other tracks than the cities), 3D roadside models
   (`0x66738`), the mirror's view, the physics, the race's setup from the front end.
@@ -216,9 +218,8 @@ races 320x200 / 320x240; commit locally as the work goes.
    behind the options (credits, audio, graphics, controls, load / save), Danik chose
    (2026-10-19): **the race next**, the remaining menus later. In the race, the
    port now makes a first frame of its own (`--race cy1`), the cars, their shadows,
-   the racers' markers and the dashboard in it. Next: the status bar's numbers and the
-   map, the mirror's view (`0x4fed8`, `0x5aa84`), then the player's car driving (the
-   physics, 33.3 steps a second).
+   the racers' markers, the dashboard and the map in it. Next: the mirror's view (`0x4fed8`, `0x5aa84`), then the player's car driving (the
+   physics, 33.3 steps a second), and with the race's timing the status bar's numbers.
    Open: who writes `0x136618` (28 sections drawn: a detail setting?). The walls `0x59294`
    and the circuits' sky ring `0x4ace8` can be checked on CY1 memory with made-up input,
    or on snapshots of another track (`tools/nfsdos.py`).

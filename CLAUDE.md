@@ -202,7 +202,7 @@ the roadside objects; pixel-exact on the snapshots, `tools/roadpic_emu.py`), `mo
 reaches their rows, their shadows, the racers' markers; pixel-exact, `tools/cars_emu.py`;
 NOTES §4.10), `polyfill.c` (EA's polygon filler `0x8bc71`, lines `0x8bb3c`, the smoothed
 wide line `0x8b195`; exact, `tools/polyfill_emu.py`), `hud.c` (the dashboard over the view:
-`0x30094`, `0x31684`, the needles; pixel-exact, `tools/dash_emu.py`; NOTES §4.11), `track.c`
+`0x30094`, `0x31684`, the needles, the map `0x31cb4`; pixel-exact, `tools/dash_emu.py`; NOTES §4.11), `track.c`
 (the TRI and its ring of sections), `trackinfo.c`, `trackfam.c`, `racepal.c`, `sky.c`, `view.c` (windows, lens,
 matrices), `car.c` (cars' files, the grid), `camera.c` (the driver's eyes), `dash.c`
 (the dashboard's file, colours, places and BAMF lists), `race.c` (`--race`: the loading and the frame),

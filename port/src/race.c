@@ -71,6 +71,7 @@ int race_test(const char *name)
     const view_window *w;
     int i, eye, horizon, redline, near, gathered = -1;
     hud_car driver;
+    hud_map_state map;
     unsigned start;
     const char *car = "F512TR";
 
@@ -153,6 +154,12 @@ int race_test(const char *name)
     g_hud.shown = 1;
     g_hud.race_type = g_race_type;
     g_hud.running = 1;
+    g_hud.map = 1;             /* (0x12b988: on as a race starts) */
+    memset(&map, 0, sizeof map);
+    map.place = 1;
+    for (i = 0; i < RACERS; i++)
+        map.places[i] = (unsigned char)(i + 1);
+    map.driver = 1;
     driver.steer = 0;
     driver.number = cars[0].number;
     driver.rpm = 700;
@@ -195,6 +202,10 @@ int race_test(const char *name)
         /* the race's steps, a third of the clock's ticks (until the race's own clock,
            0x4c454's three-cycle, comes with the race's step) */
         g_hud.steps = (int)((clock_ticks() - start) / 3);
+        map.node = (short)cars[0].node;
+        for (i = 0; i < RACERS; i++)
+            map.nodes[i] = (short)cars[i].node;
+        hud_map(&map);
         hud_frame(&driver);
         video_retrace();
     }

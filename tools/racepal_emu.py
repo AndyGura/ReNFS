@@ -117,6 +117,9 @@ def check(path, name, L):
     marks = bytes((U8 * 8).in_dll(L, "g_marker_colour")) + struct.pack("<i", ctypes.c_int.in_dll(L, "g_marker_line").value)
     if marks != s.read(0x13d5e8, 8) + s.read(0x13d5c8, 4):
         print("%s: the markers' colours differ: %s, original %s" % (path, marks.hex(), (s.read(0x13d5e8, 8) + s.read(0x13d5c8, 4)).hex()))
+    hud = list((ctypes.c_int * 17).in_dll(L, "g_hud_colour")) + [ctypes.c_int.in_dll(L, n).value for n in ("g_hud_slate", "g_map_frame")]
+    theirs = [s.i32(0x13d5a4 + 4 * i) for i in range(17)] + [s.i32(0x12b9fc), s.i32(0x12ba08)]
+    print("   the HUD's colours: %s" % ("equal" if hud == theirs else "differ: %s, original %s" % (hud, theirs)))
     needle = struct.pack("<i", ctypes.c_int.in_dll(L, "g_needle_colour").value)[:1] + bytes(
         (U8 * 4096).in_dll(L, "g_needle_blend"))
     rec = s.u32(0x12b5f4)
