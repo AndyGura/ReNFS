@@ -9,6 +9,7 @@
 #include "font.h"
 #include "fsh.h"
 #include "menu.h"
+#include "options.h"
 #include "sound.h"
 #include "video.h"
 #include <stdio.h>
@@ -55,28 +56,11 @@ enum { PIC_TRACK, PIC_PLAYER, PIC_OPPONENT, PIC_TYPE };
 static int cw(int at) { return config_word(at); }
 static void cset(int at, int v) { config_set_word(at, v); }
 
-/* drawshapeatpos 0x8129c (all of it) and 0x815e4 (colour 255 left out), at the shape's
-   own place */
-static void blit(const shape *s, int see_through)
-{
-    for (int y = 0; y < s->h; y++) {
-        int sy = s->y + y;
-        if (sy < 0 || sy >= g_fb_h)
-            continue;
-        for (int x = 0; x < s->w; x++) {
-            int sx = s->x + x;
-            unsigned char c = s->pixels[y * s->w + x];
-            if (sx >= 0 && sx < g_fb_w && !(see_through && c == 255))
-                g_fb[sy * g_fb_w + sx] = c;
-        }
-    }
-}
-
 static void art(const char *name, int see_through)
 {
     shape s;
     if (fsh_find(&g_art, name, &s))
-        blit(&s, see_through);
+        fe_draw_shape(&s, see_through);
 }
 
 /* a picture of its own file (0x83f18), its shape "0000", loaded again only when what it
@@ -98,7 +82,7 @@ static void picture(int which, const char *name, int k0, int k1, int k2)
         g_pic[which].key[2] = k2;
     }
     if (g_pic[which].loaded && fsh_find(&g_pic[which].f, "0000", &s))
-        blit(&s, 0);
+        fe_draw_shape(&s, 0);
 }
 
 /* 0x424c0: the pictures let go */
@@ -112,16 +96,16 @@ static void pictures_free(void)
     fsh_free(&g_art);
 }
 
-/* 0x73a80: two settings that follow the player's car */
-static void car_setup(void)
+/* car_setup 0x73a80: ABS and traction control as the player's car has them */
+void fe_car_setup(void)
 {
     static const int a[12] = { 1, 1, 1, 1, 1, 0, 1, 0, 0, 0, 0, 0 };
     static const int b[12] = { 0, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0 };
     int car = cw(CFG_CAR);
     if (car < 0 || car > 11)
         car = 0;
-    cset(CFG_CAR_SETUP_A, a[car] ? 0 : 2);
-    cset(CFG_CAR_SETUP_B, b[car] ? 1 : 2);
+    cset(CFG_ABS, a[car] ? 0 : 2);         /* on, or none on that car */
+    cset(CFG_TCS, b[car] ? 1 : 2);         /* off, or none */
 }
 
 /* the laps from the race length; the open roads (4-7 are circuits) run half as long */
@@ -163,7 +147,7 @@ static void race_type_changed(void)
             cset(CFG_TRACK, 0);
         track = cw(CFG_TRACK);
         cset(CFG_CAR, tournament_car[track < 0 || track > 9 ? 0 : track]);
-        car_setup();
+        fe_car_setup();
         cset(CFG_OPPONENT, 10);
         cset(CFG_RACE_LENGTH, 1);
         cset(CFG_LAPS, track < 4 || track > 7 ? 8 : 6);
@@ -259,7 +243,7 @@ static void car_step(int right)
             car = g_warrior_ok ? 11 : 7;
     }
     cset(CFG_CAR, car);
-    car_setup();
+    fe_car_setup();
 }
 
 /* the opponent: the cars, and in a single race traffic (8) too */
@@ -481,7 +465,7 @@ int fe_main_menu(void)
             if (cw(CFG_RACE_TYPE) == 3) {
                 int t = cw(CFG_TRACK);
                 cset(CFG_CAR, tournament_car[t < 0 || t > 9 ? 0 : t]);
-                car_setup();
+                fe_car_setup();
             }
             set_laps();
         }
@@ -576,8 +560,17 @@ int fe_main_menu(void)
                 case RACE:
                     fprintf(stderr, "renfs: the race is not written yet\n");
                     break;
-                case OPTIONS:
-                    fprintf(stderr, "renfs: the options are not written yet\n");
+                case OPTIONS:              /* back with everything loaded and faded in
+                                              again (0x4577a) */
+                    pal_fade_down(0, 256);
+                    pictures_free();
+                    fe_options_screen();
+                    if (!fsh_load(&g_art, path) || !fsh_palette(&g_art, 0, pal)) {
+                        done = 1;
+                        break;
+                    }
+                    place_mouse(sel);
+                    redraw = first = 1;
                     break;
                 case CANCEL:
                     fe_flush_keys();

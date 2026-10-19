@@ -48,6 +48,21 @@ void fe_flush_keys(void)
         ;
 }
 
+void fe_draw_shape(const shape *s, int see_through)
+{
+    for (int y = 0; y < s->h; y++) {
+        int sy = s->y + y;
+        if (sy < 0 || sy >= g_fb_h)
+            continue;
+        for (int x = 0; x < s->w; x++) {
+            int sx = s->x + x;
+            unsigned char c = s->pixels[y * s->w + x];
+            if (sx >= 0 && sx < g_fb_w && !(see_through && c == 255))
+                g_fb[sy * g_fb_w + sx] = c;
+        }
+    }
+}
+
 /* the mouse */
 int g_mouse_active, g_mouse_buttons;
 static int g_saved_x, g_saved_y;

@@ -716,6 +716,30 @@ libraries `0x80000`..`0x94000` and `0x95000`..`0xb0000`, Watcom's runtime `0x940
     DOSBox install has none, so the original there starts from `cfg_defaults` `0x38ea8`
     (track 0). The port tests take the original's live state (`nfsdos.py
     mem:156c14:5f52:...`, `RENFS_CONFIG=`).
+  - Options (sel 5): fade down, pictures freed, `fe_options_screen`; back: the race type
+    checked again (a loaded game may change it), `CENTRAL.QFS` and its palette loaded
+    again, the mouse put on Options, drawn and faded up as the first time (0x4577a).
+
+- **`fe_options_screen` `0x53a30` (2026-10-19; the port's `port/src/options.c` equals the
+  original on six screens: 6 to 24 pixels of DOSBox's colour noise)**. `OPTION/OPTIONS.QFS`
+  (`OPTIONS.INV`, rebuilt by the fade anyway). Rows 0 Transmission, 1 ABS, 2 Traction
+  control, 3 Audio (`fe_audio_options` `0x105dc`), 4 Graphics detail (`0x32d08`), 5
+  Controls setup (`0x22bd0`), 6 Load and save (`0x3c0c8`; not in a network game), 7
+  Credits (`fe_credits` `0x25600` with `credits.asf`), 8 Done, 9 Cancel. Shapes: `bgnd`,
+  the names lit `Tral Absl Trcl Audl Gral Conl Loal Crel Donl Canl` (dark ones are in
+  bgnd), values `Autd/Mand`, `On1d/Of1d/N/1d`, `On2d/Of2d/N/2d` and their lit `..l`
+  (tables 0x53978..). The values: CONFIG.DAT **+0x97 gearbox (0 automatic, 1 manual; +0x8d
+  = 1 when automatic, set with it), +0x99 ABS, +0x8f traction control (0 on, 1 off, 2 the
+  car has none: not switchable)**. Mouse by height: y <= 0x85, 0xa7, 0xcb, 0xec, 0x10e,
+  0x132, 0x155, 0x184 the rows; below, x <= 0x141 Done, x >= 0x143 Cancel; elsewhere the
+  choice stays. Keys put the mouse at x 240 (Done 40, Cancel 565), y 118 151 185 220 253
+  287 324 363 450 450. Up: one less (Cancel → Credits), from the top to Done; Down: one
+  more, from Done / Cancel to the top; Left / Right swap Done and Cancel. A choice plays
+  0x48 then, as the screen is drawn again, 0x47. Esc and Cancel put the four words back
+  (and `0x721ec` re-applies the volume +0x77); Done, the right button, 2 minutes or
+  `0x13c3ca` leave keeping them, fitting the opponent to the race type when a game was
+  loaded. Every key acts once a quarter second (Esc included here). Leaving: fade down,
+  `0x15d13e` = 1 (the main menu draws again), result 0.
 
 ### 4.3 The race
 

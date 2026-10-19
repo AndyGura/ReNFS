@@ -22,11 +22,13 @@ void config_set_word(int at, int v);
 
 /* the main menu's choices (fe_main_menu 0x42c30) */
 #define CFG_RACE_TYPE 0x6d     /* 0 time trial, 1 head to head, 2 single race, 3 tournament */
-#define CFG_CAR_SETUP_B 0x8f   /* 1 or 2 by the player's car (0x73a80) */
+#define CFG_AUTO 0x8d          /* 1 with the automatic gearbox (the options set it) */
+#define CFG_TCS 0x8f           /* traction control: 0 on, 1 off, 2 the car has none */
 #define CFG_OPPONENT 0x91      /* 0-7 the cars, 8 traffic (single race), 9 the clock (time
                                   trial), 10 the tournament, 11 the Warrior */
 #define CFG_TRACK 0x95         /* 0 city .. 7 transtropolis, 8 Lost Vegas, 9 (moon, never) */
-#define CFG_CAR_SETUP_A 0x99   /* 0 or 2 by the player's car (0x73a80) */
+#define CFG_TRANSMISSION 0x97  /* 0 automatic, 1 manual */
+#define CFG_ABS 0x99           /* 0 on, 1 off, 2 the car has none */
 #define CFG_CAR 0x9b           /* the player's car, 0-7, 11 the Warrior */
 #define CFG_LAPS 0xb1          /* from the race length and the track */
 #define CFG_RACE_LENGTH 0xb3   /* 0, 1, 2 */

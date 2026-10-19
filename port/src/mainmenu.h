@@ -5,5 +5,7 @@
 /* the cars, the opponent, the race type and the track chosen (into CONFIG.DAT's place);
    0 back to the game mode screen, 1 quit, 2 nothing done in 2 minutes (the title) */
 int fe_main_menu(void);
+/* car_setup 0x73a80: ABS and traction control as the player's car has them */
+void fe_car_setup(void);
 
 #endif

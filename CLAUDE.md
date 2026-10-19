@@ -126,7 +126,8 @@ police every 4th (flags `0x12f1bc`, measured). A race ends through `0x13c178`: 1
 The original in DOSBox: `nfs-dos`, `tools/nfsdos.py` (unseen, keys, memory; NOTES §5).
 Main menu `0x42c30` (NOTES §4.2): the choices in CONFIG.DAT (+0x6d type, +0x91 opponent,
 +0x95 track, +0x9b car, +0x5f50 unlocks); typed codes SKCART EARALLYE CASINOVILLE
-CONCEPTCAR ROCKYROAD TURBO NITRO EXPLODE (`0x46e94`), End held = no mercy.
+CONCEPTCAR ROCKYROAD TURBO NITRO EXPLODE (`0x46e94`), End held = no mercy. Options
+`0x53a30`: +0x97 gearbox, +0x99 ABS, +0x8f traction (0 on, 1 off, 2 none).
 Menus: held keys, letters blended per pixel, an inverse colour table after every fade up
 (NOTES §4.2).
 
@@ -184,7 +185,7 @@ Sound: SDL's device at 44.1 kHz 16-bit stereo, each stream converted by an
 queued), the pictures timed by the sound heard, as the original with sound on.
 `src/files.c` (case-insensitive paths), `unpack.c` (all of EA's packers on the CD),
 `fsh.c`, `video.c` (screen, clock, keys), `audio.c`, `eacs.c` (EA sound blocks), `tgv.c`
-and `movie.c` (the movies), `fe.c` (front end screens), `mainmenu.c` (Control Central), `menu.c` (what the menus share:
+and `movie.c` (the movies), `fe.c` (front end screens), `mainmenu.c` (Control Central), `options.c` (the options screen), `menu.c` (what the menus share:
 keys, mouse, text styles, the yes/no dialog), `font.c` (FFN, letters blended pixel by
 pixel, `nearest_colour`, the inverse table), `sound.c` (the front end's sound bank and
 music), `config.c` (CONFIG.DAT), `main.c`. The menus' look is checked against the

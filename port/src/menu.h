@@ -4,6 +4,7 @@
 #define RENFS_MENU_H
 
 #include "font.h"
+#include "fsh.h"
 
 /* 0x727a0: the key held, as the menus read the keyboard: 0x1b Esc, 0x20 Space, 0x0d
    Enter, 0x4800 up, 0x5000 down, 0x4b00 left, 0x4d00 right, 0x5200 Ins, 0x5300 Del,
@@ -26,6 +27,10 @@ void fe_mouse_moved(void);         /* 0x71b24: g_mouse_active once it moves or i
 void fe_mouse_press(void);         /* 0x52304: the pointer pressed a fifth of a second */
 void fe_mouse_hide(void);          /* 0x71afc: a key used, the pointer hidden until the
                                       screen is drawn again */
+
+/* drawshapeatpos 0x8129c: a shape at its own place, all of it; see_through: colour 255
+   left out (drawshape_see_through 0x815e4) */
+void fe_draw_shape(const shape *s, int see_through);
 
 /* the menus' font (fonts/graver18.ffn, set at start-up 0x42250) */
 extern font g_fe_font;

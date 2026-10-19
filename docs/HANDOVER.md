@@ -135,7 +135,11 @@ Ghidra project and `build/decomp`, one command). The git history was started aga
   keys or the mouse; the mirrored and rally tracks, Lost Vegas and the Warrior unlock by
   their typed codes (SKCART checked against the original), End held on head to head shows
   "No mercy", Esc / Cancel go back, the right button asks "Exit game ?", 2 minutes untouched
-  shows the title. Race, Options, the cars' showcase and the track records do nothing yet.
+  shows the title. Race, the cars' showcase and the track records do nothing yet. The
+  menu's choices are kept between runs (`~/.config/renfs/config.dat`).
+- **The options screen equals the original's** (gearbox, ABS, traction control, Done,
+  Cancel, Esc; six screens compared). Audio, graphics, controls, load / save and credits
+  behind it are not written yet.
 
 **Progress page for Danik**: https://claude.ai/artifact/VZdxTpYC3oLXYeBVJpoDoM (every step,
 its percent done and weight). Update its steps file after each finished step.
@@ -160,8 +164,9 @@ races 320x200 / 320x240; commit locally as the work goes.
    `ORIP`, textures, FFN, EA sound, the packers, PBS/PDN first reading, INFO, INV, BAMF,
    TGV, RPL, CONFIG.DAT). What is still open inside them is listed in NOTES §3.4.
 3. **The port's skeleton: done** (movies, title, game mode screen, exit dialog). Name entry
-   and the main menu done too. Next in it: the settings written back (the port's own
-   file, NOTES §3.16), the options screen `0x53a30`, then the race from Race.
+   the main menu, the settings kept and the options screen done too. Next: the screens
+   behind the options (credits, audio, graphics, controls, load / save), or straight to
+   the race from Race (Danik's call; the race is half the work).
 4. Front end (menus, car and track choice), then the race (track, cars, physics, HUD,
    sound), then the rest (replays, championship/tournament, cops, the showcase).
 5. MiSTer (`~/MiSTer-ReNFS`): the skill's steps 5–8 — `MISTER_HYBRID`, `mister_port.[ch]`,
