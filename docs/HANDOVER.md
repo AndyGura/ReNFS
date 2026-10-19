@@ -165,8 +165,8 @@ races 320x200 / 320x240; commit locally as the work goes.
    TGV, RPL, CONFIG.DAT). What is still open inside them is listed in NOTES §3.4.
 3. **The port's skeleton: done** (movies, title, game mode screen, exit dialog). Name entry
    the main menu, the settings kept and the options screen done too. Next: the screens
-   behind the options (credits, audio, graphics, controls, load / save), or straight to
-   the race from Race (Danik's call; the race is half the work).
+   behind the options (credits, audio, graphics, controls, load / save), Danik chose
+   (2026-10-19): **the race next**, the remaining menus later.
 4. Front end (menus, car and track choice), then the race (track, cars, physics, HUD,
    sound), then the rest (replays, championship/tournament, cops, the showcase).
 5. MiSTer (`~/MiSTer-ReNFS`): the skill's steps 5–8 — `MISTER_HYBRID`, `mister_port.[ch]`,

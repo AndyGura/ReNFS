@@ -52,6 +52,8 @@ stalls, find the code that reads the field.**
   *HDMI Only* / VGA); races at 320x200 / 320x240.
 - **Commit locally as the work goes** (each finished step, in `~/renfs` and
   `~/MiSTer-ReNFS`), never game data or decompiled code; nothing is pushed.
+- **After the options screen, the race comes next** (Danik, 2026-10-19); the screens
+  behind the options, showcase, records and tournament wait.
 - GitHub: **local only** until Danik says otherwise. Ask before creating
   `ItsDanik/renfs` (branch `mister`) or `ItsDanik/ReNFS_MiSTer`.
 
