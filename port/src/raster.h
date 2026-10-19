@@ -17,6 +17,11 @@ void raster_window(unsigned char *base, int pitch, int x0, int y0, int x1, int y
 /* the corners in order round the quad: uv in 16.16 picture pixels, xy in screen pixels */
 void raster_quad(const raster_tex *t, const int uv[8], const int xy[8]);
 
+/* the whole picture, less its outer row of pixels, stretched over a quad: its corners in
+   order round it from the picture's top left, in screen pixels (0x90900, 0x906d0; the
+   road's far sections). Painted as two triangles, from corners 0 1 2 and 2 3 0 */
+void raster_quad_whole(const raster_tex *t, const int xy[8]);
+
 /* where n points lie against the window, all of them together (0x91cee): 1 left, 2 right,
    4 above, 8 below. Compared unsigned, as the original: a point left of 0 counts as right */
 int raster_outcode(int n, const int *xy);

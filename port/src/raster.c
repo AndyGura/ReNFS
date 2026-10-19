@@ -188,6 +188,183 @@ void raster_quad(const raster_tex *t, const int uv[8], const int xy[8])
     }
 }
 
+/* The far road's painter (NOTES §4.6): a picture stretched whole over a quad, cut in two
+   triangles (0x90900, and 0x906d0 for see-through pictures). Each triangle is stepped
+   straight across from its long edge (0x8fbd8, 0x8f0c8), every row reading the picture
+   through one table of steps worked out at its widest row (0xa6240). */
+
+#define STEPS 0x604                    /* (0x6000000 >> 16) + 1, written in pairs (0x15ed1c) */
+static int g_steps[STEPS];
+
+/* where a row's pixels read, from where it starts: the picture stepped du, dv a pixel from
+   half way into the first one (0xa6240). A width of a power of two (0 too) is shifted */
+static void row_steps(int du, int dv, int w, int n)
+{
+    unsigned u = 0x8000, v = 0x8000, x;
+    int i, shift = -1;
+    if ((w & (w - 1)) == 0)
+        for (shift = 0, x = (unsigned)w; x > 1; x >>= 1)
+            shift++;
+    n = (n + 1) >> 1 << 1;
+    if (n > STEPS)
+        n = STEPS;
+    for (i = 0; i < n; i++, u += (unsigned)du, v += (unsigned)dv) {
+        int row = (int)v >> 16;
+        g_steps[i] = (shift >= 0 ? (int)((unsigned)row << shift) : row * w) + ((int)u >> 16);
+    }
+}
+
+/* (a << 16) / b in 64 bits, as the original's shld and idiv; a itself when b is 0 */
+static int div16(int a, int b)
+{
+    return b ? (int)((long long)a * 65536 / b) : a;
+}
+
+static int sub(int a, int b)
+{
+    return (int)((unsigned)a - (unsigned)b);
+}
+
+/* where a triangle's rows stand: both sides' x, the picture at the left one and its steps */
+typedef struct {
+    int row, lx, rx, u, v, sl, sr, su, sv;
+} tri_rows;
+
+/* rows up to `end`, cut to the window, each from the picture where its left side is plus
+   the steps (0x94aed; 0x9473e leaves colour 255 out). A row cut on the left starts its
+   steps from those of the pixels cut, added to the first pixel's: not the steps further
+   along, as the original */
+static void rows(const raster_tex *t, tri_rows *r, int end)
+{
+    for (; r->row < end; r->row++) {
+        int l = r->lx >> 16, n = (r->rx >> 16) - l, over = l + n - g_x1, skip = g_x0 - l;
+        if (over > 0)
+            n -= over;
+        if (skip > 0) {
+            n -= skip;
+            l += skip;
+        } else
+            skip = 0;
+        if (n > 0 && r->row >= g_y0 && skip + n <= STEPS) {
+            const unsigned char *src = t->pixels + (r->v >> 16) * t->rowbytes + (r->u >> 16) +
+                                       g_steps[skip];
+            unsigned char *dst = g_base + r->row * g_pitch + l;
+            int i;
+            for (i = 0; i < n; i++) {
+                const unsigned char *p = src + g_steps[i];
+                unsigned char c = p >= t->lo && p < t->hi ? *p : 0;
+                if (!t->see_through || c != 255)
+                    dst[i] = c;
+            }
+        }
+        r->u += r->su;
+        r->v += r->sv;
+        r->lx += r->sl;
+        r->rx += r->sr;
+    }
+}
+
+/* one triangle, uv and xy in 16.16 (0x8fbd8). The original goes a quicker way when the
+   corners lie inside the window, but it compares their 16.16 x with the window's pixels,
+   so it only takes it for rows it would paint nothing in anyway */
+static void tri(const raster_tex *t, const int uv[6], const int xy[6])
+{
+    int hi = 0, lo = 0, m, xb, yb, xt, yt, xm, ym, ub, vb, ut, vt, um, vm;
+    int dy, xlm, w, wabs, left, ulm, vlm, end;
+    tri_rows r;
+
+    if (xy[3] > xy[1])
+        hi = 1;
+    if (xy[1] > xy[3])
+        lo = 1;
+    if (xy[hi * 2 + 1] < xy[5])
+        hi = 2;
+    if (xy[lo * 2 + 1] > xy[5])
+        lo = 2;
+    xb = xy[lo * 2], yb = xy[lo * 2 + 1], ub = uv[lo * 2], vb = uv[lo * 2 + 1];
+    xt = xy[hi * 2], yt = xy[hi * 2 + 1], ut = uv[hi * 2], vt = uv[hi * 2 + 1];
+    dy = sub(yt, yb);
+    if (dy < 0x10000)
+        return;                        /* also when all three are on one row */
+    m = 3 - (hi | lo);
+    xm = xy[m * 2], ym = xy[m * 2 + 1], um = uv[m * 2], vm = uv[m * 2 + 1];
+
+    /* the long edge where the middle corner's row crosses it, and the width there */
+    xlm = xb + (int)((long long)sub(xt, xb) * sub(ym, yb) / dy);
+    w = sub(xm, xlm);
+    left = w < 0;                      /* the middle corner on the left */
+    wabs = left ? (int)(0u - (unsigned)w) : w;
+    if (wabs < 0x10000 || wabs >= 0x6000000)
+        return;
+    ulm = ut + (int)((long long)sub(ub, ut) * sub(yt, ym) / dy);
+    vlm = vt + (int)((long long)sub(vb, vt) * sub(yt, ym) / dy);
+    row_steps(div16(sub(um, ulm), w), div16(sub(vm, vlm), w), t->rowbytes, (wabs >> 16) + 1);
+
+    /* from the top corner down to the middle one's row: the picture follows the left side */
+    r.row = yb >> 16;
+    r.u = ub;
+    r.v = vb;
+    r.lx = r.rx = xb;
+    if (left) {
+        r.su = div16(sub(ub, um), sub(yb, ym));
+        r.sv = div16(sub(vb, vm), sub(yb, ym));
+    } else {
+        r.su = div16(sub(ub, ut), sub(yb, yt));
+        r.sv = div16(sub(vt, vb), sub(yt, yb));
+    }
+    if (r.row < ym >> 16) {
+        if (left) {
+            r.sl = div16(sub(xb, xm), sub(yb, ym));
+            r.sr = div16(sub(xt, xb), dy);
+        } else {
+            r.sr = div16(sub(xb, xm), sub(yb, ym));
+            r.sl = div16(sub(xt, xb), dy);
+        }
+        end = g_y1 < ym >> 16 ? g_y1 : ym >> 16;
+        rows(t, &r, end);
+    }
+
+    /* and on to the bottom corner: the short side starts again at the middle corner */
+    if (r.row >= yt >> 16)
+        return;
+    if (left) {
+        r.sl = div16(sub(xm, xt), sub(ym, yt));
+        r.sr = div16(sub(xt, xb), dy);
+        r.lx = xm;
+        r.u = um;
+        r.v = vm;
+        r.su = div16(sub(um, ut), sub(ym, yt));
+        r.sv = div16(sub(vm, vt), sub(ym, yt));
+    } else {
+        r.sr = div16(sub(xm, xt), sub(ym, yt));
+        r.sl = div16(sub(xt, xb), dy);
+        r.rx = xm;
+    }
+    end = yt >> 16 < g_y1 ? yt >> 16 : g_y1;
+    rows(t, &r, end);
+}
+
+/* corners and picture points as whole pixels into 16.16, half way into each (0x905e0) */
+static void tri_pixels(const raster_tex *t, const int uv[6], const int *p0, const int *p1,
+                       const int *p2)
+{
+    int uv16[6], xy16[6], i;
+    const int *p[3] = {p0, p1, p2};
+    for (i = 0; i < 6; i++) {
+        uv16[i] = (int)(((unsigned)uv[i] << 16) + 0x8000);
+        xy16[i] = (int)(((unsigned)p[i / 2][i % 2] << 16) + 0x8000);
+    }
+    tri(t, uv16, xy16);
+}
+
+void raster_quad_whole(const raster_tex *t, const int xy[8])
+{
+    int w = t->w - 2, h = t->h - 2;
+    const int a[6] = {1, 1, w, 1, w, h}, b[6] = {w, h, 1, h, 1, 1};
+    tri_pixels(t, a, xy, xy + 2, xy + 4);
+    tri_pixels(t, b, xy + 4, xy + 6, xy);
+}
+
 int raster_outcode(int n, const int *xy)
 {
     int all = 15;

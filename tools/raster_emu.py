@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """The game's textured-quad painters (0x91360, and 0x90b30 that leaves colour 255 out) run
 in a CPU emulator against the port's port/src/raster.c, on random quads. Needs unicorn
-(build/venv, see tools/unpack_emu.py) and a C compiler.
+(build/venv, see tools/unpack_emu.py) and a C compiler. With --whole, the far road's
+painters instead (0x90900, 0x906d0: a whole picture over a quad as two triangles), on
+pictures of random sizes.
 
-    build/venv/bin/python tools/raster_emu.py [count] [seed]
+    build/venv/bin/python tools/raster_emu.py [--whole] [count] [seed]
 
 Prints the quads whose pixels differ, and the totals.
 """
@@ -13,6 +15,7 @@ from unicorn.x86_const import UC_X86_REG_ESP
 
 IMAGE = "build/nfs_flat.bin"
 PLAIN, SEE_THROUGH, FATAL = 0x91360, 0x90b30, 0x92484
+WHOLE, WHOLE_SEE_THROUGH = 0x90900, 0x906d0
 X0, Y0, X1, Y1, BITS, ROWTAB, BASE = 0xf88a4, 0xf88a8, 0xf88ac, 0xf88b0, 0xf88b4, 0xf88c4, 0xf88c8
 MEM, MEMSIZE = 0x400000, 0x100000         # the texture in the middle, its neighbours around
 TEX = MEM + 0x80000
@@ -53,6 +56,17 @@ class Original:
         mu.emu_start(SEE_THROUGH if see_through else PLAIN, DONE)
         return bytes(mu.mem_read(FB, W * H))
 
+    def whole(self, fb, win, xy, see_through):
+        mu = self.mu
+        mu.mem_write(FB, bytes(fb))
+        mu.mem_write(X0, struct.pack("<4i", win[0], win[1], win[2], win[3]))
+        mu.mem_write(ARGS, struct.pack("<8i", *xy))
+        sp = STACK - 0x100
+        mu.mem_write(sp, struct.pack("<3I", DONE, TEX, ARGS))
+        mu.reg_write(UC_X86_REG_ESP, sp)
+        mu.emu_start(WHOLE_SEE_THROUGH if see_through else WHOLE, DONE)
+        return bytes(mu.mem_read(FB, W * H))
+
 
 def port_lib():
     out = "build/raster_test.so"
@@ -66,7 +80,56 @@ class Tex(ctypes.Structure):
                 ("see_through", ctypes.c_int)]
 
 
+def main_whole(args):
+    count = int(args[0]) if args else 2000
+    rnd = random.Random(int(args[1]) if len(args) > 1 else 1)
+    mem = bytearray(rnd.randrange(256) for _ in range(MEMSIZE))
+    for i in range(0, MEMSIZE, 7):
+        mem[i] = 255
+    orig = Original(bytes(mem))
+    lib = port_lib()
+    cmem = (ctypes.c_ubyte * MEMSIZE).from_buffer(mem)
+    base = ctypes.addressof(cmem)
+    cfb = (ctypes.c_ubyte * (W * H))()
+    bad = painted = 0
+    for n in range(count):
+        tw, th = rnd.choice([4, 8, 16, 32, 64, 128, 5, 23, 48, 100]), rnd.choice([4, 16, 64, 7, 30, 128])
+        head = struct.pack("<I6H", 0x7b | 0x100000, tw, th, 0, 0, 0, 0)
+        orig.mu.mem_write(TEX, head)
+        cmem[TEX - MEM:TEX - MEM + 16] = list(head)
+        tex = Tex(base + TEX - MEM + 16, base, base + MEMSIZE, tw, tw, th, 0)
+        kind = n % 4
+        win = [0, 0, 320, 200] if kind < 2 else \
+              [rnd.randrange(0, 100), rnd.randrange(0, 100), rnd.randrange(200, 641), rnd.randrange(150, 481)]
+        span = 40 if kind == 0 else 400
+        cx, cy = rnd.randrange(-50, 400), rnd.randrange(-50, 300)
+        xy = [v for _ in range(4) for v in (cx + rnd.randrange(-span, span), cy + rnd.randrange(-span, span))]
+        if kind == 3:
+            r = rnd.randrange(2, 200)
+            xy = [cx - r, cy - r, cx + r + rnd.randrange(-r, r), cy - r, cx + r, cy + r, cx - r, cy + r + rnd.randrange(-r, r)]
+            if rnd.random() < 0.5:
+                xy = xy[6:] + xy[4:6] + xy[2:4] + xy[0:2]
+        see = rnd.random() < 0.3
+        fb = bytes([n & 0xff]) * (W * H)
+        want = orig.whole(fb, win, xy, see)
+        ctypes.memmove(cfb, fb, W * H)
+        lib.raster_window(cfb, W, *win)
+        tex.see_through = see
+        lib.raster_quad_whole(ctypes.byref(tex), (ctypes.c_int * 8)(*xy))
+        got = bytes(cfb)
+        if want != fb:
+            painted += 1
+        if got != want:
+            bad += 1
+            if bad <= 10:
+                print("quad %d: %d pixels differ  win %s xy %s tex %dx%d see %d" % (
+                    n, sum(a != b for a, b in zip(got, want)), win, xy, tw, th, see))
+    print("%d quads (%d painted something), %d differ" % (count, painted, bad))
+
+
 def main():
+    if sys.argv[1:2] == ["--whole"]:
+        return main_whole(sys.argv[2:])
     count = int(sys.argv[1]) if len(sys.argv) > 1 else 2000
     rnd = random.Random(int(sys.argv[2]) if len(sys.argv) > 2 else 1)
     tw, th = 64, 64
