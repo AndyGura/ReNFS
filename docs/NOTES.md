@@ -2234,7 +2234,7 @@ stretch's racer (`0x78660`). The traffic sometimes picks another place in its la
 (`0x7dd33`, 1 in `0xf74f0` = 0x28).
 
 **Ported (`port/src/opponent.c`): equal to the original step for step in 220 runs on all
-11 snapshots** (`tools/opponent_emu.py`: the race cut to the player and the opponent,
+11 snapshots** (374 with the cars meeting, §4.14) (`tools/opponent_emu.py`: the race cut to the player and the opponent,
 three driving scripts, 15 settings: single race, no traffic option, the lane rule off,
 fast, steering, off its lane, off the road, in the air, changing gear, past the finish,
 before the start, and the player catching and passing a slowed opponent), and the
@@ -2243,8 +2243,103 @@ several cars in the lanes (`0x78c88` 241 of 618 instructions run, `0x7850c` 24 o
 `0x78660`, `0x7e548`, `0x7e5e4` none) wait for the traffic to be checked. `--race cy1` races one
 opponent (`RENFS_SEED=n` for its random numbers). Not yet: the traffic's coming and going
 (`0x79500`, `0x77de8`, `0x7cac8`), the police (`0x79728`, `0x786d4`'s police branch,
-`chase_drop` `0x781ac`), a computer's car crashing (kind 4 → `0x1de8a`, kind 5
-`0x7d9e4`), EXPLODE's push (`0x78370`), the horns and engines' sounds.
+`chase_drop` `0x781ac`), EXPLODE's push (`0x78370`), the horns and engines' sounds.
+
+### 4.14 Cars meeting cars (2026-10-19)
+
+After every race step's driving, `cars_meets_world` `0x1c878` (the hit's wait `0xea5d0`
+counted down, else the hit level `0xea5d4` back to 0x6666; the tick every fourth step)
+goes through the cars by node (`0x13c298`). A player's car: caught by the police
+(`+0x176` & 1) it steers towards car 2, the police car (`police_steer` `0x1c800`: the
+angle to it less its heading, half of it added to half its steering, held within
+±0x140000, the throttle off); outside the lanes (`lanes right × width < +0x80`, or the
+left's) it meets the roadside objects (`0x1ebf4`, not ported). A car not of kind 6 with
+`+0x51a` & 6 = 6 is tried against the cars after it in that order (round past the last
+when within 4 nodes of the loop's end) until one is more than 2 nodes ahead (only while
+the loop's end is more than 4 away), each with `+0x51a` & 5 = 5 and both |Δx| and |Δz|
+under the sum of their radii (`+0xc0`→+0x70).
+
+**`car_car_collide` `0x1c6a4`**: both bodies made from the cars (unless of kind 4,
+`0x1cbb0`), `car_car_impact`; a hit at or above the hit level sets the level to it +
+0x8000, the wait to 10, and shakes both views: s = min(hit, 0xa0000), negated if
+`rand_below(10)` > 5, roll shake ±s (`+0x429`, opposite for the two), pitch shake
+(`+0x42d`) ±s by another draw, all four phases `0x1c`. (Its sound `0x7fb58`, `0x52e40`:
+not ported.) **EA's random numbers** `0x91e04`: six words `0xf8a8c`.. s0..s5, the sum
+s5 + s4 + s3 + s2 + s1 + s0 with carries, each partial sum stored back (s4, s3, s2, s1),
+then s5 counted up with its carry running up through s4..s1 into the result, s0 = the
+result. Its seeding `0x91e6a` is never called: the image's words are the start.
+`rand_below(n)` `0x52580` = (low 16 bits × n) >> 16.
+
+**`car_car_impact` `0x1e314`**: `box_separate` `0x2b864` and `box_impulse` `0x2afb8`;
+nothing if either fails. The limit is 0xd0000 (`0xea5b0`), 0x100000 (`0xea5b4`) with a
+player in it. **A light hit** (the push `0xea668` ≤ the limit, and no player in it
+already thrown): each car not of kind 4 driven again by its own kind from its body
+(`0x1cd40`; the second is asked **by the first car's kind**, as the program does), both
+`+0x15c` from their bodies (`0x1e6cc`). (A replay highlight `0x5c6d4` when both go faster
+than 16: not ported.) **A hard hit**: both kind 4, a body moving faster than 0x8000 on any
+axis waits 300 steps, and a player's car not yet thrown gets its road frame, `+0x4f2` = 1
+and **the knock** `0x1e838`: spin = spin/256 × `0xea5b8`/256 + `0xea5bc`/256 × the road's
+across/256 + `0xea5c0`/256 × along/256, the speed += `0xea5c4`/256 × its own up axis/256.
+
+**`box_separate` `0x2b864`** (the live path; the switches `0xea62c`..`0xea64c` are never
+written: 0 0 0 1 0 0 0 1 0): the turn between the boxes M[r][c] = A's axis r · B's axis c
+(p8 products), with B's half sizes and A's (P5 = M·hB, P6 = M·hA). Up to 32 times: where
+B is from A, in A's and in B's frame; **`box_contact` `0x26324`**: the first of (1) the
+middles of B's six faces inside A (+ then −, axes 0..2), the normal ±B's axis; (2) A's
+inside B, the normal ∓A's axis; (3) B's eight corners inside A (signs +++, ++−, +−+, +−−,
+−++, …), (4) A's inside B, the face for a corner: in a fast hit (|B.vel − A.vel| > 0xf0000
+on an axis) the box's axis most along the moving body's speed, else the face it is least
+deep behind, turned to the corner's side. "Inside" includes the faces. No contact: done.
+At the first contact the push is chosen: **along their speeds** when they close faster
+than 0x140000 on an axis and either are within 0x3333 of each other or the closing
+direction is within 0xd999 of the line between their middles (both made unit: the speeds
+by `0x2bf9c`, halved first while too big; the line by `0x2c25c`): −1/|ΔV| (`0x3e7fc` of
+the length `0x2c2d8`) / 256 × each body's own speed / 256, / 32; **else apart along the
+line**, each by the other's share of the weight (`0x2c1c0` unit, fix_div shares, / 4,
+then >> 14 and >> 5, or >> 19). Each pass adds the pushes. **`box_impulse` `0x2afb8`**:
+rA, rB from the middles to the point, cA = rA × n, cB = rB × n (`0x3e880`, rounded);
+closing = B.vel·n − A.vel·n − A.spin·cA + B.spin·cB; resistance = half of each 1/mass
+and of each 1/inertia × |c|²; j = fix_div; nothing if j < 0; j × `0xea680` (the bounce)
+is the hit `0xea668`; the speeds ± j·n/mass, the spins ± (r × j·n)/inertia. (The force
+feedback `0x4d7a4` when `0x15d144`: not ported.) Closing faster than about 180 m/s on an
+axis overflows the length and `0x3e784`'s square root never ends: the original hangs;
+racing never comes near.
+
+**A computer's car thrown about** (kind 4, `0x1cfe0` from `0x1de8a`, also a player's car
+of kind 4 not crashing): t = its up axis · the road's up. Waited out (`+0x80` = 0) and
+upright (t > 0xf70a) or out of every player's stretch (`0x7bf94`): **stood up**
+(`car_stand_up` `0x7daec`: up = the road's, across = up × along made unit, along =
+across × up), a police car's chase dropped (`0x781ac`(0)), kind 5 (`0x1cd40`), the car
+from its body. Else, waiting: one step less; still moving (0x18000 on any speed or spin)
+or neither on its wheels, roof nor side (|t| between 0x8f5 and 0xf70a): the wait =
+(wait & 3) + 60 (police: chase dropped). A car longer than 3 m from middle to end not
+crashing is stood up every step, its spin kept about the up axis only. Then the touching
+tail and the car from its body as for a player's car. **Kind 5** (`drive_kind5`
+`0x7d9e4`): its yaw rate eased to 0 by 0x13333 (0x23333 a racer); near a player it drives
+with target speed 0 (`0x7b34c`); out of their sight: kind 3, standing along the road (the
+turn the road's axes, no speed, on the ground). **A player put back after a crash**
+(`0x7c030` from `0x1d8b3`): the chase dropped (`0x781ac`(1)); for each car after the
+players (the field on a circuit, all cars on an open road): its chase flags (`+0x174`
+& 0xfff7dbff, `0xf74a8` 0); a racer of kind 4 or 5 within the road's edges (−node+2 ×
+0x2000 .. node+3 × 0x2000) is put back as kind 5 does (kind 4 through `0x1cd40`(3) first);
+the traffic, and cars of kind 3 out of the stretches or police, are placed again by
+`0x7cac8` (with the traffic).
+
+**Ported (`port/src/collide.c`, `crash.c`, `opponent.c`): equal to the original.**
+`tools/collide_emu.py`: 22,000 random pairs of the snapshots' two cars (turned, placed and
+moving at random up to 48 m/s an axis), the separation's touch, point, normal and both
+places, the push's hit, speeds and spins, and 1000 of EA's random numbers, on all 11
+snapshots; every instruction the switches leave live in `0x26324`, `0x2b864`, `0x2afb8`,
+`0x2bf9c` and `0x2c1c0` run. `tools/opponent_emu.py` with the cars' meeting on (EA's
+random numbers and the hit compared every step), 374 runs on all 11 snapshots: the
+opponent put beside the player, ahead of it standing (the player ramming it: hard hits on
+d2, d4), behind it closing (188 touches as it pushes a braking player), behind it fast (a
+hard hit, both thrown, the opponent stood up, the player put back and the opponent with
+it), and started thrown about (tumbling, on its roof, rolling; near the player or far
+ahead; with the player's car thrown at a wall too, so that the player is put back while
+the opponent still lies there). Not run: the police's parts, the long cars (traffic) and
+kind 6. `RENFS_PLACE=s:a,c,v` puts the opponent so in `--race`. Not yet: the roadside
+objects `0x1ebf4`, the traffic's placing `0x7cac8`, the police's parts, the sounds.
 
 ## 5. The original in DOSBox (2026-10-19)
 

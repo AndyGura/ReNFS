@@ -50,6 +50,12 @@ extern opp_race g_opp;
 void opponent_start(unsigned seed);
 /* drive_opponent 0x7b34c: a step of a car the computer drives (kind 3) */
 void opponent_drive(race_car *c);
+/* 0x7c030's loop: after a player's crash, the racers thrown about put back on the road */
+void opponent_put_back(void);
+/* drive_kind5 0x7d9e4: a step of a computer's car stood up after a crash (kind 5) */
+void opponent_recover(race_car *c);
+/* 0x7bf94: is the car near any player (in their stretches of road)? */
+int opponent_near_players(const race_car *c);
 /* traffic_police_tick 0x7a040: every fourth step, the cars refreshed and the target
    speeds and lanes chosen */
 void opponent_tick(void);

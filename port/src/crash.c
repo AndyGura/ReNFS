@@ -5,6 +5,7 @@
    z turned round: its turn's elements 2, 5, 6 and 7 and its z change sign between them. */
 #include "crash.h"
 #include "cardraw.h"
+#include "collide.h"
 #include "exe.h"
 #include "opponent.h"
 #include "track.h"
@@ -615,6 +616,24 @@ static void set_kind(race_car *c, int k)
     c->slide_rear = 0;
 }
 
+/* car_stand_up 0x7daec: the body turned upright, its up along the road's (up) and its
+   other two axes squared to it, across first */
+static void stand_up(car_body *b, const vec3 *up)
+{
+    int *m = b->m;
+
+    m[3] = up->x;
+    m[4] = up->y;
+    m[5] = up->z;
+    m[0] = p8(m[4], m[8]) - p8(m[5], m[7]);
+    m[1] = p8(m[5], m[6]) - p8(m[3], m[8]);
+    m[2] = p8(m[3], m[7]) - p8(m[4], m[6]);
+    normalize((vec3 *)&m[0]);
+    m[6] = p8(m[1], m[5]) - p8(m[2], m[4]);
+    m[7] = p8(m[2], m[3]) - p8(m[0], m[5]);
+    m[8] = p8(m[0], m[4]) - p8(m[1], m[3]);
+}
+
 /* 0x1ceb4: landed on its wheels: driven again, the gearbox's automatic in neutral */
 static void land(race_car *c)
 {
@@ -670,9 +689,10 @@ static void respawn(race_car *c, const vec3 *side, const vec3 *at)
     int a;
 
     c->crashing = 0;
-    /* (0x7c030: the other cars near it put back too; not in the port yet) */
+    /* (0x7c030: the other cars thrown about put back too) */
     if (g_drive.chase)
         chase_off();
+    opponent_put_back();
     memcpy(b->m, &c->road_side, 9 * sizeof(int));
     b->m[2] = -b->m[2];
     b->m[5] = -b->m[5];
@@ -870,8 +890,38 @@ void crash_step(race_car *c)
                        && dot8((const vec3 *)&b->m[3], &up) > 0xf70a)
                 land(c);
         }
+    } else {
+        /* a computer's car (0x1de8a): waited out, upright or out of the players' sight,
+           it is stood up and handed to kind 5 (a police car's chase dropped, 0x781ac:
+           with the police) */
+        int t = dot8((const vec3 *)&b->m[3], &up);
+
+        if (!b->wait && (t > 0xf70a || !opponent_near_players(c))) {
+            stand_up(b, &up);
+            set_kind(c, 5);
+            goto placed;
+        }
+        /* still moving, or neither on its wheels, roof nor side: a second more to wait */
+        if (b->wait) {
+            b->wait--;
+            if (iabs(b->vel.x) >= 0x18000 || iabs(b->vel.y) >= 0x18000
+                || iabs(b->vel.z) >= 0x18000 || iabs(b->spin.x) >= 0x18000
+                || iabs(b->spin.y) >= 0x18000 || iabs(b->spin.z) >= 0x18000
+                || !(t > 0xf70a || t < -0xf70a || (t < 0x8f5 && t > -0x8f5)))
+                b->wait = (b->wait & 3) + 0x3c;
+        }
+        /* a long one (over 3 m from its middle to its end) kept upright, turning only
+           about its up */
+        if (b->half[2] > 0x30000 && !c->crashing) {
+            int e;
+
+            stand_up(b, &up);
+            e = (p8(b->spin.y, up.y) + p8(b->spin.x, up.x) + p8(up.z, b->spin.z)) >> 8;
+            b->spin.x = e * (up.x >> 8);
+            b->spin.y = e * (up.y >> 8);
+            b->spin.z = e * (up.z >> 8);
+        }
     }
-    /* (the other cars' path, 0x1de8a: stood up and handed to kind 5, comes with them) */
 
     /* touching: the tyres' screech by the corner's speed, the hit heard */
     if (g_crash.depth < 0x3333) {
@@ -893,6 +943,7 @@ void crash_step(race_car *c)
         }
     } else
         c->slide_front = 0;
+placed:
     car_from_body(c);
     if ((b->wait & 3) == 2 || b->wait == 0)
         squared_up(b->m);
@@ -923,8 +974,7 @@ void crash_refresh(race_car *c)
     /* the speed along the road: the car's (0x7b130) or its body's (0x1e6cc); the
        computer's cars drive by it */
     if (c->state == 4)
-        c->road_speed = p8(c->body.vel.x, c->road_fwd.x) + p8(c->body.vel.y, c->road_fwd.y)
-                      + p8(-c->body.vel.z, c->road_fwd.z);
+        c->road_speed = crash_body_road_speed(c);
     else if (c->state != 3)
         c->road_speed = p8(-c->vel.x, c->road_fwd.x) + p8(c->vel.y, c->road_fwd.y)
                       + p8(c->vel.z, c->road_fwd.z);
@@ -946,11 +996,44 @@ void crash_world(void)
         opponent_tick();
         g_crash.refresh = 4;
     }
+    collide_world();
 }
 
 void crash_road_frame(race_car *c)
 {
     road_frame(c);
+}
+
+void crash_body_from_car(race_car *c)
+{
+    body_from_car(c);
+}
+
+void crash_set_kind(race_car *c, int k)
+{
+    set_kind(c, k);
+}
+
+/* 0x1e6cc */
+int crash_body_road_speed(const race_car *c)
+{
+    return p8(c->body.vel.x, c->road_fwd.x) + p8(c->body.vel.y, c->road_fwd.y)
+         + p8(-c->body.vel.z, c->road_fwd.z);
+}
+
+int crash_len3(const vec3 *v)
+{
+    return len3(v);
+}
+
+int crash_recip(int x)
+{
+    return recip(x);
+}
+
+void crash_normalize(vec3 *v)
+{
+    normalize(v);
 }
 
 void crash_turn_y(int *m, int a)

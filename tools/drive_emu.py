@@ -9,9 +9,9 @@ and cars_meets_world 0x1c878, its traffic_police_tick 0x7a040 cut down to the pl
 from the same car record and globals, given the same control words. After every step
 every field of the car the port keeps is compared (its tumbling body too), the globals
 the driving and the crash write and the smoke's block. The sounds, the replay's
-highlights, the acceleration test's times, the force feedback, the police's steering,
-the roadside objects and the cars against each other are left out on the original's side
-(LEFT_OUT).
+highlights, the acceleration test's times, the force feedback and the roadside objects
+are left out on the original's side (LEFT_OUT); the cars meet each other on both sides
+(collide.c, from the snapshot's random numbers and order).
 
     build/venv/bin/python tools/drive_emu.py [snapshot ..]     (default: all d*, e*, r*)
 """
@@ -28,11 +28,10 @@ SOURCES = ["drive.c", "cardraw.c", "model.c", "polyfill.c", "camera.c", "car.c",
 # (crash.c is compiled into drive_test.c, which reaches its parts)
 # sounds (0x52d2c, 0x52e40, 0x52ea8: two words on the stack each), highlights, the
 # acceleration test's times, speech, force feedback, the wall's sound by the camera,
-# EXPLODE's push; the crash's sounds (0x53214, 0x531dc), the police's steering 0x1c800,
-# the roadside objects 0x1ebf4, the cars against each other 0x1c6a4
+# EXPLODE's push; the crash's sounds (0x53214, 0x531dc), the roadside objects 0x1ebf4
 LEFT_OUT = {0x52d2c: 2, 0x52e40: 2, 0x52ea8: 2, 0x5c6d4: 0, 0x2d71c: 0, 0x2d778: 0,
             0x722b4: 0, 0x72438: 0, 0x4d8c0: 0, 0x4d878: 0, 0x7fb58: 0, 0x78c30: 0,
-            0x53214: 0, 0x531dc: 0, 0x1c800: 0, 0x1ebf4: 0, 0x1c6a4: 0}
+            0x53214: 0, 0x531dc: 0, 0x1ebf4: 0}
 KIND = {2: 0x382d0, 4: 0x1cfe0}
 CAR, SPEC = 0x600, 0x800
 
@@ -156,7 +155,7 @@ def lib():
     import subprocess
     out = "build/drive_test.so"
     subprocess.check_call(["cc", "-O1", "-g", "-fwrapv", "-shared", "-fPIC", "-o", out] +
-                          ["port/src/" + f for f in SOURCES] + ["tools/drive_test.c", "-Iport/src"] +
+                          ["port/src/" + f for f in SOURCES] + ["tools/drive_test.c", "tools/collide_test.c", "-Iport/src"] +
                           subprocess.check_output(["sdl2-config", "--cflags", "--libs"]).decode().split())
     return ctypes.CDLL(os.path.abspath(out))
 
@@ -190,8 +189,22 @@ PORTED = [(0x10010, 0x10428), (0x483e4, 0x48b80), (0x5162c, 0x51690), (0x3e918, 
           (0x2c490, 0x2c584), (0x2c584, 0x2c71c), (0x2c894, 0x2c91f), (0x2c9c0, 0x2ca92),
           (0x2cb78, 0x2cc5d), (0x3e784, 0x3e7e9), (0x3e7fc, 0x3e845), (0x64588, 0x645b9),
           (0x64804, 0x64977), (0x64978, 0x64a73), (0x7dbd8, 0x7dd45), (0x786d4, 0x788b5),
-          (0x78a19, 0x78a7f), (0x7b130, 0x7b175), (0x1e6cc, 0x1e719), (0x1c878, 0x1c8d4)]
+          (0x78a19, 0x78a7f), (0x7b130, 0x7b175), (0x1e6cc, 0x1e719), (0x1c878, 0x1ca99),
+          # the cars meeting
+          (0x1c6a4, 0x1c7ff), (0x1c800, 0x1c875), (0x1e314, 0x1e6cb), (0x1e838, 0x1e9ca),
+          (0x2afb8, 0x2b863), (0x2b864, 0x2bf9b), (0x26324, 0x2a331), (0x2bf9c, 0x2c0f1),
+          (0x2c1c0, 0x2c259), (0x52580, 0x52599), (0x91e04, 0x91e6a)]
 HIT = set()
+
+
+def set_collide(L, s):
+    """the cars meeting: EA's random numbers and the cars by node as the original's"""
+    st = (ctypes.c_uint * 6)(*struct.unpack("<6I", s.read(0xf8a8c, 24)))
+    L.collide_test_random(st, 1)
+    L.collide_test_set_impulse(s.i32(0xea668))
+    n = s.i32(0x12da38)
+    L.collide_test_order((ctypes.c_int * n)(*struct.unpack("<%di" % n, s.read(0x13c298, 4 * n))), n)
+    s.write(0x15d144, b"\0\0\0\0")           # (no force feedback)
 
 
 def run(L, F, path, scr, var, coverage=False):
@@ -265,6 +278,7 @@ def run(L, F, path, scr, var, coverage=False):
             L.drive_test_in(o, bytes(mu.mem_read(a, CAR)), spec)
             others.append(o)
         L.drive_test_car(k, o)
+    set_collide(L, s)
     n = tumbling = 0
     for steps, w in script(scr):
         for _ in range(steps):

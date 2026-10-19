@@ -247,8 +247,18 @@ Ghidra project and `build/decomp`, one command). The git history was started aga
   run). `--race cy1` races one opponent: it starts beside the player on the left and
   pulls away (`build/shots/opp_grid.png`, `opp_race.png`). The racer's first step moves it
   from the grid's node 20 to 19, which sets its road axes: no road follow at set-up.
-  Not yet: the traffic, the police, a computer's car crashing (kind 4 → `0x1de8a`, kind 5),
-  its sounds, EXPLODE.
+  Not yet: the traffic, the police, its sounds, EXPLODE.
+
+- **Cars meet cars** (`port/src/collide.c`, NOTES §4.14): `cars_meets_world` `0x1c878`'s
+  loop, the two bodies pushed apart as boxes (`box_separate` `0x2b864`, `box_contact`
+  `0x26324`), the hit's push (`box_impulse` `0x2afb8`), the views shaken by EA's random
+  numbers (`0x91e04`); a hard hit throws both cars about and knocks a player's over
+  (`0x1e838`); a thrown computer's car is stood up and drives again (`0x1de8a`, kind 5
+  `0x7d9e4`), put back with the player after its crash (`0x7c030`). **Equal**: 22,000
+  random pairs on all 11 snapshots (`tools/collide_emu.py`, every live instruction run)
+  and races with the opponent placed beside, ahead and behind the player, touching up to
+  188 times and a hard hit (`tools/opponent_emu.py`). `RENFS_PLACE=s:a,c,v` places the
+  opponent in `--race`. Not yet: the roadside objects `0x1ebf4`, the sounds.
 
 **Progress page for Danik**: https://claude.ai/artifact/VZdxTpYC3oLXYeBVJpoDoM (every step,
 its percent done and weight). Update its steps file after each finished step.
@@ -276,9 +286,9 @@ races 320x200 / 320x240; commit locally as the work goes.
    port now makes a first frame of its own (`--race cy1`), the cars, their shadows,
    the racers' markers, the dashboard, the map and the mirror in it, and the player's car
    drives and crashes (equal step for step), and the status bar's numbers and the race's
-   timing, the camera outside and the crash's smoke, and the opponent's driving. Next:
-   cars meeting cars (`0x1c878`: `car_car_collide` `0x1c6a4`, the opponent's crash),
-   the traffic (`0x79500`, `0x77de8`, `0x7cac8`), the police, the sounds.
+   timing, the camera outside and the crash's smoke, the opponent's driving, and cars
+   meeting cars. Next: the roadside objects (`0x1ebf4`, `0x1ee80`), the traffic
+   (`0x79500`, `0x77de8`, `0x7cac8`), the police, the sounds.
    Open: who writes `0x136618` (28 sections drawn: a detail setting?). The walls `0x59294`
    and the circuits' sky ring `0x4ace8` can be checked on CY1 memory with made-up input,
    or on snapshots of another track (`tools/nfsdos.py`).

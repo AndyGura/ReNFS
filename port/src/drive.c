@@ -1480,6 +1480,8 @@ void drive_step(race_car *c)
         crash_step(c);
     else if (c->state == 3)
         opponent_drive(c);
+    else if (c->state == 5)
+        opponent_recover(c);
     else {
         physics(c);
         drive_check_lap(c);

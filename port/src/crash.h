@@ -60,9 +60,9 @@ void crash_body_setup(race_car *c, const unsigned char *pdn);
 void crash_hard_hit(race_car *c, int a, int b, int s);
 /* drive_crashed 0x1cfe0: a step of the tumbling car (state 4) */
 void crash_step(race_car *c);
-/* cars_meets_world 0x1c878, as far as the port has it: the hit's sound's timers, and
-   every fourth step traffic_police_tick (opponent_tick). (The police's steering 0x1c800,
-   the roadside objects 0x1ebf4 and the cars against each other 0x1c6a4 come later) */
+/* cars_meets_world 0x1c878: the hit's sound's timers, every fourth step
+   traffic_police_tick (opponent_tick), then the cars against each other (collide.c).
+   (The roadside objects 0x1ebf4 come later) */
 void crash_world(void);
 /* traffic_police_tick's refresh 0x786d4 of a car: its place across the road and how far
    its body reaches across it, its target speed (the computer's, opponent.c), its speed
@@ -75,5 +75,14 @@ void crash_turn_y(int *m, int a);
 void crash_mat_mul(int *out, const int *a, const int *b);
 /* 0x1ca9c: a computer's car spins out (to kind 4 for 60 steps) */
 void crash_spin_out(race_car *c);
+/* for collide.c: the body from the car (0x1cbb0); the car driven by kind k again from its
+   body (0x1cd40); the body's speed along the road (0x1e6cc); |v| (0x2c2d8); 1 / x on the
+   x87 (0x3e7fc); v made a unit long (0x2c25c) */
+void crash_body_from_car(race_car *c);
+void crash_set_kind(race_car *c, int k);
+int crash_body_road_speed(const race_car *c);
+int crash_len3(const vec3 *v);
+int crash_recip(int x);
+void crash_normalize(vec3 *v);
 
 #endif

@@ -82,6 +82,31 @@ static void race_throw(race_car *player, int st)
     }
 }
 
+/* RENFS_PLACE="<step>:<along>,<across>,<speed>": a test, the opponent put that many
+   metres along and across the road from the player's car at that step, driving at that
+   speed (m/s), as opponent_emu's placed runs do, to see the cars meet */
+static void race_place(const race_car *player, int st)
+{
+    const char *e = getenv("RENFS_PLACE");
+    race_car *o = g_ncars > 1 ? g_cars[1] : 0;
+    double along, across, speed;
+    int at;
+
+    if (!o || !e || sscanf(e, "%d:%lf,%lf,%lf", &at, &along, &across, &speed) != 4 || st != at * 2)
+        return;
+    o->pos.x = player->pos.x + (int)(along * player->road_fwd.x) + (int)(across * player->road_side.x);
+    o->pos.y = player->pos.y + (int)(along * player->road_fwd.y) + (int)(across * player->road_side.y);
+    o->pos.z = player->pos.z + (int)(along * player->road_fwd.z) + (int)(across * player->road_side.z);
+    o->yaw = player->yaw;
+    o->node = player->node;
+    o->road_side = player->road_side;
+    o->road_up = player->road_up;
+    o->road_fwd = player->road_fwd;
+    o->road_at = player->road_at;
+    o->road_off = o->across_to = player->road_off + (int)(across * 65536);
+    o->road_speed = o->speed = o->speed_to = (int)(speed * 65536);
+}
+
 /* a race step for the player's car (race_step 0x6348c, race_update_cars 0x519d8): the
    flags from the step counter, the keyboard's word (controls_read 0x49248: both gear
    keys at once hold the engine at full revs), every second step the controls applied,
@@ -100,6 +125,7 @@ static void race_step(race_car *player, race_camera *cam)
     g_drive.nitro_keys = key_down(0x31) && (key_down(0x2a) || key_down(0x36) || key_down(0x30));
     g_drive.clock = (int)clock_ticks();
     race_throw(player, st);
+    race_place(player, st);
     if (g_drive.flags & 4)
         drive_controls(player);
     /* (race_update_cars 0x519d8) the finish, the driving, the cars sorted round the

@@ -648,3 +648,12 @@
 0x38c10 random_seed
 0x91d9b time
 0x1ca9c car_spin_out
+0x2b864 box_separate
+0x26324 box_contact
+0x2afb8 box_impulse
+0x1e838 car_knock
+0x2bf9c vec_normalize_halved
+0x91e04 ea_rand
+0x52580 rand_below
+0x1c800 police_steer
+0x7fb58 sound_pan

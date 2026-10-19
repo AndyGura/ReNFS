@@ -267,6 +267,11 @@ static int near_players(const race_car *c)
     return 0;
 }
 
+int opponent_near_players(const race_car *c)
+{
+    return near_players(c);
+}
+
 /* 0x51724: how far past the finish (an open road's nodes past its end, or a circuit's
    node once the laps are done); 0 before */
 static int past_finish(const race_car *c)
@@ -627,6 +632,80 @@ void opponent_drive(race_car *c)
     c->pos.z += (c->vel.z >> 11) + (c->vel.z >> 7);
     if (c->body.steady && c->body.steady != STEADY(c))
         put_down(c, off_road(c));
+}
+
+/* 0x7c030's loop: a player's car put back on the road after its crash puts back the
+   racers thrown about or stood up (kinds 4, 5) that are within the road's edges: driven
+   again (kind 3), standing, along the road. Their chase flags are cleared. (The traffic,
+   and the cars of kind 3 out of the stretches round the racers or police cars, are
+   placed again by 0x7cac8: with the traffic and the police) */
+void opponent_put_back(void)
+{
+    int n = g_track.loop ? g_field : g_ncars, i;
+
+    for (i = g_humans; i < n; i++) {
+        race_car *c = g_cars[i];
+        const unsigned char *nd;
+        int far, k;
+
+        if (!c)
+            continue;
+        far = !opponent_near(c->node);
+        c->bits[1] &= 0xdb;
+        c->bits[2] &= 0xf7;
+        k = c->state;
+        if (k != 5 && k != 4 && !(c->bits[0] & 8) && !far)
+            continue;
+        if (!RACER(c) || (k != 4 && k != 5))
+            continue;
+        nd = node_ptr(c->node);
+        if (-(int)((unsigned)nd[2] << 13) > c->road_off || (int)((unsigned)nd[3] << 13) < c->road_off)
+            continue;
+        if (k == 4)
+            crash_set_kind(c, 3);
+        else
+            c->state = 3;
+        c->yaw_rate = 0;
+        c->steer = 0;
+        c->steer_to = 0;
+        memcpy(c->turn, &c->road_side, sizeof c->turn);
+        c->vel.x = c->vel.y = c->vel.z = 0;
+        c->road_speed = 0;
+        c->on_ground = 1;
+    }
+}
+
+/* drive_kind5 0x7d9e4: a computer's car stood up again after being thrown about (kind
+   5). Its turning eased out; while a player is near, it drives with nothing to reach (it
+   stops); out of their sight it is put back along the road, standing, and driven as
+   before (kind 3). (A police car's chase dropped, 0x781ac: with the police. A car of kind
+   6 counted down, 0x15d480: this one is of kind 5) */
+void opponent_recover(race_car *c)
+{
+    int d = c->bits[0] & 4 ? 0x23333 : 0x13333;
+
+    if (c->yaw_rate > 0) {
+        c->yaw_rate -= d;
+        if (c->yaw_rate < 0)
+            c->yaw_rate = 0;
+    } else if (c->yaw_rate < 0) {
+        c->yaw_rate += d;
+        if (c->yaw_rate > 0)
+            c->yaw_rate = 0;
+    }
+    if (near_players(c)) {
+        c->speed_to = 0;
+        opponent_drive(c);
+        return;
+    }
+    c->yaw_rate = 0;
+    c->steer = 0;
+    c->steer_to = 0;
+    memcpy(c->turn, &c->road_side, sizeof c->turn);
+    c->vel.x = c->vel.y = c->vel.z = 0;
+    c->road_speed = 0;
+    c->on_ground = 1;
+    c->state = 3;
 }
 
 /* ---- every fourth step: the target speed (0x786d4's part) ----------------------------- */

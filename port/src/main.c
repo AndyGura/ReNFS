@@ -1,6 +1,7 @@
 /* ReNFS: The Need for Speed Special Edition (1996), written again from its DOS program.
    main 0x4716c -> startup 0x42054 -> fe_outer_loop 0x47000 (NOTES §4.1). */
 #include "audio.h"
+#include "collide.h"
 #include "exe.h"
 #include "fe.h"
 #include "files.h"
@@ -29,6 +30,8 @@ static const char usage[] =
     "  RENFS_SNDWAV=f   write what is heard to the file f (a WAV)\n"
     "  RENFS_THROW=s:x,y,z  a test: at race step s the car given that speed (m/s)\n"
     "  RENFS_SEED=n     a test: the race's random numbers from n (else the clock)\n"
+    "  RENFS_PLACE=s:a,c,v  a test: at race step s the opponent put a m ahead of the\n"
+    "                   car and c m to the side, at v m/s\n"
     "\n"
     "Keys: Space, Enter or Esc pass a movie or the title.\n";
 
@@ -59,6 +62,7 @@ int main(int argc, char **argv)
     }
     if (!exe_load())           /* the game's tables, the built-in settings among them */
         return 1;
+    collide_init();            /* EA's random numbers as the program starts */
     if (!video_init(shot, shot_frames))
         return 1;
 

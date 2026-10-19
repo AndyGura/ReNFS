@@ -130,6 +130,9 @@ orders (`0x518c0`), passes splits (`0x68d7c`); the status bar's numbers `0x30d8c
 A race ends through `0x13c178`: 1 finished,
 4 arrested (the second police ticket), 0x10 everyone turned back (NOTES §4.3, §4.8).
 The original in DOSBox: `nfs-dos`, `tools/nfsdos.py` (unseen, keys, memory; NOTES §5).
+Cars meeting (NOTES §4.14): `0x1c878` after the driving, the boxes `0x2b864`, the hit
+`0x2afb8`, hard above `0xea5b0` (`0xea5b4` with a player); a thrown computer's car stood up,
+kind 5 `0x7d9e4`; EA's random numbers `0x91e04` start from the image.
 Cars drawn: `cars_at_node` `0x6837c` → `0x66d08` → `0x66880` (NOTES §4.10); their
 pictures re-coloured by `0x65020` through a colour map `0xf9520` that keeps what the last
 re-colouring left. Snapshots e1..e5: a 320x200 race, `NFS_DOS_DIR=$PWD/build/dosnfs`.
@@ -196,6 +199,7 @@ k<letter> held; `<from>-<to>:<key>` holds a key through those retraces, several 
 once; for `--shot` tests);
 `RENFS_SHOTRAW=f`: `--shot` also writes the palette numbers (comparing by entry);
 `RENFS_THROW=s:x,y,z`: the car given a speed at race step s (to see a crash);
+`RENFS_PLACE=s:a,c,v`: the opponent put a m ahead and c m beside at v m/s at race step s;
 `RENFS_CONFIG=f`: a CONFIG.DAT for the test (the original's, `nfsdos.py mem:156c14:5f52:f`).
 `RENFS_SEED=n`: the race's random numbers seeded with n (else the time, as the original).
 Sound: SDL's device at 44.1 kHz 16-bit stereo, each stream converted by an
@@ -229,6 +233,8 @@ the race's end; equal step for step, `tools/timing_emu.py`; NOTES §4.12), `oppo
 `traffic_police_tick` `0x7a040`'s lanes and target speeds; equal step for step,
 `tools/opponent_emu.py`; NOTES §4.13), `race.c` (`--race`: the loading
 and the frame, a step every 3 ticks),
+`collide.c` (cars meeting cars: `0x1c878`'s loop, the boxes pushed apart `0x2b864`/`0x26324`,
+the hit `0x2afb8`, EA's random numbers `0x91e04`; equal, `tools/collide_emu.py`, NOTES §4.14),
 `exe.c`: **the game's fixed tables are read from the CD's `NFS_DOS.EXE`** at the
 original's addresses (checked by a sum of the image), never copied into the port. The menus' look is checked against the
 original's screenshots by palette entry (DOSBox Staging changes colours slightly).
