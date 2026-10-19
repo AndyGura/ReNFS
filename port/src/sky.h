@@ -15,4 +15,11 @@ void sky_tables(int width, int half_fov, int scale, int squash);
    the colours only, no picture (0x12d9d6) */
 void sky_draw(int yaw, const int m[9], const road_window *win, int plain);
 
+/* the mirror's horizon (0x5adbc), into the window's picture of width x height: on the
+   road types without one (node 3 behind the camera's: 4, 7, 9, 8) one colour; else the
+   "horz" picture in tiles across, every other one turned round on tracks that say so, by
+   the camera's yaw and pitch (2^24 a turn), lens_h the view's layout's height (+0x20) and
+   dy its window's centre moved */
+void sky_behind(int yaw, int pitch, int node, int lens_h, int dy, int width, int height);
+
 #endif

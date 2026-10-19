@@ -24,6 +24,7 @@ typedef struct {
     void (*model)(int model, const vec3 *pos, int angle);
     void (*car_row)(int camera_node, int row_node, const scr2 *a, const scr2 *b);
     void (*cars)(int node);
+    void (*cars_behind)(int node);     /* 0x68430: the cars on a row, in the mirror */
 } road_painters;
 
 extern road_painters g_road_paint;
@@ -48,5 +49,9 @@ void road_objects_start(void);
 /* the road's `drawn` sections ahead of road node `node` (the camera's), far ones first
    (0x5a4f0; 0x59d3c the far ones). near: the near plane (road_transform's) */
 void road_draw(int drawn, int node, int near, const road_window *win);
+/* the road behind in the mirror (0x5aa84): `drawn` sections from the farthest of those
+   road_gather_behind took, the camera at road node `node`, each section's quads the last
+   first, with draw_quad's cutter */
+void road_draw_behind(int drawn, int node, int near, const road_window *win);
 
 #endif

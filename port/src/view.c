@@ -10,6 +10,11 @@ int g_view_res;
 view_rec g_view_ahead, g_view_mirror;
 const view_rec *g_view_now;
 
+static int layout(int rec, int res)
+{
+    return 0xe8b10 + 0x16c * res + 52 * exe_i32(rec + 8);
+}
+
 void view_init(int res, int car, int horizon)
 {
     int r, i, k, h, d, d480;
@@ -20,6 +25,12 @@ void view_init(int res, int car, int horizon)
             memcpy(&g_windows[r][i], exe_at(0xe85c0 + 0x2a8 * r + 40 * i, 40), 40);
     g_view_ahead.fov = exe_i32(0xe8de8);
     g_view_mirror.fov = exe_i32(0xe8e28);
+    /* each its layout's (0x14630: 0xe8b10 + 0x16c × resolution + 52 × the record's +8):
+       the window (+4, handed to 0x14154) and the lens's height (+0x20) */
+    g_view_ahead.mode = exe_i32(layout(0xe8de8, res) + 4);
+    g_view_mirror.mode = exe_i32(layout(0xe8e28, res) + 4);
+    g_view_ahead.lens_h = exe_i32(layout(0xe8de8, res) + 0x20);
+    g_view_mirror.lens_h = exe_i32(layout(0xe8e28, res) + 0x20);
 
     /* the view's height above the dashboard, the car's own (0x145d0) */
     h = exe_i32(0xe8e4c + 0x90 * res + 12 * car);

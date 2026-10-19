@@ -13,12 +13,16 @@ from poly_emu import View, Vec3
 ROAD_POINTS, ROAD_SECTIONS, EXTRA_POINTS = 515, 600, 900
 
 
+BEHIND_POINTS = 55
+
+
 class Scr2(ctypes.Structure):
     _fields_ = [("x", ctypes.c_int), ("y", ctypes.c_int)]
 
 
 class Section(ctypes.Structure):
-    _fields_ = [("kind", ctypes.c_ubyte), ("a", ctypes.c_short), ("points", ctypes.c_short)]
+    _fields_ = [("kind", ctypes.c_ubyte), ("behind", ctypes.c_ubyte), ("a", ctypes.c_short),
+                ("points", ctypes.c_short)]
 
 
 class Road(ctypes.Structure):
@@ -29,7 +33,9 @@ class Road(ctypes.Structure):
                 ("xmoved", Vec3 * EXTRA_POINTS), ("xview", Vec3 * EXTRA_POINTS),
                 ("xscreen", Scr2 * EXTRA_POINTS), ("fill", ctypes.c_int), ("xfill", ctypes.c_int),
                 ("base", ctypes.c_int), ("xfirst", ctypes.c_int), ("xnext", ctypes.c_int),
-                ("xnode", ctypes.c_int)]
+                ("xnode", ctypes.c_int), ("xcursor", ctypes.c_int), ("bcount", ctypes.c_int),
+                ("bworld", Vec3 * BEHIND_POINTS), ("bview", Vec3 * BEHIND_POINTS),
+                ("bscreen", Scr2 * BEHIND_POINTS)]
 
 
 def lib():

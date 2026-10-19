@@ -30,6 +30,7 @@ typedef struct {
     int state;                 /* +0x512: 6 off the road (not drawn) */
     int slot;                  /* +0x516: its place in the race's tables */
     int draw_node;             /* +0x341: the node it is drawn at (0x51fa3, 0x678a4) */
+    int mirror_node;           /* +0x345: the same in the mirror (0x51fa3, 0x677f8) */
     int own_turn;              /* +0x20: turned by its own matrix (the driven cars) */
     int turn[9];               /* +0x24 */
     int yaw_drawn;             /* +0x351: its heading as drawn */

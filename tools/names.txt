@@ -194,7 +194,7 @@
 0x5adbc draw_horizon
 0x5aa84 draw_road_sections
 0x35b04 draw_quad
-0x68430 draw_slice_objects
+0x68430 cars_behind_at
 # the race's rules, collisions, traffic and police (NOTES 4.3, 4.6, 4.8)
 0x47c88 race_keys
 0x63304 race_check_pause
@@ -450,7 +450,7 @@
 0x55abc hud_find_colours
 0x55790 hud_nearest
 0x678a4 cars_seen
-0x677f8 cars_rows_mark
+0x677f8 cars_mark_behind
 0x68258 car_place_shadow
 0x67f1c car_place
 0x66d08 car_draw
@@ -539,3 +539,7 @@
 0x74ca0 fe_speed_test
 0x8ee80 cpu_check
 0x89903 atoi
+0x4fed8 road_behind_section
+0x5a950 road_transform_behind
+0x59134 behind_visible
+0x5ad44 mirror_picture_alloc

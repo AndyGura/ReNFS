@@ -199,14 +199,14 @@ pixel, `nearest_colour`, the inverse table), `sound.c` (the front end's sound ba
 music), `config.c` (CONFIG.DAT; the built-in defaults, equal byte for byte,
 `tools/config_emu.py`), `main.c`.
 The race so far: `raster.c` (the quad and triangle painters), `poly.c` (projection, quad cutting),
-`road.c` (the frame's points, into the view), `roaddraw.c` (the road painted far to near,
-the roadside objects; pixel-exact on the snapshots, `tools/roadpic_emu.py`), `model.c`
+`road.c` (the frame's points, into the view; the mirror's five sections behind), `roaddraw.c` (the road painted far to near,
+the roadside objects, the mirror's road behind (`tools/mirror_emu.py`, NOTES §4.7); pixel-exact on the snapshots, `tools/roadpic_emu.py`), `model.c`
 (EA's 3D library: ORIP models placed, sorted, painted), `cardraw.c` (the cars as the road
 reaches their rows, their shadows, the racers' markers; pixel-exact, `tools/cars_emu.py`;
 NOTES §4.10), `polyfill.c` (EA's polygon filler `0x8bc71`, lines `0x8bb3c`, the smoothed
 wide line `0x8b195`; exact, `tools/polyfill_emu.py`), `hud.c` (the dashboard over the view:
 `0x30094`, `0x31684`, the needles, the map `0x31cb4`; pixel-exact, `tools/dash_emu.py`; NOTES §4.11), `track.c`
-(the TRI and its ring of sections), `trackinfo.c`, `trackfam.c`, `racepal.c`, `sky.c`, `view.c` (windows, lens,
+(the TRI and its ring of sections), `trackinfo.c`, `trackfam.c`, `racepal.c`, `sky.c` (the sky, the mirror's horizon), `view.c` (windows, lens,
 matrices), `car.c` (cars' files, the grid), `camera.c` (the driver's eyes), `dash.c`
 (the dashboard's file, colours, places and BAMF lists), `race.c` (`--race`: the loading and the frame),
 `exe.c`: **the game's fixed tables are read from the CD's `NFS_DOS.EXE`** at the

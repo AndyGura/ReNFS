@@ -8,6 +8,7 @@
 
 #define RACE_CARS_MAX 12
 #define CARS_SEEN 35           /* road nodes from the camera's on (0x14e5d0) */
+#define CARS_BEHIND 11         /* road nodes back from the camera's (0x14e5c5) */
 
 extern race_car *g_cars[RACE_CARS_MAX];      /* 0x13c24c: every car of the race */
 extern int g_ncars;                          /* 0x12da38 */
@@ -22,6 +23,7 @@ extern int g_field;                          /* 0x12da2c: the cars racing (1, 2 
 extern int g_humans;                         /* 0x12da30: the players' cars, the first slots */
 extern unsigned char g_car_marks[RACE_CARS_MAX]; /* 0x14e5bc: each one's palette entry */
 extern unsigned char g_cars_seen[CARS_SEEN];     /* 0x14e5d0 */
+extern unsigned char g_cars_behind[CARS_BEHIND]; /* 0x14e5c5 */
 extern const race_camera *g_camera;          /* 0x143df4 */
 extern const int *g_camera_m;                /* 0x143df8: the matrix being drawn with */
 
@@ -33,5 +35,8 @@ void cars_list(void);
 void cars_seen(int cam_node);
 /* the cars at a road node, as the road reaches it (0x6837c; g_road_paint.cars) */
 void cars_at_node(int node);
+/* the cars on road node `node` in the mirror (0x68430): within ten nodes behind the
+   camera's, in the list's order, no shadows, nearer than 0x2100 */
+void cars_behind_at(int node);
 
 #endif

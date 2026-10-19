@@ -34,6 +34,7 @@ typedef struct {
     int kmh;                   /* 0x15d140: kilometres an hour, not miles */
     int radar;                 /* 0xea814: the radar detector's level, 0 quiet */
     int radar_flash;           /* 0x12b9f8: its big light lit */
+    int cop_flash;             /* 0x12ba04: the police's dot on the map, 0..10 */
 } hud_status;
 
 /* what the map shows (0x31cb4) */
@@ -63,8 +64,9 @@ extern fsh_file g_mask;              /* the HUD's pictures (0x145604) */
 extern hud_picture g_hud_screen;     /* the screen (0xa0000 at 320x200) */
 extern hud_picture g_hud_map_back;   /* 0xf4580 */
 extern hud_picture g_hud_view;       /* 0xf4578: the 3D view, painted off the screen */
-extern hud_picture g_hud_mirror;     /* 0xf457c: the mirror's view (none yet) */
-extern hud_picture g_hud_map;        /* 0xf4584: the map (none yet) */
+extern hud_picture g_hud_mirror;     /* 0xf457c: the mirror's view, between the
+                                        dashboard's places 0 and 1 (0x5ad44) */
+extern hud_picture g_hud_map;        /* 0xf4584: the map */
 
 /* the HUD's pictures (load_cockpit_mask 0x5f7c8: SIMDATA/MISC/MASKLO.FSH, MASKLOG.FSH
    in German), their colours queued for re-colouring with the program's 13 at 0xf0 */
@@ -81,5 +83,7 @@ void hud_frame(const hud_car *c);
 /* the map's picture (0x31cb4, before the frame): the road round the viewed car turned
    to its heading, the segment's end, the racers and the police */
 void hud_map(const hud_map_state *m);
+/* the mirror's picture turned round, left for right (0x96240), once it is painted */
+void hud_mirror_flip(void);
 
 #endif

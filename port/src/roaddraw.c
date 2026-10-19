@@ -9,7 +9,7 @@
 #include "trackfam.h"
 #include <stddef.h>
 
-road_painters g_road_paint = { quad_view, paint_whole, paint_picture, 0, 0, 0, 0 };
+road_painters g_road_paint = { quad_view, paint_whole, paint_picture, 0, 0, 0, 0, 0 };
 int g_road_steps;
 
 #define RECORDS 0xf61bc        /* the section kinds: +0 points (far), +4 quads, +8 and +0x10
@@ -18,6 +18,7 @@ int g_road_steps;
 #define QUADS 0xf4880          /* 11 bytes each */
 #define NEAR_VARIANT 0xf4690   /* the texture's size by the row, near sections */
 #define FAR_VARIANT 0xf4708    /* the same by four rows, far sections */
+#define BEHIND_VARIANT 0xf467c /* the same in the mirror, by section (a word each) */
 #define OBJ_VARIANT 0xf4604    /* an object's picture by the row */
 #define OBJ_VARIANT_B 0xf458c  /* the same for placements marked at +8 */
 #define NEAR_TRIPLES 0xf6b08   /* three corner triples a quad's facing is tried on */
@@ -399,4 +400,75 @@ void road_draw(int drawn, int node, int near_z, const road_window *win)
     }
     cars(st.row_node + 1);
     /* (with 0x143dcc, 0x5a0a8 after: not in a race) */
+}
+
+/* a quad in the mirror (0x59134): not wholly beside the window, nor with its far side
+   below it */
+static int behind_visible(const scr2 *s)
+{
+    if (s[0].x < g_left && s[1].x < g_left && s[2].x < g_left && s[3].x < g_left)
+        return 0;
+    if (s[0].x > g_right && s[1].x > g_right && s[2].x > g_right && s[3].x > g_right)
+        return 0;
+    return g_bottom >= s[1].y || g_bottom >= s[2].y;
+}
+
+static void cars_behind(int row)
+{
+    if (g_road_paint.cars_behind)
+        g_road_paint.cars_behind(row < 0 ? 0 : row);
+}
+
+void road_draw_behind(int drawn, int node, int near_z, const road_window *win)
+{
+    road_state *r = &g_road;
+    int sec = (int)((unsigned)((node + 3) / 4 - 4) & g_track.sec_mask), row, k, i, n, c;
+    const scr2 *screen = r->bscreen;
+    const vec3 *view = r->bview;
+    rows_state st;
+
+    g_left = win->x;
+    g_top = win->y;
+    g_right = win->x + win->w;
+    g_bottom = win->y + win->h;
+    if (!g_track.loop && sec < 0)
+        sec = 0;
+    row = sec * 4;
+    for (k = drawn - 1; k >= 0; k--, screen += 11, view += 11) {
+        const unsigned char *q = section_quads(&st, r->sec[(unsigned)sec & g_track.sec_mask].behind, &n);
+
+        if (!q)
+            return;
+        st.variant = exe_i32(BEHIND_VARIANT + 4 * k);
+        st.sec = track_section(sec);
+        for (i = n - 1; i >= 0; i--, q -= 11) {
+            const unsigned char *tile = quad_tile(q);
+            const vec3 *p[4];
+            scr2 s[4];
+            int j;
+
+            if (!tile)
+                return;
+            for (j = 0; j < 4; j++)
+                s[j] = screen[q[j]];
+            if (behind_visible(s)) {
+                unsigned char *shape = quad_texture(&st, q, tile);
+                if (shape) {
+                    raster_tex t;
+                    for (j = 0; j < 4; j++)
+                        p[j] = &view[q[j]];
+                    shape_tex(shape, &t);
+                    quad_mirror(&t, rd32(tile), 0, rd32(tile + 4), 0, p, s, near_z);
+                }
+            }
+            if (q[10])         /* (five rows for any quad that ends some) */
+                for (c = 0; c < 5; c++) {
+                    cars_behind(row - 5);
+                    row = (int)((unsigned)(row + 1) & g_track.node_mask);
+                }
+        }
+        sec = (int)((unsigned)(sec + 1) & g_track.sec_mask);
+    }
+    cars_behind(row - 2);
+    cars_behind(row - 1);
 }

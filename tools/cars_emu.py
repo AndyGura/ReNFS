@@ -44,7 +44,7 @@ class RaceCar(ctypes.Structure):
     _fields_ = Car._fields_ + [
         ("police", I), ("cfm", P), ("cfm_len", ctypes.c_long), ("colours", P),
         ("pics", P * 2), ("pics_pal", P * 2),
-        ("state", I), ("slot", I), ("draw_node", I), ("own_turn", I), ("turn", I * 9),
+        ("state", I), ("slot", I), ("draw_node", I), ("mirror_node", I), ("own_turn", I), ("turn", I * 9),
         ("yaw_drawn", I), ("half_len", I), ("half_wid", I), ("braking", I), ("bits", U8 * 3),
         ("seen", Vec3), ("far", I), ("shadow", Vec3), ("along", Vec3), ("across", Vec3),
         ("near_m", Model), ("far_m", Model), ("groups", Group * 4)]
@@ -147,6 +147,7 @@ def load_cars(s, name, L):
         c.roll_shake, c.pitch_shake = g(a, 0x429), g(a, 0x42d)
         c.player, c.number = g(a, 0x47d), g(a, 0x48a)
         c.state, c.slot, c.draw_node, c.own_turn = g(a, 0x512), g(a, 0x516), g(a, 0x341), g(a, 0x20)
+        c.mirror_node = g(a, 0x345)
         for i in range(9):
             c.turn[i] = g(a, 0x24 + 4 * i)
         c.yaw_drawn, c.half_len, c.half_wid, c.braking = g(a, 0x351), g(a, 0x78), g(a, 0x7c), g(a, 0x3b9)

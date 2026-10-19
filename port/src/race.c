@@ -28,6 +28,7 @@
 #define RACE_CARS 9
 static const int race_ids[RACE_CARS] = { 204, 201, 400, 7, 5, 0, 11, 6, 4 };
 #define RACERS 2
+#define MIRROR_SECTIONS 4      /* 0x13661c */
 #define DRAWN 28               /* the sections drawn ahead (0x136618) */
 
 /* the player's car's physics (SIMDATA/CARSPECS, 30FB): +0x36c the driver's eyes above
@@ -61,6 +62,26 @@ static int quarter(int node)
     return node >= 0 ? node / 4 : -(-node / 4);
 }
 
+/* the mirror's view into its picture (0x5be3e ..): the road behind and its cars, turned
+   round left for right */
+static void draw_mirror(race_camera *cam, const int *m)
+{
+    const int *mm = view_select(cam, 1);
+    const view_window *w = g_view_now->win;
+    road_window win = { w->x, w->y, w->cw, w->ch };
+    int near;
+
+    g_camera_m = mm;
+    near = road_transform_behind(&cam->pos, mm);
+    raster_window(g_hud_mirror.pix, g_hud_mirror.w, 0, 0, g_hud_mirror.w, g_hud_mirror.h);
+    sky_behind(cam->yaw, cam->pitch, cam->node, g_view_now->lens_h, w->dy, g_hud_mirror.w,
+               g_hud_mirror.h);
+    road_draw_behind(MIRROR_SECTIONS, cam->node, near, &win);
+    hud_mirror_flip();
+    view_select(cam, 0);
+    g_camera_m = m;
+}
+
 int race_test(const char *name)
 {
     static race_car cars[RACE_CARS];
@@ -73,6 +94,7 @@ int race_test(const char *name)
     hud_car driver;
     hud_map_state map;
     unsigned start;
+    int mirror_skip = 0;
     const char *car = "F512TR";
 
     if (!exe_load() || !track_load(name) || !trackinfo_load(name, 1, 0)
@@ -118,9 +140,9 @@ int race_test(const char *name)
        in slot 7 (0x12dca0) */
     view_init(0, cars[0].number, horizon);
     camera_init(eye);
-    view_setup(&g_view_ahead, exe_i32(0xe8de8 + 0x10));
-    view_setup(&g_view_mirror, exe_i32(0xe8e28 + 0x10));
-    view_setup(&g_view_ahead, exe_i32(0xe8de8 + 0x10));
+    view_setup(&g_view_ahead, g_view_ahead.mode);
+    view_setup(&g_view_mirror, g_view_mirror.mode);
+    view_setup(&g_view_ahead, g_view_ahead.mode);
     for (i = 0; i < RACERS; i++) {
         car_grid_place(&cars[i], 7 - i, RACERS, 0);
         track_follow(&cars[i].pos, &cars[i].node);
@@ -144,6 +166,7 @@ int race_test(const char *name)
     memcpy(g_car_marks, marks, RACERS);
     g_camera = &cam;
     g_road_paint.cars = cars_at_node;
+    g_road_paint.cars_behind = cars_behind_at;
 
     /* the dashboard as the race starts: the status bar still black (its first 360
        steps), standing with the engine idling (+0x3c1 700 at the start) */
@@ -179,6 +202,8 @@ int race_test(const char *name)
             road_gather(cam.node, quarter(cam.node), DRAWN);
             gathered = cam.node;
         }
+        if (cam.flags)         /* (the road behind for the mirror: 0x50070's end) */
+            road_gather_behind(cam.node);
         cam.flags = 0;
 
         cars_list();           /* (the race's step does this) */
@@ -189,6 +214,11 @@ int race_test(const char *name)
         cars_seen(cam.node);
         w = g_view_now->win;
         near = road_transform(&cam.pos, m, cam.node);
+        /* the mirror (race_draw_frame 0x5be17), every other frame with the settings'
+           +0x87, shown each frame while the camera has one */
+        g_hud.mirror = cam.mirror_on;
+        if (cam.mirror_on && (!config_word(0x87) || (mirror_skip ^= 1)))
+            draw_mirror(&cam, m);
         win.x = w->x;
         win.y = w->y;
         win.w = w->cw;
@@ -210,7 +240,7 @@ int race_test(const char *name)
         video_retrace();
     }
 
-    g_road_paint.cars = 0;
+    g_road_paint.cars = g_road_paint.cars_behind = 0;
     g_ncars = 0;
     for (i = 0; i < RACE_CARS; i++)
         car_free(&cars[i]);

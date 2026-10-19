@@ -8,9 +8,11 @@
 #define ROAD_POINTS 515        /* 0x137434 .. 0x138c58 */
 #define ROAD_SECTIONS 600      /* 0x136620 .. 0x137434, 6 bytes each */
 #define EXTRA_POINTS 900       /* 0x12f540 .. 0x131f70 */
+#define BEHIND_POINTS 55       /* 0x13b494 .. 0x13b728: 5 sections' first rows */
 
 typedef struct {
     unsigned char kind;        /* +0: the record of its faces (0xf61c0 + kind × 0x4c) */
+    unsigned char behind;      /* +1: the same for the mirror */
     short a;                   /* +2 */
     short points;              /* +4: its points across */
 } road_section;
@@ -39,6 +41,12 @@ typedef struct {
     int xnext;                         /* 0x1365d0: the next placement to take */
     int xnode;                         /* 0x1365d4: its node (-1: none left) */
     int xcursor;                       /* 0x1365c8: the objects' points not yet painted */
+
+    /* the road behind, for the mirror */
+    int bcount;                        /* 0x13bb7c */
+    vec3 bworld[BEHIND_POINTS];        /* 0x13b494 */
+    vec3 bview[BEHIND_POINTS];         /* 0x13b728 */
+    scr2 bscreen[BEHIND_POINTS];       /* 0x13b9bc */
 } road_state;
 
 extern road_state g_road;
@@ -54,5 +62,11 @@ void road_clip_direction(int section);
 /* the points into the view (0x59a74): the camera at pos, turned by m (3 x 3, 16.16), in
    section node / 4. Returns the near plane (also the view's +4) */
 int road_transform(const vec3 *pos, const int m[9], int node);
+
+/* the road behind for the mirror (0x50070's end, 0x4fed8), when the camera's node
+   changed: the first row of five sections from (node + 3) / 4 - 4 */
+void road_gather_behind(int node);
+/* those points into the mirror's view (0x5a950); returns its near plane */
+int road_transform_behind(const vec3 *pos, const int m[9]);
 
 #endif

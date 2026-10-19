@@ -19,6 +19,7 @@ int g_field;
 int g_humans;
 unsigned char g_car_marks[RACE_CARS_MAX];
 unsigned char g_cars_seen[CARS_SEEN];
+unsigned char g_cars_behind[CARS_BEHIND];
 const race_camera *g_camera;
 const int *g_camera_m;
 
@@ -29,7 +30,7 @@ void cars_list(void)
     g_car_order_n = 0;
     for (i = 0; i < g_ncars; i++) {
         race_car *c = g_cars[i];
-        c->draw_node = c->node;
+        c->draw_node = c->mirror_node = c->node;
         g_car_order[g_car_order_n++] = c;
     }
 }
@@ -53,8 +54,22 @@ void cars_seen(int cam_node)
         if (d < CARS_SEEN)
             g_cars_seen[d] = 1;
     }
-    /* (0x677f8 then marks the eleven nodes round each car for 0x679ec, the player's own
-       car's rows: not drawn from the driver's seat) */
+    /* 0x677f8: the same for the mirror, its node moved on half way along it */
+    memset(g_cars_behind, 0, sizeof g_cars_behind);
+    for (i = 0; i < g_ncars; i++) {
+        race_car *c = g_cars[i];
+        if (c->state == 6)
+            continue;
+        node = c->mirror_node;
+        if (c->dist + 0x29999 > 0x50000)
+            node++;
+        if (node > g_track.length * 4)
+            node -= g_track.length * 4;
+        c->mirror_node = node;
+        d = node <= cam_node ? cam_node - node : g_track.length * 4 - node + cam_node;
+        if (d < CARS_BEHIND)
+            g_cars_behind[d] = 1;
+    }
 }
 
 static int iabs(int v)
@@ -121,8 +136,9 @@ static void shadow_axes(race_car *c)
 }
 
 /* the car's place in the view (0x67f1c, 1/128 units); 0 if it is behind, too far or off
-   to the side. Then its shadow's four corners on the screen */
-static int car_place(race_car *c, int xy[8])
+   to the side, or in the mirror (no shadow there). Then its shadow's four corners on the
+   screen */
+static int car_place(race_car *c, int xy[8], int mirror)
 {
     static const int sa[4] = { -1, -1, 1, 1 }, sb[4] = { 1, -1, -1, 1 };
     vec3 d, ctr, p, q;
@@ -133,6 +149,8 @@ static int car_place(race_car *c, int xy[8])
     d.y = (c->pos.y - g_camera->pos.y) >> 9;
     d.z = (c->pos.z - g_camera->pos.z) >> 9;
     rotate(&d, g_camera_m, &c->seen);
+    if (mirror)
+        return 0;
     if (c->seen.z < 0x20 || c->seen.z > 0x1900)
         return 0;
     if (iabs(c->seen.x) > c->seen.z)
@@ -241,16 +259,21 @@ static void car_marker_at(const race_car *c)
         car_marker(s.x, s.y - 0x2000 / seen.z - 7, c->slot, seen.z);
 }
 
-/* a car in the view ahead (0x66d08 with 0): near enough and not off to the side, its
-   turn from its own matrix or from its angles and sway, into the view */
-static void car_draw(race_car *c)
+/* a car in the view (0x66d08: 0 ahead, 1 the mirror): near enough and not off to the
+   side, its turn from its own matrix or from its angles and sway, into the view */
+static void car_draw(race_car *c, int mirror)
 {
     int x[9], y[9], z[9], zx[9], m[9], r[9];
     int z_ = c->seen.z;
 
     if (z_ < 0x20 || z_ > 0x5a00 || 2 * z_ < iabs(c->seen.x))
         return;
-    c->far = z_ > 0x1900 && c->slot != 2;
+    if (mirror) {
+        if (z_ > 0x2100)
+            return;
+        c->far = z_ > 0xa00;
+    } else
+        c->far = z_ > 0x1900 && c->slot != 2;
     if (c->own_turn)
         memcpy(m, c->turn, sizeof m);
     else {
@@ -291,8 +314,28 @@ void cars_at_node(int node)
             continue;          /* the player's own, from the driver's seat (0x6829c) */
         if (c->own_turn)
             c->yaw_drawn = (int)((unsigned)ea_atan2(c->turn[6], c->turn[8]) << 8);
-        if (car_place(c, xy))  /* 0x68258: its shadow first, darkening the road */
+        if (car_place(c, xy, 0))  /* 0x68258: its shadow first, darkening the road */
             poly_fill(4, xy, poly_shade_rows, 0);
-        car_draw(c);
+        car_draw(c, 0);
+    }
+}
+
+void cars_behind_at(int node)
+{
+    int d = node <= g_camera->node ? g_camera->node - node
+                                   : g_camera->node + g_track.length * 4 - node, i, xy[8];
+
+    if (d >= CARS_BEHIND || d < 0 || !g_cars_behind[d])
+        return;
+    for (i = 0; i < g_car_order_n; i++) {
+        race_car *c = g_car_order[i];
+        if (c->state == 6 || node != c->mirror_node)
+            continue;
+        if (c == g_cars[g_player] && g_camera->mode == 0)
+            continue;
+        if (c->own_turn)
+            c->yaw_drawn = (int)((unsigned)ea_atan2(c->turn[6], c->turn[8]) << 8);
+        car_place(c, xy, 1);
+        car_draw(c, 1);
     }
 }

@@ -35,7 +35,6 @@ static int g_bar_at;                 /* 0x12b944: the status bar drawn again aft
                                         step */
 static int g_bar_black;              /* 0x12b94c: its strip to be blacked first */
 static int g_map_back_taken;         /* 0x12ba0c: the map's background taken */
-static int g_cop_flash;              /* 0x12ba04: the police's dot, 0..10 */
 
 /* the window drawn into (0xf889c): a picture and its clip */
 static hud_picture g_win;
@@ -159,13 +158,16 @@ int hud_load(void)
     g_hud_view.w = 320;                    /* 0x143e30, 0x143e34 */
     g_hud_view.h = 200;
     g_hud_view.pix = calloc(320 * 200, 1);
+    g_hud_mirror.w = g_dash.place[1][0] - g_dash.place[0][0] + 1;
+    g_hud_mirror.h = g_dash.place[1][1] - g_dash.place[0][1] + 1;
+    g_hud_mirror.pix = calloc((size_t)(g_hud_mirror.w * g_hud_mirror.h), 1);
     g_hud_map.w = 0x3a;
     g_hud_map.h = 0x36;
     g_hud_map.pix = calloc(0x3a * 0x36, 1);
     g_redraw = 1;
     g_bar_black = 1;
     g_map_back_taken = 0;
-    return g_hud_map_back.pix && g_hud_view.pix && g_hud_map.pix;
+    return g_hud_map_back.pix && g_hud_view.pix && g_hud_map.pix && g_hud_mirror.pix;
 }
 
 void hud_free(void)
@@ -174,7 +176,8 @@ void hud_free(void)
     free(g_hud_map_back.pix);
     free(g_hud_view.pix);
     free(g_hud_map.pix);
-    g_hud_map_back.pix = g_hud_view.pix = g_hud_map.pix = 0;
+    free(g_hud_mirror.pix);
+    g_hud_map_back.pix = g_hud_view.pix = g_hud_map.pix = g_hud_mirror.pix = 0;
 }
 
 /* a time (1/60 s) as minutes, seconds and tenths in grey digits (0x2d6b4 with 0x2d3ac:
@@ -684,10 +687,24 @@ void hud_map(const hud_map_state *m)
         if (apart < 0x140) {
             map_point(&v, m->cop_node, &x, &y);
             if ((x < 0 ? -x : x) < 0x1c && (y < 0 ? -y : y) < 0x1d) {
-                if (++g_cop_flash > 10)
-                    g_cop_flash = 0;
-                map_dot(MAP_X + x, MAP_DOT_Y - y, g_marker_colour[g_cop_flash > 5 ? 0 : 6]);
+                if (++g_hud.cop_flash > 10)
+                    g_hud.cop_flash = 0;
+                map_dot(MAP_X + x, MAP_DOT_Y - y, g_marker_colour[g_hud.cop_flash > 5 ? 0 : 6]);
             }
+        }
+    }
+}
+
+void hud_mirror_flip(void)
+{
+    int y, i;
+
+    for (y = 0; y < g_hud_mirror.h; y++) {
+        unsigned char *r = g_hud_mirror.pix + (long)y * g_hud_mirror.w, t;
+        for (i = 0; i < g_hud_mirror.w / 2; i++) {
+            t = r[i];
+            r[i] = r[g_hud_mirror.w - 1 - i];
+            r[g_hud_mirror.w - 1 - i] = t;
         }
     }
 }

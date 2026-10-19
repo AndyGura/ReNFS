@@ -1046,7 +1046,7 @@ race_from_menu 0x3770c (from fe_main_menu)
   `0x13b728` (12 bytes each, `0x84` a section) and on the screen at `0x13b9bc` (8 bytes,
   `0x58` a section); its faces (11 bytes each: four point numbers, a texture number,
   flags) drawn by `draw_quad` `0x35b04` with the texture from `0x140cd8`; then the objects
-  and cars at that slice: `draw_slice_objects` `0x68430` (→ `0x66d08`). The section's kind
+  and the cars behind at that row: `cars_behind_at` `0x68430` (→ `0x66d08`). The section's kind
   is `0x136621 + section × 6` → a record of `0x4c` bytes at `0xf61c0`.
 - `0x5a4f0` is the road ahead (the view); `0x5aa84` the mirror's. Read and ported: see
   "Painting the road" below.
@@ -1118,7 +1118,10 @@ that packs the four pointers and screen points of a child.
   window is still painted). `0xeaad8` = 2, `0xf6aa4` = 11, both tables 6.4, 4.8, 3.8.
 - Each view has a record (camera `+0x88` the road ahead, `+0x8c` the mirror; `0x1486c(cam,
   mirror)` makes one current: `0x143dfc`): `+0` the field of view in degrees (85 ahead,
-  96 a second view `0xe8e08`, 70 the mirror), `+4` the near plane, `+0x10` its window,
+  96 a second view `0xe8e08`, 70 the mirror), `+4` the near plane, `+8` its layout
+  (`0xe8b10` + 0x16c · resolution + 52 · `+8`, copied to `+0xc` and kept in `+0x18`),
+  `+0x10` its window **as the layout's `+4` says** (`0x14630` hands that to `0x14154`: the
+  program file's `+0x10` is not used; 0 ahead, 12 the mirror at 320x200),
   `+0x14` its reciprocal table (made current by `0x83ae0`, which changes only `0xf7a14`),
   `+0x1c` → the window. See "The views" below.
 - **The views (`port/src/view.c`, checked by `tools/view_emu.py`: equal on all 6
@@ -1341,6 +1344,47 @@ the window and the horizon **`road_draw` `0x5a4f0(N = 0x136618, S = the camera's
   for pixel on all 6** (r1a after putting back the see-through mark of the picture it was
   paused painting). The walls `0x59294` and the 3D models `0x66738` are not ported yet
   and no CY1 frame reaches them.
+- **The mirror's view (2026-10-19; ported: `road_gather_behind` / `road_transform_behind`
+  in `road.c`, `road_draw_behind` in `roaddraw.c`, `sky_behind` in `sky.c`,
+  `cars_behind_at` in `cardraw.c`).** `race_draw_frame` `0x5be17`: the camera's `+0x68`
+  sets `0x143e08` bit 0; when `0x143e08` = 1 and `0xea708` < 2: `0x1486c(cam, 1)`,
+  `0x5a950`, the window `0xf457c` (`0x8118c`), `0x5adbc`, `0x5aa84([0x13661c] = 4)`,
+  `0x96240` (the picture's rows reversed, its cx = w − cx), `0x1486c(cam, 0)`. With the
+  settings' `+0x87` (`0x12d9d7`) `0x143e08` ^= 2 each frame: painted every other frame,
+  shown every frame. The picture (`0x5ad44`, sized by `0x301f4`) is the dashboard's places
+  0..1 inclusive: 47x17 for the 512TR.
+  - **The road behind** (`0x50070`'s end, when the camera's `+0x3c` is set): sec = ((node +
+    3) / 4 − 4) & `0x13bb90`; if ≠ `0x136614`, kept there, `0x13bb7c` = 0, and five
+    sections from it through `0x4fed8(sec)` (below 0 → 0 on an open road): its row 0 of
+    the ring (`0x4f48c(sec)` + 0xc, 11 points), the kind = dword `0xedc84` + node(sec ·
+    4).type · 24, the points the record `0xf61bc` + kind · 0x4c + 0x18 lists (ascending,
+    0..10) appended at `0x13b494`, the kind kept at `0x136621` + 6 · sec.
+  - **`0x5a950`**: near = `0xf6aa8` >> shift into the view's +4; the points less the
+    camera (`0x94db8`, >> shift) into `0x1422e4`, turned by `[0x143df8]` (the mirror's
+    matrix) into `0x13b728`, projected (shift 16) into `0x13b9bc`; those with z <
+    0x23333 >> shift projected again at twice that z.
+  - **`0x5aa84(n)`**: the window from `0x58f30` (the view's window +0x18..+0x24); for
+    k = n−1..0 (the farthest section first) the section's record by its kept kind, its
+    quads last to first, corners `0x13b9bc`[11i + q[j]], kept when `0x59134` says so (not
+    all left, not all right, the bottom at or below a far corner's row), the texture
+    `0x140cd8`[ring[2 + q4] · 32 + (tile + 8 + dword `0xf467c`[k]) · 4], painted by
+    `draw_quad` `0x35b04`; a quad with q[10] set then draws the cars of 5 rows
+    (`0x68430(max(row − 5, 0))`, row + 1 each); at the end `0x68430` at row − 2 and − 1.
+  - **`0x68430(node)`**: d = the camera's node − node (wrapped); d < 11 and
+    `0x14e5c5`[d] marked: every car in `0x13c224` not in state 6, at `+0x345` = node, not
+    the player in camera mode 0: `0x67f1c(car, 1)` (only where it is seen, `+0x391`: no
+    shadow) and `0x66d08(car, 1)` (not drawn beyond z 0x2100, far beyond 0xa00).
+  - **The horizon `draw_horizon` `0x5adbc`**: on node (camera − 3) of type 4/7/9 the
+    window filled with `0x13d5d4`, type 8 `0x13d5b0`; else across = −(((yaw · 2) >> 16) +
+    0x100) & 0x1ff, row = (pitch << 2) >> 16 (− 0x400 above 0x200; × 480/200 at
+    640x480) + the layout's +0x20 / 2 + the window's dy; step 0x1000000 / w (and across)
+    halved at 320x200; tile = step·w, bottom = step·(h−1), row −= step·cy (16.16 rounded),
+    −17 on track 5 (`+0x95`); above row the sky's colour (`horz`'s 16th), then the tiles
+    right to left from across (turned every other one with `0x12efc4`) through
+    `0x90900`, below them its last pixel.
+  - **Checked** (`tools/mirror_emu.py`): the 55 points equal to the snapshot's, the
+    mirror's picture equal pixel for pixel on all 11 snapshots, and with car 1 put in the
+    camera's lane 3, 6, 9 nodes behind on d1, 2, 5, 10 on e3, 4 on d4.
 
 ### 4.8 Cars meeting cars, walls, traffic and the police
 
@@ -1489,8 +1533,11 @@ Each frame `0x678a4` clears `0x14e5d0[35]` and, for every car not in state 6 (`+
 takes node = `+0x341`, one less when `+0x39d` − 0x29999 < 0 (near the start of its node),
 plus 4 · length below 0, **writes it back to `+0x341`** (a second frame between two steps
 takes one more off) and marks `0x14e5d0[node − camera's node]` (wrapped) when < 35; then
-`0x677f8` marks the eleven rows round each car for `0x679ec` (the player's own car's rows:
-nothing in the driver's view).
+`0x677f8` (`cars_mark_behind`) does the same for the mirror: it clears `0x14e5c5[11]` and,
+for every car not in state 6, takes node = `+0x345`, one more when `+0x39d` + 0x29999 >
+0x50000, less 4 · length past the end, writes it back to `+0x345`, and marks
+`0x14e5c5`[camera's node − node] (wrapped) when < 11. (An earlier reading here, "the eleven
+rows round each car for `0x679ec`", was wrong.)
 
 **`cars_at_node` `0x6837c(node)`**, called by the road painter as each row is reached far
 to near: d = node (+ 4 · `0x13bb8c` when below the camera's) − the camera's node; if d < 35

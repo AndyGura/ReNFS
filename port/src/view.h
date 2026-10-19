@@ -23,6 +23,8 @@ typedef struct {
     int near;                  /* +4: the near plane (road_transform's) */
     int mode;                  /* +0x10: its window, of the resolution's */
     const view_window *win;    /* +0x1c */
+    int lens_h;                /* its layout's (+0x18, 0xe8b10 + 52 × +8) +0x20: the
+                                  height the mirror's horizon is set by */
 } view_rec;
 
 /* what the frame is drawn from (the camera record [0x143df4], 0x129ecc) */

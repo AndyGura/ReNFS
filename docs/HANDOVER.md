@@ -184,12 +184,18 @@ Ghidra project and `build/decomp`, one command). The git history was started aga
   **The map** (`0x31cb4`, `hud_map`): the road round the car turned to its heading, the
   segment's end, the racers' dots or arrows, the police's flashing dot; equal on e1, e3,
   e5 in 18 cases each (other nodes, mirrored, the police, from outside).
+  **The mirror's view** (`road_gather_behind`, `road_transform_behind`, `road_draw_behind`,
+  `sky_behind`, `cars_behind_at`; NOTES §4.7 "The mirror's view"): five sections behind,
+  the horizon turned round, the road's quads and the cars behind, flipped left for right;
+  equal pixel for pixel on all 11 snapshots and with a car put 2..10 nodes behind
+  (`tools/mirror_emu.py`). `--race cy1` shows it. (The views' windows come from their
+  layouts, not the program file's +0x10.)
   Not yet: the status bar's numbers after the start (`0x30d8c`: speed, gear, place,
   time, laps; they wait for the race's timing), the gear gate (`0x2e4f0`, map off), the
   HUD's keys (`0x2f644`), the map at 640x480, the replay's buttons (`0x5c5d0`), the doubled BAMF lists (detail),
   one-colour polygons (`0xaa990`), the police lights, the circuits' sky ring (`0x4ace8`),
   the roadside walls (`0x59294`, other tracks than the cities), 3D roadside models
-  (`0x66738`), the mirror's view, the physics, the race's setup from the front end.
+  (`0x66738`), the physics, the race's setup from the front end.
 
 **Progress page for Danik**: https://claude.ai/artifact/VZdxTpYC3oLXYeBVJpoDoM (every step,
 its percent done and weight). Update its steps file after each finished step.
@@ -216,7 +222,7 @@ races 320x200 / 320x240; commit locally as the work goes.
    behind the options (credits, audio, graphics, controls, load / save), Danik chose
    (2026-10-19): **the race next**, the remaining menus later. In the race, the
    port now makes a first frame of its own (`--race cy1`), the cars, their shadows,
-   the racers' markers, the dashboard and the map in it. Next: the mirror's view (`0x4fed8`, `0x5aa84`), then the player's car driving (the
+   the racers' markers, the dashboard, the map and the mirror in it. Next: the player's car driving (the
    physics, 33.3 steps a second), and with the race's timing the status bar's numbers.
    Open: who writes `0x136618` (28 sections drawn: a detail setting?). The walls `0x59294`
    and the circuits' sky ring `0x4ace8` can be checked on CY1 memory with made-up input,

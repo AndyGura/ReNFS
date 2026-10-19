@@ -77,12 +77,36 @@ int road_transform(const vec3 *pos, const int m[9], int node)
     return near;
 }
 
+int road_transform_behind(const vec3 *pos, const int m[9])
+{
+    road_state *r = &g_road;
+    int shift = g_view.far_shift, near = NEAR_PLANE >> shift, close = 0x23333 >> shift, i;
+    vec3 t, moved[BEHIND_POINTS];
+
+    t.x = (int)-(unsigned)pos->x >> shift;
+    t.y = (int)-(unsigned)pos->y >> shift;
+    t.z = (int)-(unsigned)pos->z >> shift;
+    translate(r->bcount, r->bworld, shift, &t, moved);
+    for (i = 0; i < r->bcount; i++)
+        rotate(&moved[i], m, &r->bview[i]);
+    project_points(r->bcount, r->bview, r->bscreen, 16);
+    /* the points nearer than 70 projected again as if at 140 */
+    for (i = 0; i < r->bcount; i++)
+        if (close > r->bview[i].z) {
+            vec3 p = r->bview[i];
+            p.z = 2 * close;
+            project_points(1, &p, &r->bscreen[i], 16);
+        }
+    return near;
+}
+
 /* the game's tables of the road's detail (in NFS_DOS.EXE): a kind for each node type and
    distance ahead (8 rows of 32), and a record each kind whose +0x18 lists, a row at a
    time, the points of the row kept (0xff ends a row) */
 #define DETAIL_KINDS 0xed284
 #define DETAIL_RECORDS 0xf61bc
 #define DETAIL_BYTES 0x4c
+#define BEHIND_KINDS 0xedc84   /* the mirror's: a kind for each node type, 24 bytes apart */
 
 static int rd32(const unsigned char *p)
 {
@@ -254,4 +278,37 @@ void road_gather(int node, int sec, int drawn)
         section_points(base, sec++, 4, 1);
     section_points(base, sec, 4, 0);
     section_points(base, sec + 1, 1, 0);
+}
+
+/* 0x4fed8: section sec's first row as the mirror's detail keeps it */
+static void behind_points(int sec)
+{
+    road_state *r = &g_road;
+    const unsigned char *ring = track_section(sec) + 12, *list;
+    int kind = exe_i32(BEHIND_KINDS + node_ptr((int)((unsigned)(sec * 4) & g_track.node_mask))[7] * 24), i;
+
+    list = exe_at(DETAIL_RECORDS + kind * DETAIL_BYTES + 0x18, 1);
+    for (i = 0; i < 11; i++)
+        if (*list == i) {
+            vec3 *p = &r->bworld[r->bcount++];
+            p->x = rd32(ring + i * 12);
+            p->y = rd32(ring + i * 12 + 4);
+            p->z = rd32(ring + i * 12 + 8);
+            list++;
+        }
+    r->sec[(unsigned)sec & g_track.sec_mask].behind = (unsigned char)kind;
+}
+
+void road_gather_behind(int node)
+{
+    int sec = (int)((unsigned)((node + 3) / 4 - 4) & g_track.sec_mask), k;
+
+    if (sec == g_track.last_kinds)
+        return;
+    g_track.last_kinds = sec;
+    g_road.bcount = 0;
+    for (k = 0; k <= 4; k++) {
+        behind_points(!g_track.loop && sec < 0 ? 0 : sec);
+        sec = (int)((unsigned)(sec + 1) & g_track.sec_mask);
+    }
 }

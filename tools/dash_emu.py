@@ -52,7 +52,8 @@ STATUS = [("shown", 0x12b940), ("steps", 0x145c94), ("mode", 0x12b8cc), ("table"
           ("track", 0x12da12), ("segment", 0x12da0e), ("circuit", 0x13bb80), ("ahead", 0x14ea6c),
           ("splits", 0x14ea70), ("best_lap", 0x13c20c), ("race_type", 0x12da20),
           ("detail", 0x143e04), ("mirror", 0x143e08), ("map", 0x12b988), ("mirrored", 0x12dd28),
-          ("running", 0xf6b74), ("kmh", None), ("radar", 0xea814), ("radar_flash", 0x12b9f8)]
+          ("running", 0xf6b74), ("kmh", None), ("radar", 0xea814), ("radar_flash", 0x12b9f8),
+          ("cop_flash", 0x12ba04)]
 
 
 class Status(ctypes.Structure):
@@ -135,12 +136,8 @@ def port_frames(s, L):
     for at, name in ((0xf4578, "g_hud_view"), (0xf457c, "g_hud_mirror"), (0xf4584, "g_hud_map")):
         w, h, pix = picture(s, at)
         p = Picture.in_dll(L, name)
-        if name == "g_hud_mirror":
-            keep = ctypes.create_string_buffer(pix, len(pix))
-            KEEP.append(keep)
-            p.w, p.h, p.pix = w, h, ctypes.addressof(keep)
-        else:
-            ctypes.memmove(p.pix, pix, w * h)
+        assert (p.w, p.h) == (w, h) or name == "g_hud_view", (name, p.w, p.h, w, h)
+        ctypes.memmove(p.pix, pix, w * h)
     scr = Picture.in_dll(L, "g_hud_screen")
     st = Status.in_dll(L, "g_hud")
     ctypes.memset(scr.pix, FILL, W * H)

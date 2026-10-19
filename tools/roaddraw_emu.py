@@ -18,7 +18,7 @@ from road_emu import Road, ROAD_SECTIONS
 from poly_emu import Vec3
 
 SOURCES = ["roaddraw.c", "sky.c", "trackinfo.c", "road.c", "poly.c", "raster.c", "track.c", "files.c", "exe.c",
-           "trackfam.c", "racepal.c", "font.c", "video.c", "fsh.c", "unpack.c"]
+           "trackfam.c", "racepal.c", "font.c", "video.c", "fsh.c", "unpack.c", "view.c", "config.c", "polyfill.c"]
 
 
 def lib():
@@ -55,7 +55,7 @@ CARS = ctypes.CFUNCTYPE(None, I)
 
 class Painters(ctypes.Structure):
     _fields_ = [("quad", QUAD), ("whole", PAINT), ("picture", PAINT), ("roadside", WALL),
-                ("model", MODEL), ("car_row", CARROW), ("cars", CARS)]
+                ("model", MODEL), ("car_row", CARROW), ("cars", CARS), ("cars_behind", CARS)]
 
 
 def original(s, n, node):
@@ -134,8 +134,8 @@ def setup(s, name, L, n, node):
     ctypes.memset(ctypes.addressof(road), 0, ctypes.sizeof(road))
     sec = s.read(0x136620, 6 * ROAD_SECTIONS)
     for i in range(ROAD_SECTIONS):
-        k, _, a, p = struct.unpack_from("<BBhh", sec, 6 * i)
-        road.sec[i].kind, road.sec[i].a, road.sec[i].points = k, a, p
+        k, b, a, p = struct.unpack_from("<BBhh", sec, 6 * i)
+        road.sec[i].kind, road.sec[i].behind, road.sec[i].a, road.sec[i].points = k, b, a, p
     count, xcount = s.i32(0x13bb78), s.i32(0x1365c0)
     road.sec_mask, road.drawn, road.count = s.u32(0x13bb90), n, count
     ctypes.memmove(road.view, s.read(0x138c58, 12 * count), 12 * count)
