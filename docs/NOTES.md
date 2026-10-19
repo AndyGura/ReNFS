@@ -1586,8 +1586,7 @@ the window and the horizon **`road_draw` `0x5a4f0(N = 0x136618, S = the camera's
   pause waits for it); `load_ticket_picture` `0x30424` loads `ticketDH` / `warnDH` ..
   (`tickeg..` / `gwarn..` German, `..DL` the low-detail screen) from a `.qfs`.
 
-Still to name: the opponents' routines under `drive_opponent` (`0x7cf98` 2.6 KB,
-`0x7b178`, `0x7dbd8`, `0x77c..`), `0x5efb0` (first in `race_update_cars` when the state is
+Still to name: `0x5efb0` (first in `race_update_cars` when the state is
 not 0: the replay?), `0x2a918`, the second drawing pass `0x5a4f0`, the widget block
 `0x71208`..`0x74dcc`, Watcom's runtime.
 
@@ -2164,6 +2163,88 @@ segments, circuit, circuit time trial, single race, tournament, two players;
 tickets and the record's other fields, the speech (`0x722b4`, `0x72438`), the network
 branches, the old race's splits (`+0x44`), a computer car's gear from `+0x308`, the HUD's
 keys `0x2f644`, km/h from the settings.
+
+### 4.13 The opponent's driving (2026-10-19)
+
+A car the computer drives is kind 3 (`+0x512`); every step `drive_opponent` `0x7b34c`
+moves it along the road, and every fourth step `traffic_police_tick` `0x7a040` chooses
+its target speed (`+0x160`) and its place across the road (`+0x164`). A racer is a car
+whose slot `+0x516` is in [humans, field); the traffic and the police are the cars after
+the field (`+0x174` & 8 police, & 4 racer, `+0x51e` & 0x404 the wrong way).
+
+**At the start** (`load_traffic_cfg` `0x7de84`'s part): the settings block `0x15d2bc`
+(0x1ac bytes) is written by `traffic_defaults` `0x63f50` as a run of `mov [eax+d], imm32`
+stores (one `mov edx,[eax+0x24]` scheduled among them), then +0x24 and +0x28 × 60 and
++0x48 = mulr(+0x48, 0x471c); the port reads the stores out of the program. +0x34 is 0 in a
+time trial or a head-to-head on a circuit. **Each racer's driver** (`0x7dde8`): a set by
+the race type (time trial 7; head to head 5, or 6 with option bit 4; single race 3, or 4
+when cars 2 and 3 are the same model; tournament by the player's car {2,0,1,1,0,1,2,2}),
+the letter at `0xf4038` + set·8 + grid place (`0x12dca0`, 7 − slot), the record at
+`0xf4070` + 0x8d·(letter − 'A') into `0x15d490`[slot]: its +1 + 4i the catch-up factors
+(i = 0..20, by progress behind the leading player / 10 + 10), +0x55 a top-speed factor,
++0x59 the bends' slowing, +0x65 / +0x69 the sliding limit and rate. The stretches of road
+round the two racers (`0x15d29c`, `0x7814c`, `0x77f70`, `0x77cfc`): progress −12 .. +43
+(the inner window), widened by 8 behind and 11 ahead, met half way when they overlap;
+re-ranked leader first each tick. **The random numbers** (`0x38c10`): multiplier = seed |
+1, state = 3·seed + (seed even), seeded by `time()` `0x91d9b`; a number is the product's
+bits 8..23, the low 16 bits kept as the next state. Braking a step `0x15d470` = 0x5999.
+**No road follow is done for a racer before its first step**: its first `drive_check_lap`
+moves it from the grid's node 20 to 19, and that sets its road axes (`car_road_frame`
+`0x7dbd8`). The port did one at set-up and the car never moved.
+
+**A step** (`0x7b34c`): a racer's speed |v| = max + min/4; `drive_check_lap`; on a new
+node the road's frame (`0x7dbd8`), the car's turn = the road's axes (negated the wrong
+way) turned by its steering. The steering (`+0x18`) eases to `+0x1c` through a yaw rate
+(`+0x74`; ±0x23333 a step for a racer, 0x13333 the traffic; else −9 × the steering,
+snapped within 0x30000); turned beyond 0x160000 (0x200000 the wrong way) it spins out
+(`0x1ca9c`, kind 4); before progress 150 it does not steer. Every `+0x4` (body wait)
+steps — 4 a racer, 8 traffic, 6 police — **the plan** `0x7cf98`: the acceleration from
+the car's table `+0x178`[speed + 1] (made from its PDN at load, `0x1e9cc`) times the
+catch-up factor (settings +0x104/+0x158 + 4i, head to head / other), none before step
+0x136 or in the air; towards the target speed by it, down by the braking; slowed by a big
+steering error; the race's top speed noted where the road's limit allows it; the
+velocity along the road (or along the car while it turns); the slide across towards its
+place, limited by the driver's record (0x7cf04) and the speed's steering table
+(`0x7d815`), adds the road's side axis; put down on the road (or left in the air over a
+crest near a player above 0x1b0000). Then: on an open road in an edge lane past progress
+0x46, × 255/256 a step; off the road's sides it is turned back (`0x7b178`) or stopped;
+moved by 1/32 + 1/512 + 1/128 + 1/2048 of its velocity (x the other way).
+
+**Every fourth step** (`0x7a040`, unless `0xf74ac`): the ticks `0x15d4b8` += 4; the
+stretches; the leading player (most progress) `0x15d48c`; each car refreshed (`0x786d4`:
+its road frame, place across, reach; for a computer's car the target speed, below); the
+lanes each car covers (`lane_of` on its two sides). Then for each computer's car not
+crashed: three scores, the lane to the left, its own and to the right: a start's
+push to keep its lane (single race and tournament before its grid place's turn), a head
+to head's pull to the right side, the racer's engine (`0x79e28`: past the finish it pulls
+over by its grid place; gear and revs from `+0x308`), staying put alone in its lane on a
+straight road, minus for the edge lanes (more when the road beside is narrower than the
+car) and much more outside the road, plus away from a narrowing; **the cars ahead in each
+lane** (`0x78c88`: the nearest within the stretches, the speeds they leave it, 0x50000 a
+node between) scored by how much they fall short of the target (`0x78a80`); near a player
+the lanes it blocks scored down (`0x79b60`). The best lane's middle, kept on the road,
+moved by the car's own offset `+0x33c`; a lane change beside a car cuts the target to that
+lane's speed unless it can slide over first (`0x7850c`). **The target speed** (`0x786d4`'s
+part, `0x7e64c`): a racer the leading player's speed, then the road's limit
+(the TRI's speeds, 3 bytes each four nodes) × its top factor (+0x170 ×
+the driver's +0x55) × (1 − the bend's turn) × the catch-up (settings +0x5c/+0xb0 + 4i ×
+the driver's), held between 0.8 and 1.2 near a player, slowed before progress 0x41, 0 past the finish
+by its grid place; the traffic by its grip (`0x7e548`), the oncoming slower the faster its
+stretch's racer (`0x78660`). The traffic sometimes picks another place in its lane
+(`0x7dd33`, 1 in `0xf74f0` = 0x28).
+
+**Ported (`port/src/opponent.c`): equal to the original step for step in 220 runs on all
+11 snapshots** (`tools/opponent_emu.py`: the race cut to the player and the opponent,
+three driving scripts, 15 settings: single race, no traffic option, the lane rule off,
+fast, steering, off its lane, off the road, in the air, changing gear, past the finish,
+before the start, and the player catching and passing a slowed opponent), and the
+settings read from the program equal to the snapshots' blocks. With two cars, the branches for
+several cars in the lanes (`0x78c88` 241 of 618 instructions run, `0x7850c` 24 of 106,
+`0x78660`, `0x7e548`, `0x7e5e4` none) wait for the traffic to be checked. `--race cy1` races one
+opponent (`RENFS_SEED=n` for its random numbers). Not yet: the traffic's coming and going
+(`0x79500`, `0x77de8`, `0x7cac8`), the police (`0x79728`, `0x786d4`'s police branch,
+`chase_drop` `0x781ac`), a computer's car crashing (kind 4 → `0x1de8a`, kind 5
+`0x7d9e4`), EXPLODE's push (`0x78370`), the horns and engines' sounds.
 
 ## 5. The original in DOSBox (2026-10-19)
 

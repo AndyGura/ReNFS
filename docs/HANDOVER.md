@@ -232,8 +232,23 @@ Ghidra project and `build/decomp`, one command). The git history was started aga
   one-colour polygons (`0xaa990`), the police lights, the circuits' sky ring (`0x4ace8`),
   the roadside walls (`0x59294`, other tracks than the cities), 3D roadside models
   (`0x66738`), the cameras from the car ahead and the police car (modes 6, 7), the dust
-  (`smo1`.., `dir1`..), the opponents' and traffic's driving, the race's setup from
+  (`smo1`.., `dir1`..), the traffic's driving, the race's setup from
   the front end.
+
+- **The opponent drives** (`port/src/opponent.c`, NOTES §4.13): `drive_opponent`
+  `0x7b34c` every step (the steering eased, the plan `0x7cf98` every 4th step: speeding
+  up by its car's table and the catch-up factors, sliding across to its place, kept on the
+  road), and `traffic_police_tick` `0x7a040` every 4th step (its target speed from the road's
+  limits, its driver's record and how far it is from the leading player; its lane from the
+  cars ahead, the road's edges and the player beside it), the settings read from the
+  program (`0x63f50`), its driver by the race type, the random numbers (`RENFS_SEED`).
+  **Equal** step for step in 220 runs on all 11 snapshots (`tools/opponent_emu.py`, 15
+  settings, among them the player catching and passing it; `--coverage` lists what was
+  run). `--race cy1` races one opponent: it starts beside the player on the left and
+  pulls away (`build/shots/opp_grid.png`, `opp_race.png`). The racer's first step moves it
+  from the grid's node 20 to 19, which sets its road axes: no road follow at set-up.
+  Not yet: the traffic, the police, a computer's car crashing (kind 4 → `0x1de8a`, kind 5),
+  its sounds, EXPLODE.
 
 **Progress page for Danik**: https://claude.ai/artifact/VZdxTpYC3oLXYeBVJpoDoM (every step,
 its percent done and weight). Update its steps file after each finished step.
@@ -248,8 +263,7 @@ races 320x200 / 320x240; commit locally as the work goes.
 
 ## Next, in order
 
-1. **Finish the map** (NOTES §4.8, "Still to name"): the opponents' routines under
-   `drive_opponent`, `0x5efb0` (the replay?), the second drawing pass `0x5a4f0`, the
+1. **Finish the map** (NOTES §4.8, "Still to name"): `0x5efb0` (the replay?), the second drawing pass `0x5a4f0`, the
    widgets `0x71208`.., the Watcom runtime. Small enough now to leave for when the port
    reaches them; the formats are the better next step.
 2. **Formats: done.** Every file type on the CD has a reader in `tools/` (TRI, `wwww`,
@@ -262,8 +276,9 @@ races 320x200 / 320x240; commit locally as the work goes.
    port now makes a first frame of its own (`--race cy1`), the cars, their shadows,
    the racers' markers, the dashboard, the map and the mirror in it, and the player's car
    drives and crashes (equal step for step), and the status bar's numbers and the race's
-   timing, the camera outside and the crash's smoke. Next: the opponents'
-   driving (`drive_opponent` `0x7b34c`), the traffic, cars meeting cars, the sounds.
+   timing, the camera outside and the crash's smoke, and the opponent's driving. Next:
+   cars meeting cars (`0x1c878`: `car_car_collide` `0x1c6a4`, the opponent's crash),
+   the traffic (`0x79500`, `0x77de8`, `0x7cac8`), the police, the sounds.
    Open: who writes `0x136618` (28 sections drawn: a detail setting?). The walls `0x59294`
    and the circuits' sky ring `0x4ace8` can be checked on CY1 memory with made-up input,
    or on snapshots of another track (`tools/nfsdos.py`).

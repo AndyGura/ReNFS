@@ -6,6 +6,7 @@
 #include "crash.h"
 #include "cardraw.h"
 #include "exe.h"
+#include "opponent.h"
 #include "track.h"
 #include <limits.h>
 #include <math.h>
@@ -502,8 +503,8 @@ static void body_step(car_body *b)
 /* ---- the car and its body -------------------------------------------------------- */
 
 /* 0x7dbd8: the road's axes at the car's node: along it to the next node's point, across
-   by the node's +0x1c shorts, up square to both. (The traffic's lane changes after it:
-   not for the players) */
+   by the node's +0x1c shorts, up square to both. The computer's cars then sometimes pick
+   another place in their lanes */
 static void road_frame(race_car *c)
 {
     int n = c->node;
@@ -522,6 +523,8 @@ static void road_frame(race_car *c)
     c->road_up = cross8(&f, &u);
     c->road_side = u;
     c->road_fwd = f;
+    if (c->slot < 0 || c->slot >= g_humans)
+        opponent_wander(c);
 }
 
 /* the body's turn into the car's (the z flips) */
@@ -896,9 +899,9 @@ void crash_step(race_car *c)
     turn_flipped(c->turn, b->m);
 }
 
-/* ---- the refresh: 0x786d4 for the players' cars ---------------------------------- */
+/* ---- the refresh: 0x786d4 ------------------------------------------------------- */
 
-static void refresh(race_car *c)
+void crash_refresh(race_car *c)
 {
     const vec3 *row = (const vec3 *)c->turn;
     vec3 rel;
@@ -915,14 +918,18 @@ static void refresh(race_car *c)
     c->reach = p8(iabs(dot8(&c->road_side, &row[0])), c->body.half[0])
              + p8(iabs(dot8(&c->road_side, &row[1])), c->body.half[1])
              + p8(iabs(dot8(&c->road_side, &row[2])), c->body.half[2]);
-    /* the speed along the road: the car's (0x7b130) or its body's (0x1e6cc) */
+    if (c->slot < 0 || c->slot >= g_humans)
+        opponent_target_speed(c);
+    /* the speed along the road: the car's (0x7b130) or its body's (0x1e6cc); the
+       computer's cars drive by it */
     if (c->state == 4)
         c->road_speed = p8(c->body.vel.x, c->road_fwd.x) + p8(c->body.vel.y, c->road_fwd.y)
                       + p8(-c->body.vel.z, c->road_fwd.z);
     else if (c->state != 3)
         c->road_speed = p8(-c->vel.x, c->road_fwd.x) + p8(c->vel.y, c->road_fwd.y)
                       + p8(c->vel.z, c->road_fwd.z);
-    /* (+0x176 & 2: the traffic's target speed +0x160 cleared) */
+    if (c->bits[2] & 2)
+        c->speed_to = 0;
     w = (c->bits[0] | c->bits[1] << 8) & 0xbe1c;
     w |= 0x1e0;
     c->bits[0] = (unsigned char)w;
@@ -931,18 +938,38 @@ static void refresh(race_car *c)
 
 void crash_world(void)
 {
-    int i;
-
     if (g_crash.hit_wait)
         g_crash.hit_wait--;
     else
         g_crash.hit_level = 0x6666;
     if (--g_crash.refresh == 0) {
-        for (i = 0; i < g_humans && i < g_ncars; i++)
-            if (g_cars[i] && g_cars[i]->state != 6)
-                refresh(g_cars[i]);
+        opponent_tick();
         g_crash.refresh = 4;
     }
+}
+
+void crash_road_frame(race_car *c)
+{
+    road_frame(c);
+}
+
+void crash_turn_y(int *m, int a)
+{
+    rot_y(m, a);
+}
+
+void crash_mat_mul(int *out, const int *a, const int *b)
+{
+    mat_mul3(out, a, b);
+}
+
+/* 0x1ca9c: a computer's car turned too far spins out: thrown about as a box for 60
+   steps (the viewed car's sound: not yet) */
+void crash_spin_out(race_car *c)
+{
+    body_from_car(c);
+    c->state = 4;
+    c->body.wait = 60;
 }
 
 void crash_start(void)
@@ -954,24 +981,41 @@ void crash_start(void)
     smoke_reset(&g_crash.smoke);
 }
 
+static int pdn32(const unsigned char *p, int at)
+{
+    p += at;
+    return (int)(p[0] | p[1] << 8 | p[2] << 16 | (unsigned)p[3] << 24);
+}
+
 void crash_body_setup(race_car *c, const unsigned char *pdn)
 {
     car_body *b = &c->body;
     int i;
 
     memset(b, 0, sizeof *b);
-    b->mass = (int)(pdn[16] | pdn[17] << 8 | pdn[18] << 16 | (unsigned)pdn[19] << 24);
+    b->mass = pdn32(pdn, 16);
     b->inv_mass = recip(b->mass);
-    b->inertia = (int)(pdn[12] | pdn[13] << 8 | pdn[14] << 16 | (unsigned)pdn[15] << 24);
+    b->inertia = pdn32(pdn, 12);
     b->inv_inertia = recip(b->inertia);
     for (i = 0; i < 3; i++)
-        b->half[i] = (int)(pdn[4 * i] | pdn[4 * i + 1] << 8 | pdn[4 * i + 2] << 16
-                           | (unsigned)pdn[4 * i + 3] << 24);
+        b->half[i] = pdn32(pdn, 4 * i);
     b->m[0] = b->m[4] = b->m[8] = 0x10000;
     b->radius = len3((const vec3 *)b->half);
     c->height = b->half[1];
     c->reach = b->half[0];
     c->road_off = 0;
+    /* the computer's driving numbers (car_apply_pdn 0x1e9cc) */
+    c->bend = pdn32(pdn, 0x14);
+    c->bend_inv = fix_div(0x10000, c->bend);
+    c->top = pdn32(pdn, 0x18);
+    for (i = 0; i < 100; i++)
+        c->accel[i] = pdn32(pdn, 0x1c + 4 * i);
+    for (i = 0; i < 6; i++) {
+        c->gear_top[i] = pdn32(pdn, 0x1ac + 4 * i);
+        c->gear_inv[i] = c->gear_top[i] ? fix_div(0x10000, c->gear_top[i]) : 0;
+    }
+    c->rev_scale = pdn32(pdn, 0x1c4);
+    c->horn_sound = pdn32(pdn, 0x1c8);
     memset(c->turn, 0, sizeof c->turn);
     c->turn[0] = c->turn[4] = c->turn[8] = 0x10000;
 }

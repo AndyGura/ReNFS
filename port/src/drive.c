@@ -5,6 +5,7 @@
 #include "drive.h"
 #include "cardraw.h"
 #include "crash.h"
+#include "opponent.h"
 #include "exe.h"
 #include "track.h"
 #include "files.h"
@@ -1477,6 +1478,8 @@ void drive_step(race_car *c)
 {
     if (c->state == 4)
         crash_step(c);
+    else if (c->state == 3)
+        opponent_drive(c);
     else {
         physics(c);
         drive_check_lap(c);

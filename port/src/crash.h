@@ -1,9 +1,9 @@
 /* The crash (NOTES §4.6): a hard hit on a wall (0x3fed4) throws the car about as a box,
    its body (0x78204, car_crash 0x1cb14); each step drive_crashed 0x1cfe0 moves it and
    bounces it off the walls and the road, until it lands on its wheels (0x1ceb4) or, its
-   wait over, is put back in the road's first lane. And what of cars_meets_world 0x1c878
-   the player's car needs: every fourth step its place across the road and its speed
-   along it (traffic_police_tick 0x7a040 → 0x786d4). */
+   wait over, is put back in the road's first lane. And cars_meets_world 0x1c878: every
+   fourth step the cars' places across the road and speeds along it (0x786d4) and the
+   computer's driving chosen (traffic_police_tick 0x7a040, opponent.c). */
 #ifndef RENFS_CRASH_H
 #define RENFS_CRASH_H
 
@@ -61,9 +61,19 @@ void crash_hard_hit(race_car *c, int a, int b, int s);
 /* drive_crashed 0x1cfe0: a step of the tumbling car (state 4) */
 void crash_step(race_car *c);
 /* cars_meets_world 0x1c878, as far as the port has it: the hit's sound's timers, and
-   every fourth step the players' cars refreshed (their place across the road, how far
-   they reach, their speed along it). (The police's steering 0x1c800, the roadside
-   objects 0x1ebf4 and the cars against each other 0x1c6a4 come later) */
+   every fourth step traffic_police_tick (opponent_tick). (The police's steering 0x1c800,
+   the roadside objects 0x1ebf4 and the cars against each other 0x1c6a4 come later) */
 void crash_world(void);
+/* traffic_police_tick's refresh 0x786d4 of a car: its place across the road and how far
+   its body reaches across it, its target speed (the computer's, opponent.c), its speed
+   along the road */
+void crash_refresh(race_car *c);
+/* the road's axes at the car's node (0x7dbd8), the turn about y (0x2c7c4), out = a · b
+   (0x2cf14): for opponent.c */
+void crash_road_frame(race_car *c);
+void crash_turn_y(int *m, int a);
+void crash_mat_mul(int *out, const int *a, const int *b);
+/* 0x1ca9c: a computer's car spins out (to kind 4 for 60 steps) */
+void crash_spin_out(race_car *c);
 
 #endif

@@ -22,12 +22,13 @@ static const char usage[] =
     "  -home <folder>   the port's own settings (else $RENFS_HOME, else ~/.config/renfs)\n"
     "  --shot <f> <n>   no window: write the picture of retrace n (60 a second) to f\n"
     "  --race <track>   straight into a race on the track (cy1 ..: for now the 512TR\n"
-    "                   alone, driven with the arrows; Esc ends it)\n"
+    "                   against one opponent, driven with the arrows; Esc ends it)\n"
     "\n"
     "  RENFS_LANG=de    the German art (GART, ...)\n"
     "  RENFS_NOSOUND=1  no sound\n"
     "  RENFS_SNDWAV=f   write what is heard to the file f (a WAV)\n"
     "  RENFS_THROW=s:x,y,z  a test: at race step s the car given that speed (m/s)\n"
+    "  RENFS_SEED=n     a test: the race's random numbers from n (else the clock)\n"
     "\n"
     "Keys: Space, Enter or Esc pass a movie or the title.\n";
 

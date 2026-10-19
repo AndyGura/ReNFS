@@ -17,7 +17,15 @@ typedef struct {
     int radius;                /* +0x70: the length of half */
     int half[3];               /* +0x74: half its width, height and length (the PDN's first
                                   three words) */
-    int wait;                  /* +0x80: steps until it is put back on the road */
+    int wait;                  /* +0x80: steps until it is put back on the road; for the
+                                  computer's cars, steps to its next plan (0x7cf98) */
+    int honks;                 /* +0x84: a computer's car stuck behind a player: steps
+                                  it has wanted to sound its horn */
+    int steady;                /* +0x88: counts down while its steering moves (100 a
+                                  racer, 160 the traffic, when it holds still) */
+    int shift;                 /* +0x8c: steps of a gear change (revs held), then -20
+                                  counting back up */
+    int grip;                  /* +0x90: how much of a target speed the traffic takes */
 } car_body;
 
 typedef struct {
@@ -67,6 +75,7 @@ typedef struct {
     unsigned char *spec;       /* +0x479: its physics, the PBS file as load_car_pbs left
                                   it (read by offset, drive.c) */
     int steer;                 /* +0x18: the front wheels' turn, 0x1000000 a turn */
+    int steer_to;              /* +0x1c: the computer's: where it steers to */
     int progress;              /* +0x4c: how far along the road */
     int lap;                   /* +0x50 */
     vec3 vel;                  /* +0x54: in the world */
@@ -134,7 +143,22 @@ typedef struct {
     vec3 road_at;              /* +0xb0: its node's point */
     int height;                /* +0xbc: half its height (the body's) */
     car_body body;             /* +0xc4 (+0xc0 points to it) */
-    int road_speed;            /* +0x15c: its speed along the road (each fourth step) */
+    int road_speed;            /* +0x15c: its speed along the road (each fourth step; the
+                                  computer's cars drive by it) */
+
+    /* what the computer's driving needs (opponent.c, NOTES §4.13) */
+    int zone;                  /* +0x158: the stretch of road it is in (of 0x15d29c) */
+    int speed_to;              /* +0x160: the speed it drives towards */
+    int across_to;             /* +0x164: the place across the road it slides towards */
+    int bend;                  /* +0x168: the PDN's +0x14: how much a bend slows it */
+    int bend_inv;              /* +0x16c: 1 over it */
+    int top;                   /* +0x170: the PDN's +0x18 */
+    int accel[100];            /* +0x178: speed gained a step at each speed (m/s) */
+    int gear_top[6];           /* +0x308: each gear's top speed */
+    int gear_inv[6];           /* +0x320: 1 over them (0 stays 0) */
+    int rev_scale;             /* +0x338: the revs' scale, its top in the high half */
+    int lane_offset;           /* +0x33c: its place in its lane, from the middle */
+    int horn_sound;            /* +0x469: the PDN's +0x1c8 */
     int crashing;              /* +0x4f2: thrown about after a hard hit, until it is put
                                   back on the road */
 

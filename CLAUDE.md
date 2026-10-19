@@ -140,6 +140,8 @@ CONCEPTCAR ROCKYROAD TURBO NITRO EXPLODE (`0x46e94`), End held = no mercy. Optio
 `0x53a30`: +0x97 gearbox, +0x99 ABS, +0x8f traction (0 on, 1 off, 2 none).
 Driving (`0x10400` controls every 2nd step, `drive_player` `0x382d0`): the automatic
 starts in neutral (gear up = drive); `0x4071c` reads the node's slope +0x12 (NOTES §4.6).
+The opponent (NOTES §4.13): kind 3, a step `0x7b34c`, every 4th its lane and target
+speed (`0x7a040`), its driver's record `0xf4070` + 0x8d a letter, the settings `0x63f50`.
 Menus: held keys, letters blended per pixel, an inverse colour table after every fade up
 (NOTES §4.2).
 
@@ -195,6 +197,7 @@ once; for `--shot` tests);
 `RENFS_SHOTRAW=f`: `--shot` also writes the palette numbers (comparing by entry);
 `RENFS_THROW=s:x,y,z`: the car given a speed at race step s (to see a crash);
 `RENFS_CONFIG=f`: a CONFIG.DAT for the test (the original's, `nfsdos.py mem:156c14:5f52:f`).
+`RENFS_SEED=n`: the race's random numbers seeded with n (else the time, as the original).
 Sound: SDL's device at 44.1 kHz 16-bit stereo, each stream converted by an
 `SDL_AudioStream` and added in the callback. Movies: the sound read ahead (half a second
 queued), the pictures timed by the sound heard, as the original with sound on.
@@ -222,7 +225,9 @@ matrices), `car.c` (cars' files, the grid), `camera.c` (the driver's eyes; outsi
 equal step for step, `tools/drive_emu.py`; NOTES §4.6), `crash.c` (a hard wall hit: the car
 tumbling as a box, landing or put back, its smoke; the 4th-step refresh 0x786d4; equal step
 for step, drive_emu), `timing.c` (the finish, the racers' order and places, the splits,
-the race's end; equal step for step, `tools/timing_emu.py`; NOTES §4.12), `race.c` (`--race`: the loading
+the race's end; equal step for step, `tools/timing_emu.py`; NOTES §4.12), `opponent.c` (the opponent's driving: `drive_opponent` `0x7b34c`, its plan `0x7cf98`,
+`traffic_police_tick` `0x7a040`'s lanes and target speeds; equal step for step,
+`tools/opponent_emu.py`; NOTES §4.13), `race.c` (`--race`: the loading
 and the frame, a step every 3 ticks),
 `exe.c`: **the game's fixed tables are read from the CD's `NFS_DOS.EXE`** at the
 original's addresses (checked by a sum of the image), never copied into the port. The menus' look is checked against the

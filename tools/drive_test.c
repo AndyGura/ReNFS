@@ -7,6 +7,7 @@
 #include "cardraw.h"
 #include "crash.h"
 #include "drive.h"
+#include "opponent.h"
 
 #define I(o, f) { o, offsetof(race_car, f), 4 }
 #define V(o, f) I(o, f.x), I(o + 4, f.y), I(o + 8, f.z)
@@ -52,6 +53,34 @@ static const struct { int at, off, size; } fields[] = {
     B(0x51a, part),
 };
 
+/* the computer's driving's fields (opponent_emu.py; not compared for the player's car) */
+#define A1(o, f, i) I(o + 4 * (i), f[i])
+#define A10(o, f, i) A1(o, f, i), A1(o, f, i + 1), A1(o, f, i + 2), A1(o, f, i + 3), \
+    A1(o, f, i + 4), A1(o, f, i + 5), A1(o, f, i + 6), A1(o, f, i + 7), A1(o, f, i + 8), \
+    A1(o, f, i + 9)
+static const struct { int at, off, size; } opp_fields[] = {
+    I(0x1c, steer_to), I(0x158, zone), I(0x160, speed_to), I(0x164, across_to), I(0x168, bend),
+    I(0x16c, bend_inv), I(0x170, top), I(0x338, rev_scale), I(0x33c, lane_offset),
+    I(0x469, horn_sound), I(0x148, body.honks), I(0x14c, body.steady), I(0x150, body.shift),
+    I(0x154, body.grip),
+    A1(0x308, gear_top, 0), A1(0x308, gear_top, 1), A1(0x308, gear_top, 2),
+    A1(0x308, gear_top, 3), A1(0x308, gear_top, 4), A1(0x308, gear_top, 5),
+    A1(0x320, gear_inv, 0), A1(0x320, gear_inv, 1), A1(0x320, gear_inv, 2),
+    A1(0x320, gear_inv, 3), A1(0x320, gear_inv, 4), A1(0x320, gear_inv, 5),
+    A10(0x178, accel, 0), A10(0x178, accel, 10), A10(0x178, accel, 20), A10(0x178, accel, 30),
+    A10(0x178, accel, 40), A10(0x178, accel, 50), A10(0x178, accel, 60), A10(0x178, accel, 70),
+    A10(0x178, accel, 80), A10(0x178, accel, 90),
+};
+
+int opp_test_field(int i, int *at, int *size)
+{
+    if (i < 0 || i >= (int)(sizeof opp_fields / sizeof opp_fields[0]))
+        return 0;
+    *at = opp_fields[i].at;
+    *size = opp_fields[i].size;
+    return 1;
+}
+
 /* the i-th field's offset in the original's record and its size; 0 past the last */
 int drive_test_field(int i, int *at, int *size)
 {
@@ -68,6 +97,8 @@ void drive_test_in(race_car *c, const unsigned char *raw, unsigned char *spec)
 
     for (i = 0; i < sizeof fields / sizeof fields[0]; i++)
         memcpy((char *)c + fields[i].off, raw + fields[i].at, fields[i].size);
+    for (i = 0; i < sizeof opp_fields / sizeof opp_fields[0]; i++)
+        memcpy((char *)c + opp_fields[i].off, raw + opp_fields[i].at, opp_fields[i].size);
     c->spec = spec;
 }
 
@@ -77,6 +108,8 @@ void drive_test_out(const race_car *c, unsigned char *raw)
 
     for (i = 0; i < sizeof fields / sizeof fields[0]; i++)
         memcpy(raw + fields[i].at, (const char *)c + fields[i].off, fields[i].size);
+    for (i = 0; i < sizeof opp_fields / sizeof opp_fields[0]; i++)
+        memcpy(raw + opp_fields[i].at, (const char *)c + opp_fields[i].off, opp_fields[i].size);
 }
 
 /* the globals, in the order of drive_emu.py's GLOBALS */
@@ -149,6 +182,8 @@ int crash_test_smoke(unsigned char *raw, int set)
 
 void drive_test_track(const char *name)
 {
+    /* the original's tick is cut down to the player's refresh (drive_emu.py) */
+    g_opp.humans_only = 1;
     strncpy(g_drive.track, name, sizeof g_drive.track - 1);
 }
 

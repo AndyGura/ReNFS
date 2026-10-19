@@ -1,6 +1,7 @@
 /* A race (NOTES §4.3, §4.7): the loading of race_main 0x6356c and the frame of
    race_draw_frame 0x5bc40, as far as the port has them. */
 #include "race.h"
+#include "opponent.h"
 #include "camera.h"
 #include "car.h"
 #include "cardraw.h"
@@ -26,6 +27,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 /* the race the snapshots were taken in: the 512TR against the Testarossa, a police car
    and six of the traffic (0x12dce4) */
@@ -86,7 +88,7 @@ static void race_throw(race_car *player, int st)
    then the driving; the counter on by 2 */
 static void race_step(race_car *player, race_camera *cam)
 {
-    int st = g_drive.steps;
+    int st = g_drive.steps, i;
     unsigned w = drive_keyboard(g_road_mirror);
 
     g_drive.flags = (st & 1 ? 0 : 1) | (st & 3 ? 0 : 4) | (st & 7 ? 0 : 0x10);
@@ -103,7 +105,12 @@ static void race_step(race_car *player, race_camera *cam)
     /* (race_update_cars 0x519d8) the finish, the driving, the cars sorted round the
        world's checks, the splits */
     timing_step();
-    drive_step(player);
+    for (i = 0; i < g_ncars; i++) {
+        race_car *c = g_cars[g_timing.by_road[i]];
+
+        if ((c->part & 4) && c->state)
+            drive_step(c);
+    }
     timing_sort();
     crash_world();
     timing_sort();
@@ -176,6 +183,17 @@ int race_test(const char *name)
     if (!drive_load(&cars[0], config_word(CFG_AUTO), config_word(CFG_TCS) == 0,
                     config_word(CFG_ABS) == 0))
         return 0;
+    /* the opponent (car_setup 0x51200 for the computer's racers): a racer driven by the
+       computer (kind 3), standing a metre up until its first step puts it on the road */
+    for (i = 1; i < RACERS; i++) {
+        cars[i].slot = i;
+        cars[i].state = 3;
+        cars[i].half_len = 0x50000;
+        cars[i].half_wid = 0x28000;
+        cars[i].pos.y = 0x10000;
+        cars[i].lap = 1;
+        cars[i].bits[0] |= 4;
+    }
     eye = S32(cars[0].spec, 0x36c);         /* the driver's eyes above the road */
     horizon = S32(cars[0].spec, 0x370);     /* where the horizon is in the view */
     redline = S32(cars[0].spec, 0xac);      /* the engine's red line */
@@ -207,10 +225,11 @@ int race_test(const char *name)
     view_setup(&g_view_ahead, g_view_ahead.mode);
     view_setup(&g_view_mirror, g_view_mirror.mode);
     view_setup(&g_view_ahead, g_view_ahead.mode);
-    for (i = 0; i < RACERS; i++) {
+    /* (the opponent keeps the grid's node until its first step: the road's axes it
+       drives by are worked out as that step moves it to the nearest, drive_opponent) */
+    for (i = 0; i < RACERS; i++)
         car_grid_place(&cars[i], 7 - i, RACERS, 0);
-        track_follow(&cars[i].pos, &cars[i].node);
-    }
+    track_follow(&cars[0].pos, &cars[0].node);
     memset(&cam, 0, sizeof cam);
     camera_set_car(&cam, &cars[0], 0);
 
@@ -236,6 +255,12 @@ int race_test(const char *name)
     g_timing.table = 1;
     timing_cars();
     timing_start();
+    /* the computer's driving (load_traffic_cfg 0x7de84): the drivers by the grid places,
+       the random numbers from the clock (0x38c10 with time(), 0x91d9b) */
+    for (i = 0; i < RACERS; i++)
+        g_opp.grid[i] = 7 - i;
+    opponent_start(getenv("RENFS_SEED") ? (unsigned)strtoul(getenv("RENFS_SEED"), 0, 0)
+                                        : (unsigned)time(0));
     g_camera = &cam;
     g_road_paint.cars = cars_at_node;
     g_road_paint.cars_behind = cars_behind_at;

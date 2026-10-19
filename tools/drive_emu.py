@@ -24,7 +24,7 @@ from unicorn.x86_const import UC_X86_REG_ESP, UC_X86_REG_EIP, UC_X86_REG_EAX
 SOURCES = ["drive.c", "cardraw.c", "model.c", "polyfill.c", "camera.c", "car.c", "dash.c", "hud.c",
            "config.c", "view.c", "sky.c", "roaddraw.c", "trackinfo.c", "road.c", "poly.c",
            "raster.c", "track.c", "files.c", "exe.c", "trackfam.c", "racepal.c", "font.c",
-           "video.c", "fsh.c", "unpack.c", "timing.c", "smoke.c"]
+           "video.c", "fsh.c", "unpack.c", "timing.c", "smoke.c", "opponent.c"]
 # (crash.c is compiled into drive_test.c, which reaches its parts)
 # sounds (0x52d2c, 0x52e40, 0x52ea8: two words on the stack each), highlights, the
 # acceleration test's times, speech, force feedback, the wall's sound by the camera,
@@ -44,7 +44,7 @@ GLOBALS = [(0x145c94, 4), (0x12f1bc, 1), (0xf6b74, 4), (0x12da12, 4), (0x12da0e,
 GLOBALS += [(0x12d954 + 4 * p, 4) for p in range(8)] + [(0x12d974 + 12 * p, 4) for p in range(8)]
 GLOBALS += [(0x12d978 + 12 * p, 4) for p in range(8)] + [(0x12ccac + 4 * p, 4) for p in range(8)]
 GLOBALS += [(0x14ea80 + 0x1d2 * p + 0x1c4, 4) for p in range(8)]
-WRITTEN = {17: "first_move", 19: "air_shake", 22: "spinning", 32: "top_speed"}
+WRITTEN = {17: "first_move", 19: "air_shake", 22: "spinning", 56: "top_speed"}
 # the crash's, in drive_test.c's order; the last are only read
 CRASH_GLOBALS = [(0xea5d0, "hit_wait"), (0xea5d4, "hit_level"), (0xea66c, "impulse"),
                  (0xea670, "depth"), (0x12b4c4, "point_vel.x"), (0x12b4c8, "point_vel.y"),
@@ -297,8 +297,8 @@ def run(L, F, path, scr, var, coverage=False):
                 if a != b:
                     diff.append("+%#x %d/%d" % (at, a, b))
             for k, nm in WRITTEN.items():
-                a = rd(s, *GLOBALS[k + (player if k == 32 else 0)])
-                b = L.drive_test_global(k + (player if k == 32 else 0), 0, 0)
+                a = rd(s, *GLOBALS[k + (player if k == 56 else 0)])
+                b = L.drive_test_global(k + (player if k == 56 else 0), 0, 0)
                 if a != b:
                     diff.append("%s %d/%d" % (nm, a, b))
             for k, (a, nm) in enumerate(CRASH_GLOBALS):
