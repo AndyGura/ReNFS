@@ -1,11 +1,13 @@
 /* ReNFS: The Need for Speed Special Edition (1996), written again from its DOS program.
    main 0x4716c -> startup 0x42054 -> fe_outer_loop 0x47000 (NOTES §4.1). */
+#include "audio.h"
 #include "fe.h"
 #include "files.h"
 #include "video.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 static const char usage[] =
     "ReNFS: The Need for Speed SE, for Linux.\n"
@@ -18,8 +20,10 @@ static const char usage[] =
     "  --shot <f> <n>   no window: write the picture of retrace n (60 a second) to f\n"
     "\n"
     "  RENFS_LANG=de    the German art (GART, ...)\n"
+    "  RENFS_NOSOUND=1  no sound\n"
+    "  RENFS_SNDWAV=f   write what is heard to the file f (a WAV)\n"
     "\n"
-    "Keys: Space, Enter or Esc pass the title.\n";
+    "Keys: Space, Enter or Esc pass a movie or the title.\n";
 
 int main(int argc, char **argv)
 {
@@ -47,12 +51,14 @@ int main(int argc, char **argv)
     if (!video_init(shot, shot_frames))
         return 1;
 
-    /* fe_outer_loop 0x47000: the records (CONFIG.DAT), the title, the main menu.
-       The menus are next; until then the title is all there is */
-    fe_title_screen();
+    if (!shot && !getenv("RENFS_NOSOUND"))
+        audio_init();
+    srand(shot ? 1 : (unsigned)time(0));   /* pictures without a window: the same each time */
+    fe_outer_loop();
 
     if (shot)                  /* the program ended before the frame asked for */
         fprintf(stderr, "renfs: ended before frame %d\n", shot_frames);
+    audio_done();
     video_done();
     return 0;
 }

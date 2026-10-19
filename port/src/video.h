@@ -12,10 +12,13 @@ extern int g_quit;                                /* the window was closed */
 
 int video_init(const char *shot, int shot_frames);
 void video_done(void);
-/* initgraphics: 640x480 (the front end) or 320x200 (a race in low detail) */
+/* initgraphics: 640x480 (the front end), 320x200 (a race in low detail), 320x240 (the
+   movies, VGA mode X) */
 void video_mode(int w, int h);
 /* setpalette 0x84080: colours first.. from an 8-bit palette; the card keeps 6 bits */
 void video_palette(const unsigned char *pal, int first, int count);
+/* the palette read back from the card (0x98aec): its 6 bits widened, v << 2 | v >> 4 */
+void video_get_palette(unsigned char *pal, int first, int count);
 /* wait for the next vertical retrace (0xba9c2): the frame is shown then */
 void video_retrace(void);
 

@@ -2,17 +2,11 @@
 #include "fe.h"
 #include "files.h"
 #include "fsh.h"
+#include "movie.h"
 #include "video.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
-
-static unsigned char g_shown[768];     /* the palette on the card, 8 bits a channel */
-
-static void set_palette(const unsigned char *pal, int first, int count)
-{
-    memcpy(g_shown + 3 * first, pal, 3 * count);
-    video_palette(pal, first, count);
-}
 
 /* 0x98abc: each channel x level / 32 */
 static void scale(unsigned char *out, const unsigned char *in, int n, int level)
@@ -27,22 +21,18 @@ void pal_fade_up(const unsigned char *pal, int first, int count)
     for (int level = 0; level <= 32; level += 2) {
         scale(p, pal, 3 * count, level);
         video_retrace();
-        set_palette(p, first, count);
+        video_palette(p, first, count);
     }
 }
 
 void pal_fade_down(int first, int count)
 {
     unsigned char from[768], p[768];
-    /* 0x98aec reads the card back: its 6 bits widened as v << 2 | v >> 4 */
-    for (int i = 0; i < 3 * count; i++) {
-        unsigned v = g_shown[3 * first + i] >> 2;
-        from[i] = (unsigned char)(v << 2 | v >> 4);
-    }
+    video_get_palette(from, first, count);
     for (int level = 32; level >= 0; level -= 2) {
         scale(p, from, 3 * count, level);
         video_retrace();
-        set_palette(p, first, count);
+        video_palette(p, first, count);
     }
 }
 
@@ -61,7 +51,7 @@ static void draw_picture(const shape *s)
 int fe_show_picture(const char *name, int wait)
 {
     char path[256];
-    unsigned char pal[768];
+    unsigned char pal[768], pal_black[768];
     fsh_file f;
     shape bg;
 
@@ -75,8 +65,8 @@ int fe_show_picture(const char *name, int wait)
         fsh_free(&f);
         return 0;
     }
-    memset(g_shown, 0, sizeof g_shown);    /* the screen is black before it comes up */
-    video_palette(g_shown, 0, 256);
+    memset(pal_black, 0, sizeof pal_black);   /* the screen is black before it comes up */
+    video_palette(pal_black, 0, 256);
     memset(g_fb, 0, (size_t)g_fb_w * g_fb_h);
     draw_picture(&bg);
     fsh_free(&f);
@@ -102,4 +92,49 @@ void fe_title_screen(void)
     while (!g_quit && !timedout() && !key_get())
         video_retrace();
     pal_fade_down(0, 256);
+}
+
+int fe_attract_mode(void)
+{
+    static int round, attract_n;
+    unsigned char black[768] = { 0 };
+    int stopped = 0;
+
+    /* from the second round on the original first plays a replay, REPLAY1..3.RPL in
+       turn (race_run in replay mode): to come with the race */
+    if (round++ == 0) {
+        int r = (rand() & 0x7fff) / 0x2aaa;   /* 0x74aec: Watcom's rand is 15 bits; 3 = 0 */
+        attract_n = r > 2 ? 0 : r;
+    } else
+        attract_n = (attract_n + 1) % 3;
+    stopped = movie_play("EA.TGV") > 0;
+    if (!stopped && !g_quit) {
+        char name[32];
+        snprintf(name, sizeof name, "ATTRACT%d.TGV", attract_n + 1);
+        stopped = movie_play(name) > 0;
+    }
+    if (!stopped && !g_quit)
+        movie_play("TITLE.TGV");
+    video_palette(black, 0, 256);
+    video_mode(640, 480);
+    video_retrace();
+    video_palette(black, 0, 256);
+    return 1;
+}
+
+void fe_outer_loop(void)
+{
+    int state = 2, attract = 1;
+    while (!g_quit) {
+        if (attract) {
+            fe_attract_mode();
+            attract = 0;
+            /* here the original loads CONFIG.DAT the first time (3 if it is missing) */
+        }
+        if (state == 2 || state == 3)
+            fe_title_screen();
+        /* fe_game_mode_screen 0x47274 (single player, modem, exit; 2 when nothing was
+           chosen in time, then the movies again), then fe_main_menu 0x42c30: next */
+        break;
+    }
 }

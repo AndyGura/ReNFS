@@ -3,8 +3,8 @@
    as on the VGA card. The VGA's DAC kept 6 bits a channel: so does this one.
 
    With --shot <file> <n> the program runs without a window and its clock is the
-   retraces counted (60 a second at 640x480, 70 at 320x200): the n-th retrace's picture
-   is written to the file (PPM) and the program ends. */
+   retraces counted (70 a second in the 200-line modes, else 60): the n-th retrace's
+   picture is written to the file (PPM) and the program ends. */
 #include "video.h"
 #include <SDL.h>
 #include <stdio.h>
@@ -92,6 +92,20 @@ void video_palette(const unsigned char *pal, int first, int count)
     }
 }
 
+void video_get_palette(unsigned char *pal, int first, int count)
+{
+    for (int i = 0; i < 3 * count && 3 * first + i < 768; i++) {
+        unsigned v = g_dac[3 * first + i];
+        pal[i] = (unsigned char)(v << 2 | v >> 4);
+    }
+}
+
+/* the VGA's rates: 70 a second in the 200-line modes, 60 in the others */
+static int retrace_rate(void)
+{
+    return g_fb_h == 200 ? 70 : 60;
+}
+
 static void write_shot(void)
 {
     FILE *f = fopen(g_shot, "wb");
@@ -148,8 +162,7 @@ void video_retrace(void)
     SDL_RenderCopy(g_ren, g_tex, 0, 0);
     SDL_RenderPresent(g_ren);
     g_retraces++;
-    /* the VGA's rates: 60 a second at 640x480, 70 at 320x200 */
-    g_virtual_ms += g_fb_h == 480 ? 70 : 60;
+    g_virtual_ms += 4200 / retrace_rate();
     if (g_shot) {
         if ((int)g_retraces >= g_shot_at) {
             write_shot();
@@ -162,7 +175,7 @@ void video_retrace(void)
     {
         static Uint64 next;
         Uint64 now = SDL_GetPerformanceCounter(), f = SDL_GetPerformanceFrequency();
-        Uint64 step = f / (g_fb_h == 480 ? 60 : 70);
+        Uint64 step = f / retrace_rate();
         if (!next || now > next + f / 10)
             next = now;
         next += step;

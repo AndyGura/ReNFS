@@ -154,7 +154,7 @@ German has a `G` in front (`GART`, `GSHOW`, ...).
 
 ```bash
 cmake -S port -B port/build && cmake --build port/build
-port/build/renfs                                   # the game (the title, for now)
+port/build/renfs                                   # the game (the movies and the title, for now)
 port/build/renfs --shot build/shots/title.ppm 120  # no window: the picture of retrace 120
 port/build/renfs --help
 ```
@@ -167,9 +167,14 @@ palette fades, step for step). The 100 Hz clock is real time, or the retraces co
 under `--shot`. The game's blocking loops stay loops that wait for a retrace.
 Data folder: `-data`, else `$RENFS_DATA`, else `./NFSSE`, else `NFSSE` beside the program
 (a folder asked for is used or refused). Home: `-home`, `$RENFS_HOME`, `~/.config/renfs`
-(the port's own formats, never the game's files). `RENFS_LANG=de`: the German art.
+(the port's own formats, never the game's files). `RENFS_LANG=de`: the German art;
+`RENFS_NOSOUND=1`: no sound; `RENFS_SNDWAV=f`: what is heard written to a WAV (checking).
+Sound: SDL's device at 44.1 kHz 16-bit stereo, each stream converted by an
+`SDL_AudioStream` and added in the callback. Movies: the sound read ahead (half a second
+queued), the pictures timed by the sound heard, as the original with sound on.
 `src/files.c` (case-insensitive paths), `unpack.c` (all of EA's packers on the CD),
-`fsh.c`, `video.c` (screen, clock, keys), `fe.c` (front end), `main.c`.
+`fsh.c`, `video.c` (screen, clock, keys), `audio.c`, `eacs.c` (EA sound blocks), `tgv.c`
+and `movie.c` (the movies), `fe.c` (front end), `main.c`.
 **Headless tests set `RENFS_HOME` to a scratch folder** (once the port writes settings).
 
 ---

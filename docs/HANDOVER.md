@@ -112,6 +112,14 @@ Ghidra project and `build/decomp`, one command). The git history was started aga
   (`build/shots/title_120.png`; `RENFS_LANG=de` the German one). The picture equals the
   reader's pixel for pixel; the port's unpacker equals the game's on all 527 packed files.
 
+- **The port plays the movies with sound, as the attract mode does**: the EA logo, one of
+  the three attract movies (chosen at random the first time, then in turn), the title
+  movie, then the title picture; Space, Enter or Esc pass each one. The pictures equal the
+  reader's at the right moments; the sound heard equals the movie's own (recorded with
+  `RENFS_SNDWAV`, the same to within a sample all the way through); a whole run takes
+  79 s, the movies' own length. Still to come in the attract mode: the replay race from
+  the second round on (needs the race).
+
 ## Waiting for Danik
 
 Nothing. Decided 2026-10-18: menus 640x480 on the MiSTer (interlaced at 15 kHz),
@@ -126,7 +134,9 @@ races 320x200 / 320x240; commit locally as the work goes.
 2. **Formats: done.** Every file type on the CD has a reader in `tools/` (TRI, `wwww`,
    `ORIP`, textures, FFN, EA sound, the packers, PBS/PDN first reading, INFO, INV, BAMF,
    TGV, RPL, CONFIG.DAT). What is still open inside them is listed in NOTES §3.4.
-3. **The port's skeleton: done** (title picture). Next in it: the main menu
+3. **The port's skeleton: done** (movies, title). Next in it: the game mode screen
+   (`fe_game_mode_screen` `0x47274`: single, modem, exit; a timeout goes back to the
+   movies), then the main menu
    (`fe_main_menu` `0x42c30`: its pictures, the font, the mouse and keys, the music), the
    widget routines `0x71208`.. on the way.
 4. Front end (menus, car and track choice), then the race (track, cars, physics, HUD,

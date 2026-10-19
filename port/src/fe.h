@@ -13,4 +13,11 @@ int fe_show_picture(const char *name, int wait);
 /* fe_title_screen 0x46f20: TITLE.QFS for 5 seconds or until a key */
 void fe_title_screen(void);
 
+/* fe_attract_mode 0x34284: EA.TGV, one of ATTRACT1-3.TGV, TITLE.TGV, each only if no
+   key stopped the one before; returns to 640x480, black */
+int fe_attract_mode(void);
+
+/* fe_outer_loop 0x47000: the movies, the title, the game mode screen, the main menu */
+void fe_outer_loop(void);
+
 #endif
