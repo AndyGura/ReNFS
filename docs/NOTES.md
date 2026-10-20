@@ -1026,6 +1026,25 @@ libraries `0x80000`..`0x94000` and `0x95000`..`0xb0000`, Watcom's runtime `0x940
   tournament's track already raced: "Track already completed" / "Strecke bereits
   fertiggestellt" (100 ticks), and that track's picture carries `flad` see-through
   (`0x43e3c`: type 3 and raced[+0x95]).
+- **`fe_credits` `0x25600`** (2026-10-20; `port/src/credits.c`; the five pages equal to the
+  original by palette entry, DOSBox's one scaling line only). From the options screen
+  (`0x546db`): faded down, the music faded out and ended, `music_start("credits.asf")`
+  (`0x72010`: nothing when +0x73 is 0), the credits, the music faded out and ended,
+  `0x63e2c` a menu song again, the pointer back on the row, the screen drawn and faded
+  up. The credits: `credits.fsh` of the language's art folder (`0x747ec` is
+  `sprintf("%s%s", 0x1561a4, name)` then `0x83f18`), its `!pal`; pages `bgn1`..`bgn5`,
+  each drawn into the menu window and shown, faded up, `0xed0fc` = 0, then until Space,
+  Enter or the left button (the next page), Esc or the right button (the end; `0x13c3ca`
+  too, the modem game's), or `0xed0fc` ≥ 2000; faded down. The buttons count only once
+  they have been seen up (one flag for all five pages). No pointer is drawn. At the end
+  the music faded out, a fade down, the end of the music, the file freed, `mouse_save`.
+  **`0xed0fc` is a free count of the timer's ticks**: `race_timer_tick` `0x4c454`
+  (installed at start-up, `0x47202`) adds one every tick, menus and races alike; the
+  credits, the race menus (`0x1a703`, `0x1b7c0`), the pause menu (`0x56ece`),
+  `controls_read` (`0x492b5`) and `0x6034c` set it to 0 to time something, and
+  `music_choose` `0x63ed0` takes the song from it (in the port `timer_counter`; before it
+  never moved and the song was always the first of the set). In this DOSBox both it and
+  the system clock `0xf7980` count about 70 a second, so the credits' 2000 take 28 s there.
 
 ### 4.3 The race
 

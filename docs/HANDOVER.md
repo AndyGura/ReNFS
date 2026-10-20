@@ -456,8 +456,12 @@ races 320x200 / 320x240; commit locally as the work goes.
    is on (`0x15d134`): "Quit tournament ?", "Track already completed" and the raced
    track's mark (`flad`). Two traps found on the way: stores to `[esp+N]` right after a
    `push` (a row change redraws the whole screen; the list starts on its first file),
-   `tools/espdepth.py` lists them. Next: the credits (`0x25600`), then a joystick for
-   driving (the MiSTer needs one). The dashboard's keys F7 / F8 / M / F9 and Rusty Springs' measurements on the
+   `tools/espdepth.py` lists them. **The credits (`0x25600`): done**, the five pages
+   equal by palette entry, with CREDITS.ASF; the timer's free count `0xed0fc` now runs
+   in the port (`timer_counter`), so the menu music's choice varies as the original's.
+   Every screen behind the options is now in. Next: a joystick (and the mouse) for
+   driving: the controls screen's other kinds, `controls_read` `0x49248`,
+   `fe_joystick_calibrate` `0x4c6b0` (the MiSTer needs a pad). The dashboard's keys F7 / F8 / M / F9 and Rusty Springs' measurements on the
    status bar: done (NOTES §4.11). Not yet: races at 640x480 (settings +0x7f = 0).
    (`0x136618`, the sections drawn: the settings' +0x85 and F3, NOTES §4.19.)
    Open: the race's sound reaches full scale at the hits and the horn (0.2 to 0.7 % of
