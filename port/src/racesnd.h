@@ -60,6 +60,11 @@ void rsnd_engine_off(void);
 /* 0x525b8 (on) / 0x525ec: every channel's volume 0 and kept there, or the sounds heard
    again as they are next set (F5, the pause) */
 void rsnd_mute(int on);
+/* 0x52ab4: every channel stopped (the pause menu) */
+void rsnd_stop_all(void);
+/* the pause menu's end (0x56474): the engine's loops started again (0x52670), heard
+   while the player's car is driven (+0x512 1 or 2, 0x53214), else not (0x531dc) */
+void rsnd_engine_restart(void);
 /* 0x52618: every channel's volume 0 for now (P's pause; the next step sets them again) */
 void rsnd_quiet(void);
 /* 0x52a70: every channel stopped and the banks freed (the race's end) */

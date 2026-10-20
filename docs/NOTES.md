@@ -2750,8 +2750,53 @@ counter `0x145c94`, 2 a step), then `race_keys`.
 **Ported (`port/src/pause.c`): P's hold.** The race stands still while held: a race paused
 300 retraces from retrace 600 gives at retrace 1200 the same picture, byte for byte, as an
 unpaused race at 900 (`build/shots/pause/`); the original's own pause in DOSBox looks the
-same (`build/dos/ppause/`). Esc still ends the race (after its first 60 steps) until the
-menu is ported.
+same (`build/dos/ppause/`).
+
+**The pause menu, `race_pause_menu` `0x56474`.** `0x12d9e4` and `0x12f1b8` = 1 (the race
+clock held); every channel stopped (`0x52ab4`); the race's palette kept (getpalette), faded
+down; at 320x200 the mode changed to 640x480 (and back after; at 640x480 the race's own
+off-screen window is used). The mouse put on the row chosen (x 100, y `0x5632c`: 120 170
+217 265 311 360); FRONT_MW.BNK, `pause.asf` played; `check/pause.fsh` (its `!pal` the
+menu's), `check/pause.inv`, and the map `check/<name><segment + 1>.qfs` for the open
+roads, `check/<name>.qfs` for the circuits (names `0x563a4`: cy cl al loop1 loop2 loop6
+loop3 loop7 loopx; the circuits' files by track tr1 tr2 tr6 tr3 tr7 tr4, `0x3629c`).
+- Drawn: `bgnd`, the map's `0000` at its own place, `cham` (the chat dimmed; in a network
+  race `repm`, the replay dimmed, and `chal` blinking with messages), the markers, then the
+  row chosen lit (`conl repl audl gral chal quil`; dark `cond repd audd grad chad quid`).
+- **The markers** (`drawshape_centred` `0x81600`, by the shape's centre, 255 left out): a
+  car's point is its node / 4 into the track's points (pairs of words, x and z in metres,
+  every 4 nodes: CY `0xf1340 0xf1ac0 0xf21a0`, CL `0xefd60 0xf04e0 0xf0c10`, AL `0xee3c0
+  0xeebe0 0xef4e8` a segment each; the circuits `0xf2a38 0xf2c38 0xf3838 0xf3038 0xf3c38
+  0xf3438` by track 3..8; the counts `0x563e8`), x / 25 and −z / 25 (circuits / 6), plus
+  the map's place `0x56338[3·track + segment]`, `0x5636e[..]`. Race type (`0x12da20`) 2 or
+  3: `p1`..`p8` on every car, `youl` on the player's, `lear` on the race order's last
+  (`0x13c290` = `0x13c274[7]`, the leader); else the rival's `p<n>` (head to head), the
+  player's, and `youl`. The image's point tables are never written.
+- The rows by the mouse's height: 0..0x8c continue, 0x98..0xbe replay (not in a network
+  race), 0xc5..0xec audio, 0xf7..0x11b graphics, 0x125..0x149 chat (network only),
+  0x153..0x1e0 quit, else none lit. Up and down go round (past the chat, or the replay in
+  a network race), the mouse moved to the row; sounds 0x47 a move, 0x48 a choice; keys
+  repeat after 25 ticks. The right button = Quit chosen. Esc closes it as Continue, once
+  Esc was let go after the menu opened (and waits for it to be let go again).
+- Continue; Replay `0x5e4c4(1)`; Audio `fe_audio_options(2)`; Graphics
+  `fe_graphics_options(1)` (the art freed and loaded again round them); Quit: "End game ?"
+  / "Spiel beenden ?" (`fe_yes_no_dialog`), yes → `0x13c17c` = 2 (the race ends).
+- Leaving: faded down, music faded out and waited for, the bank freed; 320x200 again, the
+  race's palette set straight back (no fade); the config's detail (+0x81 .. +0x89, put
+  there from the race's globals before the menu, `0x144cc` the outside view's size) read
+  back; the dashboard due again (or `0xe80f0` from outside), `camera_set_mode`,
+  `views_start`; the engine started again (`0x52670`) and heard if the player's car is
+  driven (+0x512 1 or 2); the ticket's picture put back (`0x306d0`/`0x306e8`/`0x306dc`);
+  the inverse table, the race font; none asked, the last = now (`0x632f8`); the clock
+  goes on.
+
+**Ported: the menu**, against the original's pictures (`build/dos/pause/`, compared by
+palette entry: each entry one colour): continue, replay and graphics chosen, 156 pixels of
+307,200 differ in each, the mouse pointer and single pixels of DOSBox's scaling. Continue
+brings the race back where it stood (`build/shots/pause/back.png`), Quit with Yes ends it.
+Not yet: Replay, Audio and Graphics (their screens), the network's chat and messages, the
+ticket's picture put back after the menu, the audio settings' per-player volumes
+(`0x12da67`, `0x12da6b`).
 
 ## 5. The original in DOSBox (2026-10-19)
 

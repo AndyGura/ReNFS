@@ -266,6 +266,17 @@ int race_test(const char *name)
     view_setup(&g_view_mirror, g_view_mirror.mode);
     view_setup(&g_view_ahead, g_view_ahead.mode);
     memset(&g_pause, 0, sizeof g_pause);
+    {
+        /* the pause menu's map: the track (CONFIG.DAT +0x95) and segment (+0x93) by the
+           name asked for (the circuits' files by track, 0x3629c) */
+        static const char *const tracks[9] = { "cy", "cl", "al", "tr1", "tr2", "tr6", "tr3",
+                                               "tr7", "tr4" };
+        for (i = 8; i >= 0; i--)
+            if (!strncasecmp(name, tracks[i], strlen(tracks[i])))
+                break;
+        g_pause.track = i < 0 ? 0 : i;
+        g_pause.segment = i >= 0 && i < 3 && name[2] >= '1' && name[2] <= '3' ? name[2] - '1' : 0;
+    }
     race_keys_start();         /* (the settings' detail, 0x5ba1c's 0x1440c) */
     /* (the opponent keeps the grid's node until its first step: the road's axes it
        drives by are worked out as that step moves it to the nearest, drive_opponent) */

@@ -292,6 +292,22 @@ void rsnd_engine_on(void)
     g_rsnd.sound[5] = 0x29;
 }
 
+void rsnd_stop_all(void)
+{
+    for (int c = 0; c < SND_CHANNELS; c++)
+        channel_stop(c);
+}
+
+void rsnd_engine_restart(void)
+{
+    engine_start();
+    /* the player's car driven or held by the police: heard; else (thrown about) not */
+    if (g_cars[g_player]->state == 1 || g_cars[g_player]->state == 2)
+        rsnd_engine_on();
+    else
+        rsnd_engine_off();
+}
+
 void rsnd_quiet(void)
 {
     int c;

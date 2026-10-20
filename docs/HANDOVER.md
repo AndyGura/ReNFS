@@ -358,9 +358,9 @@ races 320x200 / 320x240; commit locally as the work goes.
    drives and crashes (equal step for step), and the status bar's numbers and the race's
    timing, the camera outside and the crash's smoke, the opponent's driving, and cars
    meeting cars, the roadside objects knocked over, the traffic, the police and the
-   sounds, and the race's keys, and P's pause (NOTES §4.20). Next: the pause menu (Esc,
-   `0x56474`, 640x480, against `build/dos/pause/*.png`; Shift+End's giving up `0x1f0b4`
-   with it), then the race's music
+   sounds, and the race's keys, P's pause and the pause menu (NOTES §4.20; its Replay,
+   Audio and Graphics wait for their screens). Next: Shift+End's giving up `0x1f0b4`,
+   then the race's music
    (`0x34xxx`, the loops "loop1".., "p1".."p8") and the speech (`0x722b4`/`0x72438`).
    (`0x136618`, the sections drawn: the settings' +0x85 and F3, NOTES §4.19.)
    Open: the race's sound reaches full scale at the hits and the horn (0.2 to 0.7 % of

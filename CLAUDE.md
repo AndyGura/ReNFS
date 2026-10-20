@@ -250,7 +250,7 @@ and the frame, a step every 3 ticks),
 pitch and sides; NOTES §4.18) and `racesnd.c` (the race's 16 channels: engine, road, tyres,
 horns, siren and radar, the two nearest cars, the hits; equal step for step,
 `tools/opponent_emu.py --full --sound`), the samples mixed by `audio.c`'s voices,
-`pause.c` (P's hold `0x63110`, the check `0x63304`; NOTES §4.20), `racekeys.c` (`race_keys` `0x47c88`: C the camera `camera_next` `0x1494c`, Alt+Ctrl+1..8
+`pause.c` (P's hold `0x63110`, the check `0x63304`, the pause menu `0x56474` with its map; NOTES §4.20), `racekeys.c` (`race_keys` `0x47c88`: C the camera `camera_next` `0x1494c`, Alt+Ctrl+1..8
 the car watched, F1..F6 view size, pixels, road distance, sky, sound, markers; the view
 key equal, `tools/camera_emu.py`; NOTES §4.19),
 `collide.c` (cars meeting cars: `0x1c878`'s loop, the boxes pushed apart `0x2b864`/`0x26324`,

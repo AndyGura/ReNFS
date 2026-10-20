@@ -24,7 +24,7 @@ static const char usage[] =
     "  --shot <f> <n>   no window: write the picture of retrace n (60 a second) to f\n"
     "  --race <track>   straight into a race on the track (cy1 ..: for now the 512TR\n"
     "                   against one opponent, driven with the arrows; P holds\n"
-    "                   it, Esc ends it)\n"
+    "                   it, Esc opens the pause menu)\n"
     "\n"
     "  RENFS_LANG=de    the German art (GART, ...)\n"
     "  RENFS_NOSOUND=1  no sound\n"

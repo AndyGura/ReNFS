@@ -13,6 +13,7 @@ typedef struct {
     unsigned long held_ticks;  /* the clock's ticks spent held, for race.c to take off
                                   its own clock (the original's stops, 0x12f1b8) */
     int quit;                  /* the race left from the menu (0x13c17c = 2) */
+    int track, segment;        /* CONFIG.DAT +0x95 and +0x93: the menu's map */
 } race_pause;
 
 extern race_pause g_pause;
