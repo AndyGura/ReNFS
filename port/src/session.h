@@ -77,6 +77,10 @@ int session_records_segment(void);
 int session_top_ten(void);
 /* 0x69e00: the player's best top speed the track's record: 1 */
 int session_records_top_speed(void);
+/* 0x69438: a circuit's best lap (the least of the player's lap times above 0, the first
+   of them if equal) the track's lap record (record 0, its speed the best top speed; not
+   with the Warrior): 1 */
+int session_records_best_lap(void);
 /* the segment the standings are about: CONFIG.DAT +0x93 less one (it is one on by
    then), 0 meaning the third */
 int session_segment(void);
@@ -88,11 +92,19 @@ void session_order_by_totals(int order[8]);
 /* 0x689b0: the player's points the most (or as many as the most) */
 int session_player_leads(void);
 
+/* 0x6926c: the player's points the most of all (beside 0x689b0, which looks at racer 0's) */
+int session_player_most(void);
+
 /* the formats the screens share (0x74914, 0x74854, 0x74a14): a time in 1/60 s as
    m:ss.t or s.t, a speed (16.16 m/s) in mph or km/h, an average speed from a time and
    a distance; "N/A" when there is none */
 void fmt_time(char *s, int t);
 void fmt_speed(char *s, int v);
 void fmt_average(char *s, int t, int d);
+
+/* RENFS_SESSION=f (a test): the results as the original holds them put in as the standings
+   begin, the race's way through them already chosen (0x5e0 bytes from 0x15cb68, then 16
+   from 0x12a150, and maybe 16 from 0x14fae0, the places: nfsdos.py mem:) */
+void session_test_load(void);
 
 #endif

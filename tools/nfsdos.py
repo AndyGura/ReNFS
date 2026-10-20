@@ -17,6 +17,8 @@ The plan is a comma-separated list of steps:
     dump:<ptr>:<n>:<f>  n bytes (hex count) at the pointer held in the word at flat address
                         <ptr> (hex), written to the file f: a table on the game's heap
     mem:<a>:<n>:<f>     n bytes (hex count) at the flat address a (hex) in the data object
+    poke:<a>:<hex>      the bytes (hex digits, as in memory) written at the flat address a
+                        (hex) in the data object: a test's state put into the game
     car:<n>             car n's record (through the pointers at 0x13c24c): position +0 +4 +8
                         (16.16), road node +0x48, across the road +0x80, speed +0x70
     snap:<f>            the game paused and its whole memory (32 MB, by the game's own
@@ -190,6 +192,13 @@ try:
                 find()
             open(p[3], "wb").write(os.pread(mem.fileno(), int(p[2], 16), base + int(p[1], 16) - DATA))
             print("0x%s: 0x%s bytes to %s" % (p[1], p[2], p[3]))
+        elif p[0] == "poke":
+            if base is None:
+                find()
+            with open("/proc/%d/mem" % pid, "r+b", 0) as w:
+                w.seek(base + int(p[1], 16) - DATA)
+                w.write(bytes.fromhex(p[2]))
+            print("0x%s: %d bytes written" % (p[1], len(p[2]) // 2))
         elif p[0] == "snap":
             if base is None:
                 find()

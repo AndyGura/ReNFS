@@ -7,6 +7,7 @@
 #include "files.h"
 #include "timing.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 race_session g_session;
@@ -321,6 +322,33 @@ int session_records_top_speed(void)
     return 1;
 }
 
+int session_records_best_lap(void)
+{
+    const session_racer *r = &g_session.racer[g_player];
+    int best = 0, i, at;
+
+    for (i = 0; i < 20; i++)
+        if (r->laps[i] < r->laps[best] && r->laps[i] > 0)
+            best = i;
+    if (config_word(CFG_CAR) == 11)
+        return 0;
+    at = record_at(config_word(CFG_TRACK), 0);
+    if (r->laps[best] >= config_long(at + 0x1b) || r->laps[best] <= 0)
+        return 0;
+    record_take(at, r->laps[best], r->best_top);
+    return 1;
+}
+
+int session_player_most(void)
+{
+    int most = 0, i;
+
+    for (i = 0; i < 8; i++)
+        if (most < g_session.points[i])
+            most = g_session.points[i];
+    return g_session.points[g_player] == most;
+}
+
 void fmt_time(char *s, int t)
 {
     if (t >= 3600 && t != 999999 && t != 99999)
@@ -357,4 +385,64 @@ void fmt_average(char *s, int t, int d)
         sprintf(s, "%d.%d%c", v / 10, v % 10, 0x9b);
     else
         sprintf(s, "%d.%dmph", v / 10, v % 10);
+}
+
+void session_test_load(void)
+{
+    const char *f = getenv("RENFS_SESSION");
+    static unsigned char d[0x600];
+    FILE *fp;
+    int i, j, n;
+
+    if (!f)
+        return;
+    fp = fopen(f, "rb");
+    n = fp ? (int)fread(d, 1, sizeof d, fp) : 0;
+    if (n < 0x5f0) {
+        fprintf(stderr, "renfs: RENFS_SESSION %s is not a session's dump\n", f);
+        if (fp)
+            fclose(fp);
+        return;
+    }
+    fclose(fp);
+#define L(o) ((int)(d[o] | d[(o) + 1] << 8 | d[(o) + 2] << 16 | (unsigned)d[(o) + 3] << 24))
+#define W(o) ((short)(d[o] | d[(o) + 1] << 8))
+    for (i = 0; i < SESSION_RACERS; i++) {
+        session_racer *r = &g_session.racer[i];
+        int o = i * 0x95;
+
+        memcpy(r->name, d + o, 9);
+        for (j = 0; j < 20; j++)
+            r->laps[j] = L(o + 9 + 4 * j);
+        r->time = L(o + 0x59);
+        r->distance = L(o + 0x5d);
+        r->top = L(o + 0x61);
+        r->total = L(o + 0x65);
+        r->total_distance = L(o + 0x69);
+        r->best_top = L(o + 0x6d);
+        r->tickets = L(o + 0x71);
+        r->warnings = L(o + 0x75);
+        for (j = 0; j < 6; j++)
+            r->stats[j] = L(o + 0x7d + 4 * j);
+    }
+    for (i = 0; i < 8; i++) {
+        g_session.points[i] = W(0x570 + 2 * i);
+        g_session.gave_up[i] = W(0x5a4 + 2 * i);
+        g_drive.gave_up[i] = W(0x5e0 + 2 * i);
+    }
+    for (i = 0; i < 9; i++) {
+        g_session.won[i] = W(0x580 + 2 * i);
+        g_session.raced[i] = W(0x592 + 2 * i);
+    }
+    g_session.result = W(0x5ba);
+    if (n >= 0x600) {
+        g_session.place = W(0x5f2);
+        g_session.rival_place = W(0x5f4);
+        g_session.rival_rank = W(0x5f6);
+        g_session.rival = W(0x5f8);
+        g_session.rank = W(0x5fa);
+        g_session.rival_car = W(0x5fc);
+    }
+#undef L
+#undef W
 }

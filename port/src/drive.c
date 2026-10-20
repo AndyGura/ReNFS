@@ -1069,6 +1069,73 @@ static void road_edges(race_car *c)
 
 /* ---- a step's driving: car_physics_player 0x408e0 -------------------------------- */
 
+/* 0x417a2: the time trial on Rusty Springs measures the car, near the start and finish
+   (nodes up to 0x61 and from 0x1d1): standing (below 0x3333) starts the clock; with the
+   throttle down, the steps to 60 and 100 mph and to a quarter mile (0x53 of the road on)
+   with the speed then; braking, the steps from 60 or 80 mph to standing. The best of the
+   race goes into its statistics; the times shown on the screen as they are made (0x2d71c,
+   0x2d778) are not here yet. The clocks are kept from race to race. */
+static void rusty_springs_test(race_car *c)
+{
+    static int braked80, braked60;                   /* 0xec3c4, 0xec3c8 */
+    static int best60 = 99999, best100 = 99999, bestq = 99999; /* 0xec3cc, d0, d4 */
+    static int start, start_at;                      /* 0xec3d8, 0xec3dc */
+    int *st, dt;
+
+    if (c->player >= DRIVE_PLAYERS)
+        return;
+    st = g_drive.stats[c->player];
+    if (c->node > 0x61 && c->node < 0x1d1)
+        return;
+    if (c->speed < 0x3333) {
+        start = g_drive.steps;
+        start_at = c->progress;
+        best60 = best100 = bestq = 99999;
+    }
+    dt = g_drive.steps - start;
+    if (c->throttle > 0x32 && dt < 0x5dc && dt > 0x64) {
+        if (c->speed > 0x1ac937 && dt < best60) {
+            best60 = dt;
+            if (dt < st[0])
+                st[0] = dt;
+        }
+        if (c->speed > 0x2ca666 && dt < best100) {
+            best100 = dt;
+            if (dt < st[1])
+                st[1] = dt;
+        }
+    }
+    if (c->progress - start_at > 0x53) {
+        dt = g_drive.steps - start;
+        start_at = 999999;
+        if (dt < bestq && dt < 0x3e8) {
+            if (dt < st[5]) {
+                st[5] = dt;
+                st[4] = c->speed;
+            }
+            bestq = dt;
+        }
+    }
+    if (c->braking > 0x32) {
+        if (c->speed > 0x23b5c2)
+            braked80 = g_drive.steps;
+        if (c->speed > 0x1ac937)
+            braked60 = g_drive.steps;
+        if (c->speed < 0x1999 && braked60 > 0) {
+            dt = g_drive.steps - braked60;
+            braked60 = 0;
+            if (dt < st[3])
+                st[3] = dt;
+        }
+        if (c->speed < 0x1999 && braked80 > 0) {
+            dt = g_drive.steps - braked80;
+            braked80 = 0;
+            if (dt < st[2])
+                st[2] = dt;
+        }
+    }
+}
+
 /* x held to within -lim..lim */
 static int clampi(int x, int lim)
 {
@@ -1336,7 +1403,8 @@ static void physics(race_car *c)
         g_drive.first_move = g_drive.steps + 1;
     if (c->player < DRIVE_RESULTS && iabs(c->speed) > g_drive.top_speed[c->player])
         g_drive.top_speed[c->player] = iabs(c->speed);
-    /* (the acceleration test's times, 0x2d71c and 0x2d778, come with its screen) */
+    if (g_race_type == 0 && g_drive.kind == 3)
+        rusty_springs_test(c);
     if (c->roll_phase > 1)
         c->roll_phase -= 2;
     if (c->pitch_phase > 0)

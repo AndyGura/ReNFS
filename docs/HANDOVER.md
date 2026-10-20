@@ -359,6 +359,19 @@ Ghidra project and `build/decomp`, one command). The git history was started aga
   winner's and the police's films, the menu music after a race. **Equal** by palette
   entry to the original's standings and checkpoint screens (`build/after/`).
 
+- **After a race, the rest** (NOTES §4.21): the finish menu (Continue, Standings, Esc,
+  two minutes), the track's standings with its ten best totals and top speed taken, the
+  ten best page, the race's standings so far and a tournament's points (20 15 12 10 8 7
+  6 5) carried from race to race, its end opening Lost Vegas and the rest; a circuit's
+  page (the best total of its race length, the lap record) with its laps page (two
+  columns from nine laps) and, on Rusty Springs' time trial, the car's measurements
+  (0–60, 0–100, the quarter mile, 60–0, 80–0) now made while driving; the commentary on
+  every page. After a race the menus get six of the race's colours back (`0x31bf4`).
+  **Equal** by palette entry to the original on every page met: a head to head's and a
+  single race's open road, Rusty Springs' time trial (laps page with test numbers),
+  Autumn Valley's single race, Burnt Sienna's tournament race (`build/circ/`; the
+  original's numbers put in with `nfsdos.py poke:` and `RENFS_SESSION`).
+
 **Progress page for Danik**: https://claude.ai/artifact/VZdxTpYC3oLXYeBVJpoDoM (every step,
 its percent done and weight). Update its steps file after each finished step.
 
@@ -389,11 +402,11 @@ races 320x200 / 320x240; commit locally as the work goes.
    meeting cars, the roadside objects knocked over, the traffic, the police and the
    sounds, and the race's keys, P's pause and the pause menu (NOTES §4.20; its Replay,
    Audio and Graphics wait for their screens), Shift+End's giving up, the race's music and its speech (NOTES §4.18's end). , the circuits' sky ring, walls and 3D objects, the race started from Control
-   Central, the segments in a row with the segment standings and the checkpoint menu.
-   Next (NOTES §4.21 "Not yet"): the finish menu `0x1b6a0`, the track standings
-   `0x6b938` (top ten), a circuit's lap standings (`0x6cb24`, `0x6e1ac`, `0x69f8c`,
-   `0x69438`), the final standings `0x6f070`, the tournament's end; then the
-   checkpoint's Options and Replay.
+   Central, the segments in a row, every standings page, the checkpoint and finish
+   menus, a tournament from race to race. Next: the race menus' Options (`0x12760`,
+   `0x195d8`) and Replay / Highlights (race_run in replay mode, +0xaf 1 / 2, the RPL
+   record); the measurements' HUD on Rusty Springs (`0x2d71c`, `0x2d778`, values
+   `0x12b968`..).
    (`0x136618`, the sections drawn: the settings' +0x85 and F3, NOTES §4.19.)
    Open: the race's sound reaches full scale at the hits and the horn (0.2 to 0.7 % of
    the samples in `build/snd_port/`): how EA's mixer sums the voices is still to compare. Model polygons of one colour (`0xaa990`) are not ported (none met so far).

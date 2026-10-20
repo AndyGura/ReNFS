@@ -9,6 +9,7 @@
 #include "drive.h"
 #include "exe.h"
 #include "files.h"
+#include "font.h"
 #include "fsh.h"
 #include "polyfill.h"
 #include "racepal.h"
@@ -249,6 +250,11 @@ void hud_free(void)
         free(g_mask_b[i]);
         g_mask_b[i] = 0;
     }
+    /* (0x31bf4) the race's colours 0x5e, 0x5f and 0xfa .. 0xfd for the menus again;
+       0x47 and the racers' marks stay out */
+    g_colour_off[0x5e] = g_colour_off[0x5f] = 0;
+    for (i = 0xfa; i < 0xfe; i++)
+        g_colour_off[i] = 0;
 }
 
 /* the HUD's digits by the program's tables of names: grey (0xf6c84: gry0 .. gry9, gryb,

@@ -46,9 +46,11 @@ typedef struct {
     int distance[DRIVE_RESULTS];       /* +0x1c0 (0x14ec40): the race's length at its
                                           end, the finish node · 4.8 (0x68ab0) */
     int stats[DRIVE_PLAYERS][6];       /* +0x198 .. (0x14ec18, 1c, 20, 24, 28, 2c): 99,999
-                                          99,999 999 999 0 99,999 as the race starts (a
-                                          circuit's statistics; what writes them during
-                                          the race is not found yet) */
+                                          99,999 999 999 0 99,999 as the race starts:
+                                          Rusty Springs' time trial measures the steps
+                                          to 60 and 100 mph, from 80 and 60 mph to
+                                          standing, the speed and steps at a quarter
+                                          mile (0x417a2) */
     int options;               /* 0x12da28 (the settings' word 0x15d12a): 0x20 lands
                                   softer after a long jump, but on tr6 */
     char track[8];             /* 0x12da16: the track's name */

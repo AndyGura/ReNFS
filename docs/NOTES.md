@@ -3058,16 +3058,94 @@ Replay and Highlights run race_run again in replay mode (+0xaf 1 / 2), Options `
 Standings the segment's (0) and the final, Quit "End game ?" → 0. (The flag that fades
 the music is the stack's, set only by Quit: Continue fades it.)
 
-**Ported** (`session.c`, `standings.c`, `racemenu.c`, `race.c`): the session, `0x68ab0`
-and `0x68dcc`, the records taken, the segment standings, the checkpoint menu (Replay,
-Highlights, Options not yet), an open road's three segments in a row, the police's and the
-winner's films, the menu's music after a race. **Equal** to the original's screens by
-palette entry: the standings after giving up (the only differences the typed name and the
-opponent's times) and the checkpoint menu (0 pixels). Seen: City's three segments in a row
-(6:30.2 + 7:47.1 = 14:17.4), Quit from the checkpoint back to Control Central. **Not
-yet**: `race_menu_finish` `0x1b6a0` (CHECK/FINMENU.QFS), the track standings `0x6b938`
-(the top ten, STANDTRK), a circuit's `0x6cb24`/`0x6e1ac`/`0x69f8c`/`records_best_lap`
-`0x69438`, the final standings `0x6f070`, the tournament's end.
+**`race_menu_finish` `0x1b6a0`** (CHECK/FINMENU.QFS): rows conl repl higl gmol gmsl
+chal; up wraps 0 → 4 past the chat, down (sel + 1) % 6, the chat → 0; Esc, two minutes or
+the right button = done; Replay / Highlights +0xaf 1 / 2, Options `0x195d8`, Standings =
+the standings again as after a race not finished (0, last); the music carries on into
+Control Central; returns 1. Both race menus (and every standings page) draw everything
+again on the pass after a change (the pointer shown again).
+
+**`fe_standings_track` `0x6b938`** (STANDTRK): the top ten `0x69980` (the player's total
+into record 6 + i, a circuit's 6 + race length +0xb3 · 10 + i, the rows below moved down;
+an open road's +0x658 / +0x664 its segment totals and tops, the time trial's reference;
+the place, 20 none) and the top speed `0x69e00` (record 36 by the best top; 0/1) taken
+first; rows y 0x9d total, 0xbc average, 0xd0 top; the records at 0x11d and 0x177 (the
+speed row's English race kind "t.t." whatever it is); the commentary: rank 0 and not a
+time trial: a tournament complete (nine raced with Lost Vegas open, else eight) and most
+points → con8_D/con6_C/con7_D (records) or con5_B (taken), once heard con8_H/con6_F/
+con7_H or con5_D; else con8_A/con6_A/con7_A or con5_A (once heard G/E/G, con5_C);
+otherwise records only: con4_F/con1_B/con2_B (heard: con4_C/con1_C/con2_D). The arrows
+move the pointer between Done (40, 450) and the middle (320, 240). Then, records taken,
+**`fe_standings_best` `0x69f8c`** (STANDBST): the ten (rows y 0x82 + i · 0x15, names cut
+at 0x11d), the player's white, the top speed under them; con4_D/A (first) or con4_G/E
+when the player is among them.
+
+**`fe_standings_final` `0x6f070`**: the race so far (SGMTSTND; "SEGMENT %d" with 'segt' on
+open roads, "%d Lap race" on circuits, at (8, 0x5a) in style 2; rows y 0xa6 + i · 0x1d:
+name 0x7b (style 3), total 0x135, an open road's segment time 0x1ef, by the totals
+`0x691f8`), or the tournament's (TRMTSTND, FINSTND when all raced: nine, or eight with
++0x5f50 = 0): by the points, most first, the points at 0x1ef, this race's (0x14ec48 in the
+race records, "0" not finished) at 0x13e. Black at once; buttons "Donl"/"Dond". The
+order after a race: open road: segment; final(1) in a single race or tournament; the last
+segment: track (and best), then a tournament's points (finished) and final(0). Circuit:
+loop1; final(1); a tournament's points and final(0). **A tournament's points `0x689f8`**:
+by the totals, 20 15 12 10 8 7 6 5 (`0xf6ffc`), none to a racer who gave up. Its end
+(`race_from_menu`, type 3): the records cleared, then if all raced and `0x689b0` (racer
+0's points the most) +0x5f50 = 2 (1 if < 2) and `fe_unlock` `0x42a84` (Lost Vegas; level
+> 0 the Warrior and mirrored tracks, > 1 the rally); otherwise the session is kept.
+
+**A circuit: `fe_standings_loop1` `0x6cb24`** (STATS/STANDLO1): g_said `0x14fb38` = 0;
+taken if finished: top ten, top speed and **the lap record `records_best_lap` `0x69438`**
+(the least positive of the 20 laps, the first if equal, into record 0 when below its time:
+time the lap, speed the best top; not with the Warrior). Buttons Done (x 0..0x82) and Laps
+(0x190..0x280, lapl/lapd), y 0x1b3..0x1e0, sel 2 = neither; the mouse at (40 | 600, 450)
+(`0x691bc`); left/right go from one to the other, up/down only from neither onto Done.
+The standing: types 2/3 by the finishing place `0x14fae2` ("%d / 8", the rival's
+`0x14fae4`; won = place 0), type 1 by the totals, a time trial against the top ten's
+best of the race length (≤); the art by track 3..8 rust autu burn mont trop neod;
+"%d Lap race"/"%d Rundenrennen" (+0xb1) at (8, 0x5f); the rival column: a time trial the
+record's time, average and speed, type 1 the other racer, types 2/3 the totals' order
+[won] (the best other than a winner); not finished or given up N/A. Records at y 0x11d
+(the top ten's best) and 0x177. The commentary (not when "again", = not finished): won or
+a tournament: g_said = 1; complete and most points (`0x6926c`: the player's points the
+greatest, unlike `0x689b0`) → con8_D/con6_C/con7_D or con5_B (taken); else won →
+con8_A/con6_A/con7_A or con5_A; neither: records → con4_f/con1_B/con2_B. Laps: the
+commentary stopped (and not again), faded down, the count + 1, **the lap page
+`0x6e1ac`** (STANDLO2): rows "%d", the time, the average (the lap's distance +0x5d) at x
+7/0x68/0xc7, from nine laps in two columns ((laps + 1) / 2, the second at 0x148/0x1a6/
+0x205), y 0x7d + row · 0x14, the best lap white; the lap record (record 0) at y 0x144;
+'no5w' over the art but on Rusty Springs' time trial, where (not the rally) **the car's
+measurements**: top speed, 0–60 and 0–100 mph (time), the quarter mile "time / mph"
+(`0x692a8` "%d.%d", no unit), 60–0 and 80–0 (`0x69318`/`0x693a8`: steps · 3000 or 3857 /
+12000 metres, "%d Ft" · 33 / 10 in English, N/A below 100 or 999); German three rows
+only. Buttons Done (→ 1: the circuit's page ends too, no fade of its own) and Final
+standings (finl/find, → 0, Esc and the time too: back to the circuit's page, redrawn, the
+pointer on Laps, the keys let go first); con2_C16 the first visit with the lap record
+taken. At the end the ten best when taken.
+
+**Rusty Springs' measurements** (`car_physics_player` `0x417a2`, after the top speed):
+in a time trial on track 3, nodes ≤ 0x61 or ≥ 0x1d1: below 0x3333 the clock starts (the
+steps `0x145c94`, the progress, the bests 99,999); throttle > 0x32 and 0x64 < dt < 0x5dc:
+past 0x1ac937 (60 mph) / 0x2ca666 (100 mph) the best steps into the race record +0x198 /
++0x19c; 0x53 of progress on (a quarter mile): steps < 1000 → +0x1ac (and the speed +0x1a8);
+braking > 0x32: the last step above 0x23b5c2 (80 mph) / 0x1ac937, standing (< 0x1999):
+the steps since into +0x1a0 / +0x1a4. Shown at once by `0x2d71c`/`0x2d778` (HUD values
+`0x12b968`.., not ported). The clocks are statics kept from race to race.
+
+**After a race the menus get six colours back**: `0x31bf4` (race_main's end, the HUD
+freed) allows 0x5e, 0x5f, 0xfa..0xfd again; 0x47 and the racers' marks stay out of the
+nearest colours (the blending of white letters picks other entries otherwise).
+
+**Ported** (`session.c`, `standings.c`, `racemenu.c`, `race.c`, `drive.c`): all of the
+above but the finish and checkpoint menus' Replay, Highlights and Options and the
+measurements' HUD. **Equal** to the original's screens by palette entry: an open road's
+segment, track and best standings, checkpoint and finish menus (all six rows); a circuit's
+page and lap page (Rusty Springs' time trial with its measurements, 16 laps in two
+columns; Autumn Valley's single race), the race's and the tournament's standings, all
+0 pixels. Checked with the original's own numbers put in: `nfsdos.py poke:` writes them
+into the game at the circuit's page (seen after Laps → back), `mem:` reads them out, and
+`RENFS_SESSION` puts the same bytes into the port as its standings begin. (Shift+End does
+not end a circuit race: the car stops; quit from the pause menu instead.)
 
 ## 5. The original in DOSBox (2026-10-19)
 

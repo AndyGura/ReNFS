@@ -25,8 +25,8 @@ extern text_style g_text;          /* the current one (0x1605e4) */
 void text_colour(int fg);
 
 /* the entries a colour may not be matched to (0xf77c8, there 0 for these): the
-   program's 254 and 255 (the mouse pointer's), the race's its own (racepal.c); never
-   put back after a race, as in the original */
+   program's 254 and 255 (the mouse pointer's), the race's its own (racepal.c); after a
+   race only 0x47 and the racers' marks stay out (hud_free, as the original's 0x31bf4) */
 extern unsigned char g_colour_off[256];
 /* nearestcolour 0x80c80: the entry nearest 0xRRGGBB. Through the screen's inverse
    palette (.INV) when it has one, else the closest of the allowed entries */
