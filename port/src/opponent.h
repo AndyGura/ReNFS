@@ -66,8 +66,13 @@ extern opp_race g_opp;
 /* load_traffic_cfg 0x7de84's part: the settings (0x63f50, from the program), each racer's
    driver by the race type and its grid place (0x583ec), the stretches of road (0x7814c),
    the traffic's counts (none waiting, all going the racers' way: g_opp.traffic set
-   before), the random numbers seeded (0x38c10) */
-void opponent_start(unsigned seed);
+   before) */
+void opponent_start(void);
+/* race_run's 0x38c10: the random numbers (0xeab70) seeded, before the race's cars are
+   chosen (0x653a4 draws the traffic from them) */
+void opponent_seed(unsigned seed);
+/* the next of them (the bits 8..23 of the product) */
+unsigned opponent_random(void);
 /* drive_opponent 0x7b34c: a step of a car the computer drives (kind 3) */
 void opponent_drive(race_car *c);
 /* 0x7c030's loop: after a player's crash, the racers thrown about put back on the road,

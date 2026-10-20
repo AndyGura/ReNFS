@@ -83,6 +83,20 @@ void collide_init(void)
         g_collide.random[k] = (unsigned)exe_i32(0xf8a8c + 4 * k);
 }
 
+void collide_seed(unsigned t)
+{
+    unsigned s = t, a;
+    int k;
+
+    /* (Watcom's rand 0x91dd0: the state times 0x41c64e6d plus 0x3039, bits 16..30 given) */
+    for (k = 0; k < 6; k++) {
+        s = s * 0x41c64e6d + 0x3039;
+        a = s >> 16 & 0x7fff;
+        s = s * 0x41c64e6d + 0x3039;
+        g_collide.random[k] = a * (s >> 16 & 0x7fff);
+    }
+}
+
 /* 0x91e04: the words from the fifth down added up with their carries into the next, the
    last counted up (its carry running up through them) */
 unsigned collide_rand(void)
@@ -105,7 +119,7 @@ unsigned collide_rand(void)
 }
 
 /* 0x52580: 0 .. n - 1 */
-static int rand_below(int n)
+int collide_below(int n)
 {
     return (int)((collide_rand() & 0xffff) * (unsigned)n) >> 16;
 }
@@ -501,11 +515,11 @@ static int collide(race_car *a, race_car *b)
         g_crash.hit_level = g_collide.impulse + 0x8000;
         g_crash.hit_wait = 10;
         s = g_collide.impulse > 0xa0000 ? 0xa0000 : g_collide.impulse;
-        if (rand_below(10) > 5)
+        if (collide_below(10) > 5)
             s = -s;
         a->roll_shake = s;
         b->roll_shake = -s;
-        t = rand_below(10) > 5 ? -s : s;
+        t = collide_below(10) > 5 ? -s : s;
         a->pitch_shake = t;
         b->pitch_shake = t;
         a->roll_phase = b->roll_phase = 0x1c;

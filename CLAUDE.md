@@ -157,6 +157,10 @@ Driving (`0x10400` controls every 2nd step, `drive_player` `0x382d0`): the autom
 starts in neutral (gear up = drive); `0x4071c` reads the node's slope +0x12 (NOTES §4.6).
 The opponent (NOTES §4.13): kind 3, a step `0x7b34c`, every 4th its lane and target
 speed (`0x7a040`), its driver's record `0xf4070` + 0x8d a letter, the settings `0x63f50`.
+The race from Control Central (NOTES §4.21): `race_from_menu` `0x3770c`, `race_run`'s
+`race_setup_record` `0x36c5c` (racers 1/2/8 by type; police and 6 traffic head to head on
+open roads), the cars `0x653a4` (menu car → game car `0x36250`), the grid `0x370bc`, the
+loading picture `0x64d28` (SIMDATA/SLIDES), EA's random numbers re-seeded from the clock.
 Menus: held keys, letters blended per pixel, an inverse colour table after every fade up
 (NOTES §4.2).
 
@@ -191,7 +195,7 @@ German has a `G` in front (`GART`, `GSHOW`, ...).
 cmake -S port -B port/build && cmake --build port/build
 port/build/renfs                                   # the game (movies, title, game mode screen, for now)
 port/build/renfs --shot build/shots/title.ppm 120  # no window: the picture of retrace 120
-port/build/renfs --race cy1                        # straight into City 1 from the grid (road and sky so far)
+port/build/renfs --race cy1                        # straight into City 1 with the saved car, opponent and race type (tr5 = the rally)
 port/build/renfs --help
 ```
 
@@ -245,8 +249,8 @@ tumbling as a box, landing or put back, its smoke; the 4th-step refresh 0x786d4;
 for step, drive_emu), `timing.c` (the finish, the racers' order and places, the splits,
 the race's end; equal step for step, `tools/timing_emu.py`; NOTES §4.12), `opponent.c` (the opponent's driving: `drive_opponent` `0x7b34c`, its plan `0x7cf98`,
 `traffic_police_tick` `0x7a040`'s lanes and target speeds; equal step for step,
-`tools/opponent_emu.py`; the traffic's coming and going, NOTES §4.16; the police, §4.17), `race.c` (`--race`: the loading
-and the frame, a step every 3 ticks),
+`tools/opponent_emu.py`; the traffic's coming and going, NOTES §4.16; the police, §4.17), `race.c` (`race_run`: the race as the settings ask, its loading and
+frame, a step every 3 ticks (TURBO 2 2 3); `race_from_menu`, `--race`),
 `sndlib.c` (EA's sound library: banks, voices by mask and priority, the random spreads,
 pitch and sides; NOTES §4.18) and `racesnd.c` (the race's 16 channels: engine, road, tyres,
 horns, siren and radar, the two nearest cars, the hits; equal step for step,

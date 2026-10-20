@@ -10,6 +10,7 @@
 #include "fsh.h"
 #include "menu.h"
 #include "options.h"
+#include "race.h"
 #include "sound.h"
 #include "video.h"
 #include <stdio.h>
@@ -557,8 +558,38 @@ int fe_main_menu(void)
                     else if (in_rect(0x5c, 0x6b, 0x154, 0x16d))
                         race_type_step(0), redraw = 1;
                     break;
-                case RACE:
-                    fprintf(stderr, "renfs: the race is not written yet\n");
+                case RACE:                 /* (a tournament's segment already raced
+                                              is refused: no tournaments yet) */
+                    if (cw(CFG_RACE_TYPE) == 3) {
+                        /* (the codes not taken into a tournament) */
+                        g_explode = 0;
+                        g_rally = 0;
+                        g_cheat_flags &= ~8ul;
+                        g_warrior_ok = 0;
+                    }
+                    mouse_show(0);
+                    pictures_free();
+                    music_fade_out();
+                    fe_sound_bank_free();
+                    pal_fade_down(0, 256);
+                    music_wait_end();
+                    g_race_codes.mirror = g_mirror;
+                    g_race_codes.rally = g_rally;
+                    g_race_codes.nitro = g_nitro;
+                    race_from_menu();
+                    /* back: "No mercy" over, the menu loaded and faded in again */
+                    g_no_mercy = 0;
+                    g_cheat_flags &= ~4ul;
+                    if (g_quit || !fsh_load(&g_art, path) || !fsh_palette(&g_art, 0, pal)) {
+                        done = 1;
+                        result = 1;
+                        break;
+                    }
+                    fe_sound_bank_load();
+                    fe_mouse_load();
+                    place_mouse(sel);
+                    fe_mouse_save();
+                    redraw = first = 1;
                     break;
                 case OPTIONS:              /* back with everything loaded and faded in
                                               again (0x4577a) */

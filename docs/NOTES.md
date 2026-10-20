@@ -2901,6 +2901,88 @@ Not yet: Replay, Audio and Graphics (their screens), the network's chat and mess
 ticket's picture put back after the menu, the audio settings' per-player volumes
 (`0x12da67`, `0x12da6b`).
 
+### 4.21 The race from Control Central (2026-10-20)
+
+**The Race button** (`fe_main_menu` `0x42c30`, case 4): a tournament's segment already
+raced is refused (a message, `0x74234`); in a tournament EXPLODE (`0xf74a4`), the rally
+(`0x12dd2c`), TURBO (`0x15d12a` & 8) and the Warrior (`0xf7494`) are cleared; the pictures
+freed, the music faded out, the sound bank freed, faded down, the music waited for, then
+`race_from_menu`. Back: "No mercy" (`0xf7492`) off, `0x15d12a` & ~4, the art, the inverse
+table and the sound bank loaded again, the menu drawn and faded in.
+
+**`race_from_menu` `0x3770c`**: the track names (`0x36290`: cy cl al tr1 tr2 tr6 tr3 tr7
+tr4); CONFIG.DAT +9..+0xb4 (`0x156c1d`, 0xac bytes) and +0x5f36 (`0x15cb4a`, 26 bytes)
+kept at `0x15d010` / `0x15d0bc` before each race and **put back after it** (what the race
+changes in the settings is not kept). An open road (`0x15d09c` the track < 3): the name
+"%s%d" with the segments done `0x15d09a` + 1, the track's records (+0x670.. by track,
+`0x157284` + track · 0xa6b) copied to `0x12c0e8` (100 words; a circuit's from + race
+length · 400). `race_run(2, names)`, then black, 640x480. The result `0x15d122`: 4 → the
+police's film; 1 → the records written back when beaten, the winner's film
+(`fe_winner_movie`) after a third segment or a circuit, the standings (`fe_standings_*`),
+then `race_menu_checkpoint` `0x1a5d8` between an open road's segments (0 = quit) or
+`race_menu_finish` `0x1b6a0` after the last; otherwise (given up, quit) the standings and
+the finish menu. A tournament's end (`0x689b0`, `0x42a84`) and `fe_new_session`. **Still
+to port** (the next step): the segments in a row, the standings, both menus, the records.
+
+**`race_run` `0x37228`**: `race_setup_record` `0x36c5c` (below); the detail settings
+(+0x81 .. +0x89) to `0x12d9d4..`; **EA's random numbers from the clock**: `0x91d9b` the
+time in seconds (rounded at 500 ms), Watcom's `srand` `0x91df4` (state `0xf8a88`), each of
+the six words `0xf8a8c..` = `rand() · rand()` (`0x91dd0`: × 0x41c64e6d + 0x3039, bits
+16..30) (the port had them only from the image); the keys (`0x36a0c`); the grid places
+(`0x370bc`); the track's name to `0x12da16` (`0x12da16` = "tr5" with the rally on track 3,
+`0xe11d8`); the time again into `0x12da44` and `0x38c10` seeds the race's random numbers
+(`0xeab70`) from it; **`0x653a4` the cars**; `race_clock_rate` with TURBO (`0x12da28` & 8:
+`0x12dd0c` = 3, 42.9 steps a second); `race_main`. After it: the detail settings back into
+CONFIG.DAT (+0x81 the outside view's size `0x144cc`), `0x15d122` = `0x13c178`, the music
+faded out.
+
+**`race_setup_record` `0x36c5c`**: `0x12da0e` = +0x93 the segment, `0x12da12` = +0x95 the
+track, `0x12da20` = +0x6d the race type, `0x12dd14` = +0xb1 the laps, `0x12dd24` = +0xb3
+the race length, `0x12dd0c` = 1 the clock's rate, `0x12da28` = `0x15d12a` the codes;
+`0x12da30` = 1 the humans, `0x12dd58` = 0 the player. **`0x12da2c` the racers: 1 a time
+trial, 2 head to head, 8 a single race or tournament. Head to head, with no "No mercy"
+(`0x15d12a` & 4), on an open road (track < 3): `0x12da34` = 1 the police, `0x12da3c` = 6
+the traffic; else none.** The machine's speed (`0xec410`, `0xec414`) lowers detail on a
+slow PC (+0x7f, +0x83, +0x87). The racers' records (0x4b bytes from `0x12da48`): +2 the
+name (+0 of CONFIG.DAT), **+0xb the car: `0x36c1c` maps the menu's number (+0x9b the
+player's, +0x91 the opponent's) through the words at `0x36250`: 7 6 0 2 3 5 4 1 8 9 10 11
+..**, so the menu's 0 is the RX-7 (7) and the game's 0 the Supra; the opponent's record a
+copy of the player's with its car. `0x12dd10` = 1 (the leader waits) unless "No mercy".
+
+**The cars `0x653a4`** (`0x12dce4[n]`, the ids `car_load` reads): base 200, or 100 when
+`0x12d9d7` (+0x87, less detail) is set, for the computer's racers in races of 8 (the
+humans always 200 + their car). A single race: the opponent 8 (the mixed field) gives car
+n `0xf6df8`[n] (7 6 0 3 2 5 1 4) + base, else seven of the opponent's car. A tournament:
+by the player's car, three cars in turn (n % 3): RX-7, NSX, Supra (0, 6, 7): 0 7 6;
+Diablo, 512TR (1, 4): 4 1 4; 911, ZR1, Viper (2, 3, 5): 5 3 2. Head to head and time
+trial: car 1 = the opponent + 200; with the police (`0x12dd08` = 1, one human and
+`0x12da34`) car 2 = 400; then the traffic: each `((rnd & 0xffff00) >> 8) · 12 >> 16`
+from `0xeab70`'s numbers (`0xeab70` × `0xeab78`), drawn again while already taken.
+(Seeded with a small number, `0xeab78` small, the products stay below 2^16 and every
+draw is 0: the clock's seconds never are; the port gives up after 10,000 draws.)
+**The grid `0x370bc`** (`0x12dca0`, a racer's place): a single race, or a tournament's
+first race: 7 6 2 3 4 5 1 0; a tournament's later races by its points (`0x15d0d8`) or the
+last segment's order (`0x12c276`); else 7 6.
+
+**The loading picture `load_slide` `0x64d28`** (from `race_main` right after
+`initgraphics(640, 480, 8)`): `SIMDATA/SLIDES/<car>S<n>.QFS` (`GSLIDES` in German; the
+car's name from `0xf6e30`, i.e. the names `0xf6b10` + 200; n = `0x52580(7)` from EA's
+random numbers, drawn again while used, the used flags `0x14e602` cleared by each race
+(`race_main` passes 1)): "SCRN", 640x480 with its palette set straight (no fade), left on
+the screen while the race loads; then `0x5b984` sets the race's mode.
+
+**Ported** (`port/src/race.c`: `race_run`, `race_from_menu`, `race_test`;
+`mainmenu.c`'s Race): the race as the settings and the codes ask (track, segment, type,
+the player's car, the opponent, the field of 1, 2 or 8, the police and traffic by type,
+the grid, the cars and the far models by +0x87, the laps +0xb1, "No mercy", the mirrored
+and rally tracks, NITRO), EA's and the race's random numbers seeded from the clock first,
+the loading picture (held a second: the port loads at once), back to Control Central after
+the race (the standings and menus between: next). Seen: Control Central → Race → the
+picture → City 1 → Esc, Quit → Control Central; a single race of 8 and a tournament's
+field on CY1 and TR1 for 85 s each; time trial; TURBO's clock (2 2 3). Not yet: EXPLODE's push,
+the network's records, the detail settings back after a race (the original puts them
+back from its copy anyway).
+
 ## 5. The original in DOSBox (2026-10-19)
 
 - The game for DOSBox is a COPY of the installed game in `~/dosgames/nfs` (`NFSSE/` +

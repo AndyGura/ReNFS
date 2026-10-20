@@ -1920,7 +1920,18 @@ static int driver_set(void)
     }
 }
 
-void opponent_start(unsigned seed)
+void opponent_seed(unsigned seed)
+{
+    g_opp.mult = seed | 1;
+    g_opp.random = 3 * seed + (seed % 2 == 0);
+}
+
+unsigned opponent_random(void)
+{
+    return rnd();
+}
+
+void opponent_start(void)
 {
     int set = driver_set(), i, k;
 
@@ -1955,7 +1966,4 @@ void opponent_start(unsigned seed)
     g_opp.ticket_up = g_opp.warning_up = 0;
     if (g_race_type == 0 || (g_race_type == 1 && g_track.loop))
         CFG(0x34) = 0;
-    /* 0x38c10 */
-    g_opp.mult = seed | 1;
-    g_opp.random = 3 * seed + (seed % 2 == 0);
 }

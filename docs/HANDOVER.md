@@ -340,6 +340,18 @@ Ghidra project and `build/decomp`, one command). The git history was started aga
   `roaddraw_emu.py` call for call); the other checks still equal. Picture:
   `build/shots/walls/vs.png`.
 
+- **The race from Control Central** (NOTES §4.21, `race.c`'s `race_run`,
+  `race_from_menu`): the Race button starts the race the menu's choices ask for: the
+  track and its first segment, the race type (time trial alone; head to head with the
+  police and six of the traffic on the open roads; a single race of eight, on one model
+  or the mixed field; a tournament's class of three cars), the player's car, the
+  opponent, the laps, the codes ("No mercy", mirrored, rally, NITRO, TURBO's faster
+  clock). The car's loading picture (SIMDATA/SLIDES) first; EA's and the race's random
+  numbers seeded from the clock as the original does each race (the port had EA's only
+  from the image). After the race, back to Control Central. Seen in pictures: the whole
+  path from the title, Esc/Quit and giving up; single races and tournaments of eight on
+  CY1 and TR1 driven 85 s. `--race` now uses the saved choices too.
+
 **Progress page for Danik**: https://claude.ai/artifact/VZdxTpYC3oLXYeBVJpoDoM (every step,
 its percent done and weight). Update its steps file after each finished step.
 
@@ -369,10 +381,11 @@ races 320x200 / 320x240; commit locally as the work goes.
    timing, the camera outside and the crash's smoke, the opponent's driving, and cars
    meeting cars, the roadside objects knocked over, the traffic, the police and the
    sounds, and the race's keys, P's pause and the pause menu (NOTES §4.20; its Replay,
-   Audio and Graphics wait for their screens), Shift+End's giving up, the race's music and its speech (NOTES §4.18's end). , the circuits' sky ring, walls and 3D objects. Next:
-   the race started from Control Central with its choices (the menu's Race button into
-   `race_from_menu` `0x3770c`, the cars and track chosen, back to the menu after), then
-   the results screens and the records.
+   Audio and Graphics wait for their screens), Shift+End's giving up, the race's music and its speech (NOTES §4.18's end). , the circuits' sky ring, walls and 3D objects, the race started from Control
+   Central. Next: what `race_from_menu` `0x3770c` does after a race (NOTES §4.21): an open
+   road's three segments in a row with the checkpoint menu between (`0x1a5d8`), the
+   standings screens (`fe_standings_*`), the finish menu (`0x1b6a0`), the records written
+   back, the winner's and the police's films.
    (`0x136618`, the sections drawn: the settings' +0x85 and F3, NOTES §4.19.)
    Open: the race's sound reaches full scale at the hits and the horn (0.2 to 0.7 % of
    the samples in `build/snd_port/`): how EA's mixer sums the voices is still to compare. Model polygons of one colour (`0xaa990`) are not ported (none met so far).

@@ -3,6 +3,7 @@
 #include "race.h"
 #include "opponent.h"
 #include "camera.h"
+#include "collide.h"
 #include "car.h"
 #include "cardraw.h"
 #include "config.h"
@@ -11,9 +12,12 @@
 #include "drive.h"
 #include "hud.h"
 #include "exe.h"
+#include "fe.h"
 #include "files.h"
+#include "fsh.h"
 #include "racepal.h"
 #include "smoke.h"
+#include "menu.h"
 #include "pause.h"
 #include "racekeys.h"
 #include "racesnd.h"
@@ -34,12 +38,105 @@
 #include <string.h>
 #include <time.h>
 
-/* the race the snapshots were taken in: the 512TR against the Testarossa, a police car
-   and six of the traffic (0x12dce4) */
+/* at most: two racers, the police car and six of the traffic, or eight racers */
 #define RACE_CARS 9
-static const int race_ids[RACE_CARS] = { 204, 201, 400, 7, 5, 0, 11, 6, 4 };
-#define RACERS 2
 #define MIRROR_SECTIONS 4      /* 0x13661c */
+
+race_codes g_race_codes;
+
+/* the tracks' files (0x36290): the open roads' by their segment, cy1 .. al3 */
+static const char *const track_names[9] = { "cy", "cl", "al", "tr1", "tr2", "tr6", "tr3",
+                                            "tr7", "tr4" };
+
+/* 0x36c1c: a car as the menus number it (CONFIG.DAT +0x9b, +0x91) to the game's (the
+   names 0xf6b10: 0 the Supra .. 7 the RX-7, 8 a mixed field, 11 the Warrior) */
+static int car_number(int menu)
+{
+    const unsigned char *p = exe_at(0x36250 + 2 * (menu & 15), 2);
+    return p ? (short)(p[0] | p[1] << 8) : 0;
+}
+
+/* 0x653a4: the race's cars, by their ids (200 + the car the racers, or 100 + the car,
+   the far models, for the computer's racers when the settings' +0x87 asks for less
+   detail; 400 the police car; below 100 the traffic). A single race: seven of the
+   opponent's car, or for the mixed field (8) one each (0xf6df8); a tournament: three
+   cars by the player's class, in turn; a head to head: the opponent, the police car and
+   six of the twelve traffic cars, drawn from the random numbers (0xeab70) without
+   repeats. The count */
+static int race_car_ids(int *ids, int type, int player, int opp, int field, int chase,
+                        int traffic)
+{
+    int base = config_word(0x87) & 0xff ? 100 : 200, used[12] = { 0 }, n, i, k;
+
+    ids[0] = player + 200;
+    if (type == 2) {
+        for (i = 1; i < field; i++)
+            ids[i] = (opp == 8 ? *exe_at(0xf6df8 + i, 1) : opp) + base;
+        return field;
+    }
+    if (type == 3) {
+        static const int classes[3][3] = { { 0, 7, 6 }, { 4, 1, 4 }, { 5, 3, 2 } };
+        int c = player == 1 || player == 4 ? 1 : player == 2 || player == 3 || player == 5 ? 2 : 0;
+
+        for (i = 1; i < 8; i++)
+            ids[i] = classes[c][i % 3] + base;
+        return 8;
+    }
+    if (chase)
+        ids[2] = 400;
+    ids[1] = opp + 200;
+    n = field + chase;
+    for (i = 0; i < traffic; i++) {
+        int tries = 0;
+
+        do
+            k = (int)(opponent_random() * 12 >> 16);
+        while (used[k] && ++tries < 10000);
+        /* (a small RENFS_SEED gives only 0 for long: the clock's seconds never do) */
+        for (k = tries < 10000 ? k : 0; used[k]; k++)
+            ;
+        used[k] = 1;
+        ids[n++] = k;
+    }
+    return n;
+}
+
+/* race_timer_tick 0x4c454: the race clock's count after t ticks of the 100 Hz clock, its
+   countdown reloaded with a, a and b in turn (race_clock_rate 0x4c5f8: 3 3 3, 33.3 steps
+   a second; with TURBO, 0x12da28 & 8, setting 3: 2 2 3, 42.9 a second) */
+static int race_clock(unsigned long t)
+{
+    unsigned a = g_drive.options & 8 ? 2 : 3, per = 2 * a + 3;
+
+    return (int)(t / per * 3 + (t % per >= a) + (t % per >= 2 * a));
+}
+
+/* load_slide 0x64d28: at 640x480 the player's car in one of its seven pictures
+   (SIMDATA/SLIDES/<car>S<n>.QFS, "SCRN" with its palette, n from EA's random numbers),
+   left on the screen while the race loads */
+static void race_slide(int car)
+{
+    char path[80];
+    fsh_file f;
+    shape sh;
+    unsigned char pal[768];
+    const char *name = (const char *)exe_at((unsigned)exe_i32(0xf6b10 + 4 * (200 + car)), 1);
+    int i;
+
+    video_mode(640, 480);
+    snprintf(path, sizeof path, "SIMDATA/%s/%sS%d.QFS", g_german ? "GSLIDES" : "SLIDES", name,
+             collide_below(7));
+    if (!fsh_load(&f, path))
+        return;
+    if (fsh_find(&f, "SCRN", &sh) && fsh_palette(&f, &sh, pal)) {
+        video_palette(pal, 0, 256);
+        fe_draw_shape(&sh, 0);
+        /* (the loading in the original takes seconds: here it is shown for one) */
+        for (i = 0; i < 60 && !g_quit; i++)
+            video_retrace();
+    }
+    fsh_free(&f);
+}
 
 static int quarter(int node)
 {
@@ -160,52 +257,77 @@ static void race_step(race_car *player, race_camera *cam, int done)
     g_drive.steps = st + 2;
 }
 
-int race_test(const char *name)
+int race_run(void)
 {
     static race_car cars[RACE_CARS];
     race_car *list[RACE_CARS];
     unsigned char marks[RACE_CARS] = { 0 };
+    int ids[RACE_CARS];
     race_camera cam;
     road_window win;
     const view_window *w;
-    int i, k, eye, horizon, redline, near;
+    int i, k, eye, horizon, redline, near, ncars, type, field, chase, traffic, player, opp;
+    int grid[8] = { 7, 6, 2, 3, 4, 5, 1, 0 };
+    char name[8];
     hud_car driver;
     hud_map_state map;
-    unsigned start;
+    unsigned start, now;
     int mirror_skip = 0, redraw, in_seat = 1;
     unsigned done = 0;
-    const char *car = "F512TR";
+    const char *car;
 
-    if (!exe_load() || !track_load(name) || !trackinfo_load(name, 1, 0)
-        || !trackfam_load(name, 1, 0)) {
+    /* race_setup_record 0x36c5c: the race as the settings ask: the track (0x12da12,
+       CONFIG.DAT +0x95) and segment (0x12da0e, +0x93), the race type (0x12da20, +0x6d),
+       the racers (0x12da2c: 1 in a time trial, 2 head to head, else 8), on the open roads
+       head to head the police car and six of the traffic (0x12da34, 0x12da3c) unless "No
+       mercy" (the codes' 4), which also stops the leader waiting (0x12dd10) */
+    memset(&g_drive, 0, sizeof g_drive);
+    g_drive.state = 1;
+    g_drive.kind = config_word(CFG_TRACK);
+    if (g_drive.kind < 0 || g_drive.kind > 8)
+        g_drive.kind = 0;
+    g_drive.segment = g_drive.kind < 3 ? config_word(CFG_SEGMENT) : 0;
+    if (g_drive.segment < 0 || g_drive.segment > 2)
+        g_drive.segment = 0;
+    type = config_word(CFG_RACE_TYPE);
+    if (type < 0 || type > 3)
+        type = 1;
+    field = type == 0 ? 1 : type == 1 ? 2 : 8;
+    chase = type == 1 && !(g_cheat_flags & 4) && g_drive.kind < 3;
+    traffic = chase ? 6 : 0;
+    player = car_number(config_word(CFG_CAR));
+    opp = car_number(config_word(CFG_OPPONENT));
+    g_drive.catch_up = !(g_cheat_flags & 4);
+    g_drive.options = (int)g_cheat_flags;
+    g_drive.rally = g_race_codes.rally;
+    g_drive.nitro = g_race_codes.nitro;
+    g_road_mirror = g_race_codes.mirror;
+    /* the track's files: an open road's by its segment, Rusty Springs' rally tr5 */
+    if (g_drive.kind < 3)
+        snprintf(name, sizeof name, "%s%d", track_names[g_drive.kind], g_drive.segment + 1);
+    else
+        snprintf(name, sizeof name, "%s", g_drive.rally && g_drive.kind == 3 ? "tr5"
+                                          : track_names[g_drive.kind]);
+    /* race_run 0x37228: EA's random numbers and the race's own from the clock's
+       seconds (0x91d9b), then the cars chosen (0x653a4) and their grid places (0x370bc:
+       in a single race or a tournament's first segment 7 6 2 3 4 5 1 0) */
+    now = getenv("RENFS_SEED") ? (unsigned)strtoul(getenv("RENFS_SEED"), 0, 0) : (unsigned)time(0);
+    collide_seed(now);
+    opponent_seed(now);
+    ncars = race_car_ids(ids, type, player, opp, field, chase, traffic);
+
+    /* race_main 0x6356c: the loading picture, then the loading */
+    race_slide(player);
+    if (!track_load(name) || !trackinfo_load(name, 1, 0) || !trackfam_load(name, 1, 0)) {
         fprintf(stderr, "renfs: the track %s could not be loaded\n", name);
         return 0;
     }
-    config_load();             /* the player's settings, the records the status bar shows */
-    memset(&g_drive, 0, sizeof g_drive);
-    g_drive.state = 1;
-    {
-        /* the track (0x12da12, CONFIG.DAT +0x95) and segment (0x12da0e, +0x93) by the name
-           asked for (the circuits' files by track, 0x3629c) */
-        static const char *const tracks[9] = { "cy", "cl", "al", "tr1", "tr2", "tr6", "tr3",
-                                               "tr7", "tr4" };
-        for (i = 8; i >= 0; i--)
-            if (!strncasecmp(name, tracks[i], strlen(tracks[i])))
-                break;
-        g_drive.kind = i < 0 ? 0 : i;
-        g_drive.segment = i >= 0 && i < 3 && name[2] >= '1' && name[2] <= '3' ? name[2] - '1' : 0;
-    }
     g_model_wide = g_drive.kind == 0 && g_drive.segment == 2;
-    g_drive.catch_up = 1;      /* (0x12dd10, race_setup_record) */
-    /* the laps: an open road's one; a circuit's by the race length (+0xb3) as Control
-       Central sets them (0x437fc): 4, 8 or 16, or 2, 6 or 12 on tracks 4..7 (or
-       RENFS_LAPS for a test) */
+    /* the laps: an open road's one; a circuit's as Control Central set them (+0xb1,
+       0x12dd14) (or RENFS_LAPS for a test) */
     g_drive.laps = 1;
     if (g_track.loop) {
-        static const int laps[2][3] = { { 4, 8, 16 }, { 2, 6, 12 } };
-        int len = config_word(0xb3);
-
-        g_drive.laps = laps[g_drive.kind >= 4 && g_drive.kind <= 7][len < 0 || len > 2 ? 2 : len];
+        g_drive.laps = config_word(CFG_LAPS);
         if (getenv("RENFS_LAPS"))
             g_drive.laps = atoi(getenv("RENFS_LAPS"));
         if (g_drive.laps < 1 || g_drive.laps > DRIVE_LAPS)
@@ -218,8 +340,8 @@ int race_test(const char *name)
     snprintf(g_drive.track, sizeof g_drive.track, "%s", name);
     /* the best lap to beat: the track's lap record (load_dash 0x2e8d4) */
     g_drive.best_lap = S32(g_config, 0xd0 + g_drive.kind * 0xa6b);
-    g_drive.chase = 1;         /* (the police on in these races, 0x12dd08, 0x12da34) */
-    g_drive.police = 1;
+    g_drive.chase = chase;     /* (0x12dd08, 0x12da34) */
+    g_drive.police = chase;
     memset(&g_crash, 0, sizeof g_crash);
     if (!smoke_load(&g_crash.smoke))       /* (after cars_create 0x51388) */
         return 0;
@@ -228,14 +350,13 @@ int race_test(const char *name)
     g_view.min_z = exe_i32(0xf7938);
     g_view.far_shift = *exe_at(0xf6aa4, 1);
     g_view.max_level = exe_i32(0xeaad8);
-    g_road_mirror = 0;
 
     /* the cars and the palette, in race_main's order */
-    for (i = 0; i < RACE_CARS; i++) {
+    for (i = 0; i < ncars; i++) {
         memset(&cars[i], 0, sizeof cars[i]);
         cars[i].player = i;
-        cars[i].police = race_ids[i] >= 400;
-        if (!car_load(&cars[i], race_ids[i]))
+        cars[i].police = ids[i] >= 400;
+        if (!car_load(&cars[i], ids[i]))
             return 0;
         list[i] = &cars[i];
     }
@@ -251,19 +372,21 @@ int race_test(const char *name)
        traffic's sends each car off the road to wait (kind 6), the police car's (car 2)
        puts it behind the player's, off the race (part without 4) until it comes out
        ahead (0x79500) */
-    for (i = 1; i < RACE_CARS; i++) {
+    for (i = 1; i < ncars; i++) {
         cars[i].slot = i;
         cars[i].state = 3;
         cars[i].pos.z = 0x10000;
         cars[i].lap = 1;
-        if (i < RACERS)
+        if (i < field)
             cars[i].bits[0] |= 4;
     }
-    cars[2].bits[0] |= 8;
+    if (chase)
+        cars[field].bits[0] |= 8;
     eye = S32(cars[0].spec, 0x36c);         /* the driver's eyes above the road */
     horizon = S32(cars[0].spec, 0x370);     /* where the horizon is in the view */
     redline = S32(cars[0].spec, 0xac);      /* the engine's red line */
-    cars_queue_colours(list, RACE_CARS, marks);
+    cars_queue_colours(list, ncars, marks);
+    car = (const char *)exe_at((unsigned)exe_i32(0xf6b10 + 4 * (200 + player)), 1);
     if (!dash_load(car, cars[0].number, 0))
         return 0;
     dash_queue_colours();
@@ -271,14 +394,14 @@ int race_test(const char *name)
         return 0;
     video_mode(320, 200);
     pal_apply_pieces();
-    race_colours(marks, RACE_CARS, 0);
+    race_colours(marks, ncars, type);
     needle_colours(cars[0].number);     /* (0x8a390, in race_colours) */
     /* (race_colours 0x2e74c goes on with the dashboard's pictures, then tints its palette)
        then the cars' pictures; in these races one racer against the player with the police
        on (0x12da30 = 1, 0x12da34), the chase of 0x6577c */
     pal_remap(g_dash.file.d, g_dash.pal);
     pal_tint(0, 0x100, g_dash.pal);
-    cars_remap(list, RACE_CARS, marks, 1);
+    cars_remap(list, ncars, marks, chase);
     hud_colours();             /* 0x55abc: the HUD's colours, then the shade table */
     shade_make(0x9999);
     pal_apply_remaps();
@@ -297,29 +420,29 @@ int race_test(const char *name)
     race_keys_start();         /* (the settings' detail, 0x5ba1c's 0x1440c) */
     /* (the opponent keeps the grid's node until its first step: the road's axes it
        drives by are worked out as that step moves it to the nearest, drive_opponent) */
-    for (i = 0; i < RACERS; i++)
-        car_grid_place(&cars[i], 7 - i, RACERS, g_drive.kind);
+    for (i = 0; i < field; i++)
+        car_grid_place(&cars[i], grid[i], field, g_drive.kind);
     track_follow(&cars[0].pos, &cars[0].node);
     memset(&cam, 0, sizeof cam);
     camera_set_car(&cam, &cars[0], 0);
 
     /* the cars: the racers standing on the grid (their turn the one the grid gives,
        +0x351), the traffic and the police after them */
-    for (i = 0; i < RACE_CARS; i++) {
+    for (i = 0; i < ncars; i++) {
         cars[i].slot = i;
         cars[i].yaw_drawn = cars[i].yaw;
         g_cars[i] = &cars[i];
     }
-    g_ncars = RACE_CARS;
+    g_ncars = ncars;
     g_player = 0;
     if (getenv("RENFS_VIEW"))  /* a test: the race watched from camera mode n */
         camera_set_car(&cam, &cars[0], atoi(getenv("RENFS_VIEW")));
-    g_racers = RACERS;
-    g_race_type = 1;           /* head to head (0x36c5c from CONFIG.DAT) */
-    g_field = RACERS;
+    g_racers = field;
+    g_race_type = type;
+    g_field = field;
     g_humans = 1;
     memcpy(g_car_marks, marks, RACE_CARS);
-    for (i = 0; i < RACE_CARS; i++)
+    for (i = 0; i < ncars; i++)
         cars[i].part = 7;      /* (+0x51a: driven, their finish checked, meeting the others) */
     /* the race's timing (race_start 0x506dc): the settings' laps (CONFIG.DAT +0xb1,
        0x12dd14, as Control Central left them), the race length's times (+0xb3, 0x12dd24) */
@@ -329,10 +452,10 @@ int race_test(const char *name)
     timing_start();
     /* the computer's driving (load_traffic_cfg 0x7de84): the drivers by the grid places,
        the random numbers from the clock (0x38c10 with time(), 0x91d9b) */
-    for (i = 0; i < RACERS; i++)
-        g_opp.grid[i] = 7 - i;
-    g_opp.traffic = RACE_CARS - RACERS - 1;    /* (0x12da3c: the cars after the police) */
-    g_opp.rival_car = cars[1].number;          /* (0x12da9e) */
+    for (i = 0; i < field; i++)
+        g_opp.grid[i] = grid[i];
+    g_opp.traffic = traffic;                   /* (0x12da3c: the cars after the police) */
+    g_opp.rival_car = opp;                     /* (0x12da9e: the opponent's record) */
     /* the sounds (race_main 0x6363b, before the random numbers are seeded): the settings'
        volumes and stereo (0x12da53's record; none without a sound card, 0x529f4), the
        banks (0x52774), the engine started silent (0x52670) and heard (0x53214); voice 0
@@ -346,10 +469,9 @@ int race_test(const char *name)
     if (g_rsnd.sfx && g_rsnd.music)
         snd_hold(0, 101, g_rsnd.music);
     snd_time(clock_ticks());
-    rsnd_load(cars[0].number, cars[1].number, g_drive.kind);
+    rsnd_load(cars[0].number, opp, g_drive.kind);
     rsnd_engine_on();
-    opponent_start(getenv("RENFS_SEED") ? (unsigned)strtoul(getenv("RENFS_SEED"), 0, 0)
-                                        : (unsigned)time(0));
+    opponent_start();
     g_camera = &cam;
     g_road_paint.cars = cars_at_node;
     g_road_paint.cars_behind = cars_behind_at;
@@ -371,7 +493,7 @@ int race_test(const char *name)
     /* (kilometres an hour: the settings' 0x15d140, not read yet; miles) */
     memset(&map, 0, sizeof map);
     map.place = 1;
-    for (i = 0; i < RACERS; i++)
+    for (i = 0; i < field; i++)
         map.places[i] = (unsigned char)(i + 1);
     map.driver = 1;
     driver.steer = 0;
@@ -392,7 +514,7 @@ int race_test(const char *name)
 
         /* the race's steps: one each three ticks of the clock (the race clock's
            three-cycle, race_timer_tick 0x4c454), the player's car driven */
-        g_rkeys.race_clock = (int)((clock_ticks() - start - g_pause.held_ticks) / 3);
+        g_rkeys.race_clock = race_clock(clock_ticks() - start - g_pause.held_ticks);
         while (done < (unsigned)g_rkeys.race_clock) {
             race_step(&cars[0], &cam, done);
             done++;
@@ -464,7 +586,7 @@ int race_test(const char *name)
         g_hud.splits = g_timing.split_shown;
         g_hud.best_lap = g_drive.best_lap;
         map.node = (short)g_cars[g_drive.viewed]->node;
-        for (i = 0; i < RACERS; i++)
+        for (i = 0; i < field; i++)
             map.nodes[i] = (short)cars[i].node;
         map.place = g_timing.place_shown;   /* (the last frame's, as the map comes first) */
         memcpy(map.places, g_timing.places, sizeof map.places);
@@ -491,12 +613,55 @@ int race_test(const char *name)
     music_wait_end();
     g_road_paint.cars = g_road_paint.cars_behind = 0;
     g_ncars = 0;
-    for (i = 0; i < RACE_CARS; i++)
+    for (i = 0; i < ncars; i++)
         car_free(&cars[i]);
     hud_free();
     smoke_free();
     dash_free();
     trackfam_free();
     track_free();
-    return 1;
+    return g_pause.quit ? 2 : g_timing.result;
 }
+
+void race_from_menu(void)
+{
+    static const unsigned char black[768];
+
+    /* (0x3770c: an open road's three segments one after the other, the standings and the
+       checkpoint's menu between, the records after: still to come) */
+    race_run();
+    video_palette(black, 0, 256);
+    video_mode(640, 480);
+}
+
+int race_test(const char *name)
+{
+    int i, len;
+
+    if (!exe_load())
+        return -1;
+    config_load();             /* the player's settings, the records the status bar shows */
+    /* the track (+0x95) and segment (+0x93) by the name asked for, tr5 Rusty Springs'
+       rally; a circuit's laps by the race length (+0xb3) as Control Central sets them
+       (0x437fc): 4, 8 or 16, or 2, 6 or 12 on tracks 4..7 */
+    memset(&g_race_codes, 0, sizeof g_race_codes);
+    if (!strncasecmp(name, "tr5", 3)) {
+        i = 3;
+        g_race_codes.rally = 1;
+    } else {
+        for (i = 8; i >= 0; i--)
+            if (!strncasecmp(name, track_names[i], strlen(track_names[i])))
+                break;
+        if (i < 0) {
+            fprintf(stderr, "renfs: no track %s (cy1 .. al3, tr1 .. tr7)\n", name);
+            return -1;
+        }
+    }
+    config_set_word(CFG_TRACK, i);
+    config_set_word(CFG_SEGMENT, i < 3 && name[2] >= '1' && name[2] <= '3' ? name[2] - '1' : 0);
+    len = config_word(CFG_RACE_LENGTH);
+    len = len < 0 || len > 2 ? 2 : len;
+    config_set_word(CFG_LAPS, (i >= 4 && i <= 7 ? (int[]){ 2, 6, 12 } : (int[]){ 4, 8, 16 })[len]);
+    return race_run();
+}
+

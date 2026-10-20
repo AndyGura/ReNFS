@@ -28,6 +28,7 @@ void config_set_word(int at, int v);
 #define CFG_TCS 0x8f           /* traction control: 0 on, 1 off, 2 the car has none */
 #define CFG_OPPONENT 0x91      /* 0-7 the cars, 8 traffic (single race), 9 the clock (time
                                   trial), 10 the tournament, 11 the Warrior */
+#define CFG_SEGMENT 0x93      /* an open road's segment, 0..2 */
 #define CFG_TRACK 0x95         /* 0 city .. 7 transtropolis, 8 Lost Vegas, 9 (moon, never) */
 #define CFG_TRANSMISSION 0x97  /* 0 automatic, 1 manual */
 #define CFG_ABS 0x99           /* 0 on, 1 off, 2 the car has none */
