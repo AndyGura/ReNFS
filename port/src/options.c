@@ -3,6 +3,7 @@
    save and credits screens. Done keeps the changes, Cancel and Esc put the three
    switches back. */
 #include "options.h"
+#include "audioopt.h"
 #include "config.h"
 #include "fe.h"
 #include "files.h"
@@ -12,6 +13,7 @@
 #include "sound.h"
 #include "video.h"
 #include <stdio.h>
+#include <string.h>
 
 /* the rows, top to bottom, then the two buttons */
 enum { GEARBOX, ABS, TRACTION, AUDIO, GRAPHICS, CONTROLS, LOAD_SAVE, CREDITS, DONE, CANCEL };
@@ -195,6 +197,11 @@ int fe_options_screen(void)
                     }
                     break;
                 case AUDIO:                /* fe_audio_options 0x105dc */
+                    pal_fade_down(0, 256);
+                    fe_audio_options(AUDIO_OPTIONS);
+                    place(sel);
+                    first = redraw = 1;
+                    break;
                 case GRAPHICS:             /* fe_graphics_options 0x32d08 */
                 case CONTROLS:             /* fe_controls_setup 0x22bd0 */
                 case LOAD_SAVE:            /* fe_load_save_screen 0x3c0c8 (sets `loaded`) */
@@ -211,6 +218,7 @@ int fe_options_screen(void)
                     config_set_word(CFG_AUTO, keep_auto);
                     config_set_word(CFG_ABS, keep_abs);
                     config_set_word(CFG_TCS, keep_tcs);
+                    music_volume(config_word(CFG_MENU_VOLUME));   /* (0x721ec) */
                     done = 1;
                     break;
                 }
@@ -225,6 +233,7 @@ int fe_options_screen(void)
                 config_set_word(CFG_AUTO, keep_auto);
                 config_set_word(CFG_ABS, keep_abs);
                 config_set_word(CFG_TCS, keep_tcs);
+                music_volume(config_word(CFG_MENU_VOLUME));
                 done = 1;
             } else if (k == 0x4800) {      /* up: from the buttons to Credits, round to Done */
                 fe_mouse_hide();
@@ -263,5 +272,157 @@ int fe_options_screen(void)
     pal_fade_down(0, 256);
     fsh_free(&g_art);
     settimeout(12000);
+    return 0;
+}
+
+/* race_menu_options 0x12760: the race menus' "Game options" (CHECK/CHKOPTS.QFS), the way
+   to the audio, graphics, controls and load / save screens. Cancel and Esc put back what
+   those screens changed (CONFIG.DAT +9 .. +0xb4); the settings are saved as it ends */
+enum { R_AUDIO, R_GRAPHICS, R_CONTROLS, R_LOAD_SAVE, R_DONE, R_CANCEL };
+
+int race_menu_options(int finish)
+{
+    static const int rx[6] = { 100, 100, 100, 100, 40, 565 };   /* 0x12700, 0x1270c */
+    static const int ry[6] = { 119, 196, 271, 345, 450, 450 };
+    static const char *const lit[6] = { "audl", "gral", "conl", "loal", "donl", "canl" };
+    unsigned char pal[768], keep[0xac];
+    char path[256];
+    int sel = R_AUDIO, redraw = 1, first = 1, changed = 0, done = 0;
+    int ready = 1, released = 1, k;
+    unsigned held = 0;
+
+    (void)finish;                  /* (which load / save screen: 0x3c0c8 or 0x3d4c4) */
+    memcpy(keep, g_config + 9, sizeof keep);
+    mouse_place(rx[sel], ry[sel]);
+    snprintf(path, sizeof path, "%s/CHECK/CHKOPTS.QFS", art_dir());
+    if (!fsh_load(&g_art, path) || !fsh_palette(&g_art, 0, pal)) {
+        fprintf(stderr, "renfs: %s is missing\n", path);
+        return 0;
+    }
+    if (g_mouse_active)
+        fe_mouse_read();
+    fe_mouse_save();
+
+    while (!done) {
+        int mx, my, over = -1;
+        mouse_read(&mx, &my);
+        if (my <= 0x9b)
+            over = R_AUDIO;
+        else if (my >= 0x9d && my <= 0xe9)
+            over = R_GRAPHICS;
+        else if (my >= 0xeb && my <= 0x136)
+            over = R_CONTROLS;
+        else if (my >= 0x138 && my <= 0x1a4)
+            over = R_LOAD_SAVE;    /* (not in a network game) */
+        else if (mx <= 0x141 && my >= 0x1a6 && my <= 0x1e0)
+            over = R_DONE;
+        else if (mx >= 0x143 && my >= 0x1a6 && my <= 0x1df)
+            over = R_CANCEL;
+        if (over >= 0 && over != sel) {
+            sel = over;
+            changed = 1;
+        }
+
+        if (redraw) {
+            art("bgnd");
+            art(lit[sel]);
+            mouse_show(1);                 /* mouse_draw 0x52288 */
+            g_mouse_active = 1;
+            if (first) {
+                fe_mouse_save();
+                if (g_mouse_active)
+                    fe_mouse_read();
+                pal_fade_up(pal, 0, 256);
+                first = 0;
+            }
+            settimeout(12000);
+            redraw = changed = 0;
+        }
+        if (changed) {                     /* the old row dark, the new one lit */
+            fe_play_sound(0x47);
+            redraw = 1;
+            changed = 0;
+        }
+
+        if (!ready) {
+            held += ticksince();
+            if (held > 25)
+                ready = 1;
+        }
+        if (g_mouse_active)
+            fe_mouse_read();
+        if (!g_mouse_buttons)
+            released = 1;
+        fe_mouse_moved();
+        k = fe_read_keys();
+
+        if (k == 0x20 || k == 0x0d || (g_mouse_buttons == 1 && released)) {
+            fe_mouse_press();
+            if (ready) {
+                fe_play_sound(0x48);
+                switch (sel) {
+                case R_AUDIO:
+                    pal_fade_down(0, 256);
+                    fe_audio_options(AUDIO_RACE_MENU);
+                    if (!g_mouse_active)
+                        mouse_place(rx[sel], ry[sel]);
+                    first = redraw = 1;
+                    break;
+                case R_GRAPHICS:           /* fe_graphics_options 0x32d08(0) */
+                case R_CONTROLS:           /* fe_controls_setup 0x22bd0(1) */
+                case R_LOAD_SAVE:          /* 0x3c0c8(1) at a checkpoint, 0x3d4c4(1) after */
+                    fprintf(stderr, "renfs: that options screen is not written yet\n");
+                    break;
+                case R_DONE:
+                    done = 1;
+                    break;
+                case R_CANCEL:
+                    memcpy(g_config + 9, keep, sizeof keep);
+                    music_volume(config_word(CFG_MENU_VOLUME));   /* (0x721ec) */
+                    done = 1;
+                    break;
+                }
+            }
+            released = ready = 0;
+            held = 0;
+            ticksince();
+        } else if (k && ready) {
+            if (k == 0x1b) {               /* as Cancel */
+                fe_play_sound(0x48);
+                memcpy(g_config + 9, keep, sizeof keep);
+                music_volume(config_word(CFG_MENU_VOLUME));
+                done = 1;
+            } else if (k == 0x4800 || k == 0x5000) {
+                /* up round to Done, down round from Done to the top (from Cancel to
+                   Graphics) */
+                fe_mouse_hide();
+                sel = k == 0x4800 ? (sel == R_AUDIO ? R_DONE : sel - 1) : (sel + 1) % 5;
+                mouse_place(rx[sel], ry[sel]);
+                changed = 1;
+            } else if ((k == 0x4b00 || k == 0x4d00) && sel >= R_DONE) {
+                fe_mouse_hide();
+                sel = sel == R_DONE ? R_CANCEL : R_DONE;
+                mouse_place(rx[sel], ry[sel]);
+                changed = 1;
+            }
+            ready = 0;
+            held = 0;
+            ticksince();
+        } else if (!k)
+            ready = 1;
+
+        video_retrace();
+        if (g_quit)
+            done = 1;
+        if (!done && (timedout() || (g_mouse_buttons == 2 && released))) {
+            fe_play_sound(0x48);           /* 2 minutes, or the right button: as Done */
+            done = 1;
+        }
+    }
+    pal_fade_down(0, 256);
+    fsh_free(&g_art);
+    settimeout(12000);
+    config_save();                         /* cfg_save_config_dat 0x3a134 */
+    fe_mouse_save();
     return 0;
 }

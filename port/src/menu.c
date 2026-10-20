@@ -27,8 +27,10 @@ int fe_read_keys(void)
     static const int raw[] = { 0x2a, 0x36, 0x1d, 0x38, 0x15, 0x31, 0x24 };
     if (key_down(0x44) && key_down(0x1d))  /* Ctrl+F10: the modem game's break */
         return 0;
-    if (key_down(0x3f))                    /* F5: 0x72638, a screenshot (not here yet) */
+    if (key_down(0x3f)) {                  /* F5: 0x72638, the sound off or on again */
+        fe_sound_mute();
         return 0;
+    }
     for (size_t i = 0; i < sizeof keys / sizeof keys[0]; i++)
         if (key_down(keys[i].scan))
             return keys[i].code;
@@ -231,6 +233,25 @@ static void frame(int x0, int y0, int x1, int y1, int colour)
         g_fb[y0 * g_fb_w + x] = g_fb[y1 * g_fb_w + x] = (unsigned char)colour;
     for (int y = y0 + 1; y < y1; y++)
         g_fb[y * g_fb_w + x0] = g_fb[y * g_fb_w + x1] = (unsigned char)colour;
+}
+
+void fe_message_box(const char *text)
+{
+    unsigned char remap[256];
+    int w = text_width(&g_fe_font, text) + 20, x;
+
+    x = 320 - w / 2;
+    darken_table(remap, video_palette8(), 0x9000);
+    for (int y = 210; y < 270 && y < g_fb_h; y++)
+        for (int i = x; i < x + w; i++)
+            if (i >= 0 && i < g_fb_w)
+                g_fb[y * g_fb_w + i] = remap[g_fb[y * g_fb_w + i]];
+    frame(x + 2, 212, x + w - 3, 267, nearest_colour(0xff0000));
+    frame(x + 3, 213, x + w - 4, 266, nearest_colour(0xff0000));
+    fe_styles_init();
+    fe_style(2);
+    fe_text_centre(text, x + w / 2, 228);
+    video_retrace();
 }
 
 int fe_yes_no_dialog(const char *question)

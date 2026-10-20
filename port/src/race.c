@@ -592,6 +592,7 @@ int race_run(void)
     driver.player = 0;
     hud_redraw_due();
     /* the race's music, the loading's last (race_main 0x6356c: 0x63d88, with 0xf749a) */
+    music_level_from(-1);      /* (heard at the stream's own volume) */
     race_music_start();
     start = clock_ticks();
     /* (race_main 0x6368a, 0x639b0) the recording ready, its first step a snapshot */
@@ -760,6 +761,7 @@ int race_run(void)
     session_race_end();
     music_fade_out();
     music_wait_end();
+    music_level_from(CFG_MENU_VOLUME);
     g_road_paint.cars = g_road_paint.cars_behind = 0;
     g_ncars = 0;
     for (i = 0; i < ncars; i++)

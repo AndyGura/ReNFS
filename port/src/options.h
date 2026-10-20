@@ -5,4 +5,7 @@
 /* gearbox, ABS, traction control, and the screens behind it; 0 */
 int fe_options_screen(void);
 
+/* race_menu_options 0x12760: the race menus' options (finish: the finish menu's, whose
+   load / save screen is another); 0 */
+int race_menu_options(int finish);
 #endif

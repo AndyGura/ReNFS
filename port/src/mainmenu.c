@@ -574,6 +574,7 @@ int fe_main_menu(void)
                     fe_sound_bank_free();
                     pal_fade_down(0, 256);
                     music_wait_end();
+                    fe_sound_unmute();     /* (0x45b21: F5's silence ends) */
                     g_race_codes.mirror = g_mirror;
                     g_race_codes.rally = g_rally;
                     g_race_codes.nitro = g_nitro;

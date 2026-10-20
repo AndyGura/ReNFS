@@ -388,7 +388,7 @@ Ghidra project and `build/decomp`, one command). The git history was started aga
   race menus' Replay and Highlight reel play the race just driven and come back to the
   menu; the pause menu's Replay shows the last seconds and races on after Done, the
   time watched not counted. The attract mode plays REPLAY2, 3, 1 .. as highlights from its
-  second round, Esc skipping the films. Not yet: the audio screen's silence (`0xf748e`).
+  second round, Esc skipping the films. F5's silence ends before a replay (`0xf748e`).
   Open (older, found 2026-10-20): `tools/timing_emu.py` puts the second racer's finish
   time one lap slot earlier than the original in 7 of its 13 runs (the game code writes
   `0x14ea7c` + racer · 0x1d2 + lap · 4 on both sides: look at the check's set-up of the
@@ -425,9 +425,12 @@ races 320x200 / 320x240; commit locally as the work goes.
    sounds, and the race's keys, P's pause and the pause menu (NOTES §4.20; its Replay,
    Audio and Graphics wait for their screens), Shift+End's giving up, the race's music and its speech (NOTES §4.18's end). , the circuits' sky ring, walls and 3D objects, the race started from Control
    Central, the segments in a row, every standings page, the checkpoint and finish
-   menus, a tournament from race to race. Next: the race menus' Options (`0x12760`,
-   `0x195d8`) and Replay / Highlights (race_run in replay mode, +0xaf 1 / 2, the RPL
-   record). The dashboard's keys F7 / F8 / M / F9 and Rusty Springs' measurements on the
+   menus, a tournament from race to race, the replays. **The race menus' Game options
+   (`0x12760`) and the audio screen (`0x105dc`, from the options screen, the race menus
+   and the pause menu; F5's silence `0x72638`): done**, equal to the original's pictures
+   (NOTES §4.2). Next: the graphics screen (`0x32d08`; with it races at 640x480, +0x7f),
+   the controls screen (`0x22bd0`, `0x4c6b0` the joystick), load / save (`0x3c0c8`,
+   `0x3d4c4`, `0x3aacc`), the credits (`0x25600`). The dashboard's keys F7 / F8 / M / F9 and Rusty Springs' measurements on the
    status bar: done (NOTES §4.11). Not yet: races at 640x480 (settings +0x7f).
    (`0x136618`, the sections drawn: the settings' +0x85 and F3, NOTES §4.19.)
    Open: the race's sound reaches full scale at the hits and the horn (0.2 to 0.7 % of

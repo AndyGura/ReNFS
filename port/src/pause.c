@@ -1,7 +1,9 @@
 /* The race held (NOTES §4.20). */
 #include "pause.h"
+#include "audioopt.h"
 #include "camera.h"
 #include "cardraw.h"
+#include "config.h"
 #include "drive.h"
 #include "exe.h"
 #include "fe.h"
@@ -157,6 +159,7 @@ static void menu(void)
     fe_mouse_load();
     fe_sound_bank_load();
     music_wait_end();          /* (0x7211c, 0x72150: the race's music stopped) */
+    music_level_from(CFG_MENU_VOLUME);
     music_start("PAUSE.ASF");
     if (g_pause.track < 3)
         snprintf(path, sizeof path, "%s/CHECK/%s%d.QFS", art_dir(), names[g_pause.track],
@@ -241,6 +244,11 @@ static void menu(void)
                     done = 1;
                     break;
                 case AUDIO:                /* fe_audio_options 0x105dc(2) */
+                    pal_fade_down(0, 256);
+                    fe_audio_options(AUDIO_PAUSE);
+                    place(sel);
+                    first = redraw = 1;
+                    break;
                 case GRAPHICS:             /* fe_graphics_options 0x32d08(1) */
                     fprintf(stderr, "renfs: that screen is not written yet\n");
                     break;
@@ -300,11 +308,13 @@ static void menu(void)
     music_wait_end();
     video_mode(320, 200);
     video_palette(race_pal, 0, 256);
+    fe_sound_unmute();                     /* (0x58107: F5's silence ends here) */
     inv_build();                           /* (make_inverse_table 0x8227c) */
     hud_redraw_due();
     g_view_redraw = 1;
     if (!g_pause.quit) {
         rsnd_engine_restart();
+        music_level_from(-1);
         race_music_start();    /* (0x63d88: another one chosen) */
     }
     g_pause.pending = 0;

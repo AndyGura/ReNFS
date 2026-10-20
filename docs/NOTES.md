@@ -794,6 +794,71 @@ libraries `0x80000`..`0x94000` and `0x95000`..`0xb0000`, Watcom's runtime `0x940
   loaded. Every key acts once a quarter second (Esc included here). Leaving: fade down,
   `0x15d13e` = 1 (the main menu draws again), result 0.
 
+- **`fe_audio_options` `0x105dc(where)`** (2026-10-20; `port/src/audioopt.c`, equal to the
+  original by palette entry from all three places: only DOSBox's 158-pixel scaling strip).
+  `where` 0 the options screen, 1 the race menus' options, 2 the pause menu (mode and 3D
+  greyed: `Audm`, the mode's dark value, `3dem`, and passed over by the mouse and the
+  keys; also with a card that has no modes, `0x15d14e`, and the mode alone on card 5).
+  `OPTION/AUDIO.FSH`. Rows 0 Song (CONFIG.DAT **+0x73**: 0 none, 1 shuffle all, 2 rock,
+  3 techno, 4..15 one of the twelve; names `0x104e4` Nony Shuy Shuo Shug Ramo Toxo Scuo
+  Oveo Rouo Powo Filg Odyg Aaeg Hidg Fung Chog), 1 Race music (**+0x75**), 2 Menu music
+  (**+0x77**), 3 Sound effects (**+0x79**), 4 Speech (+0x7b, byte ^1; `Oful/Onul`, dark
+  `Ofud/Onud`), 5 Audio mode (**+0x71**: 0 16-bit stereo, 1 8-bit stereo, 2 8-bit mono;
+  `16bl 8bsl 8bil` / `..d`), 6 3D enhanced (+0x7d, byte ^1, read by nothing else in the
+  program; `Ofdl/Ondl`, `Ofdd/Ondd`), 7 Done, 8 Cancel. Labels lit `Sonl Racl Menl Soul
+  Spel Audl 3del Donl Canl`. The mouse by height: y ≤ 0x89, 0xb3, 0xde, 0x109, 0x135,
+  0x15e, 0x18d, then x ≤ 0x141 Done / ≥ 0x143 Cancel; keys put it at x 240 (Done 40,
+  Cancel 565), y 114 158 201 244 287 329 372 450 450 (`0x104c0`, `0x104d2`).
+  - The bars: a window 198 × 29 (`newwindow(0xc6, 0x1d)`) gets `Bol<n>` (lit) or
+    `Box<n>` at 0, 0, then the clip x 6..0xc8 and the red `Bor1` (186 × 17) at
+    (pos − 0xb2, 6), and is copied to (300, 0x8d / 0xb8 / 0xe3). pos = volume · 0xb8 / 0x7f
+    (from the kept volumes while F5 has the sound off); a volume = pos · 0x7f / 0xb8, pos 1
+    giving 1. A click inside x 0x131..0x1ec, y 0x93 / 0xbe / 0xe9 + 0x11 puts the bar at
+    mouse x − 0x132 (and ends F5's silence); Left / Right a step; the race music's and the
+    menus' music's are heard at once (`0x721ec`), the effects' by `0x721c0`.
+  - Over the race music's and the effects' rows the music is heard at +0x75 and served
+    by `0x71cec` (a stream started then gets +0x75), over the menus' music's at +0x77 by
+    `fe_service_music` `0x71c20` (+0x77): `0x72224` every pass. Over the effects' row
+    sound 0x4a plays again whenever it has ended (`0x72578`; its voice `0x15662c`) and is
+    stopped as the row is left (`0x72564`).
+  - Entering with a song > 3 (or from the pause menu) the menus' music fades and the race
+    music starts (`0x63d88`). Song: the music stopped (`0x7211c`, `0x72150`), +0x73 + 1 mod
+    16, the new one started 100 ticks later (`0x63d88`) unless none. The key stays live:
+    Enter or the button held goes on through the songs (each pass waits `mouse_press`'s
+    fifth of a second), as it drags the bars.
+  - Audio mode: + 1 mod 3 (0 skipped without 16 bits, `0x15d150`), the box "Changing
+    audio mode" (`0x74234`: text_width + 20 by 60 at 320 − w/2, 210, darkened by the
+    0x9000 table, two red frames, the text in red at y + 18), the music stopped, the bank
+    freed, the card set up again (`0x71db8`), the song started again, the bank loaded.
+  - Esc and Cancel put CONFIG.DAT +9..+0xb4 back (0xac bytes, taken as the screen began)
+    and the music's volume (+0x77); Done, 2 minutes or the right button keep it. At the
+    end: if the mode differs from the last one set up (Cancel put the old one back) the
+    card is set up again and the menus' music chosen again (`0x63e2c`; the pause menu's
+    `pause.asf`); from the pause menu `pause.asf` again anyway; then `0x721ec(+0x77)`.
+- **F5 in the menus** (`0x72638`, from `fe_read_keys` `0x727a0` and `0x72ac4`): +0x75,
+  +0x77, +0x79 kept in `0x15d148` / `0x15d14a` / `0x15d14c` and set to 0, every voice's
+  volume 0 (`0xf748e` = 1); again: put back and heard (the effects' voices +0x79, speech's
+  +0x79 · 3 / 2, the music +0x77). Then a third of a second's wait (`settimeout(0x21)`) and
+  the 2 minutes again. Before a race (`0x45b21`), the race menus' replays (`0x1ae60`,
+  `0x1be94`), the pause menu's end (`0x58107`), the load screens' replays and the end
+  (`0x4721e`) the three are put back without being set. (`fe_outer_loop` saves CONFIG.DAT
+  before `0x4721e`: quitting with F5's silence on saves the volumes as 0.)
+  `0x72ac4` is `0x727a0` with a screenshot key (`nfs%02d.tga`, when `0xf9474`); the audio
+  screen reads its keys with it while the race music's service is in use.
+- **`race_menu_options` `0x12760(finish)`** (CHECK/CHKOPTS.QFS; equal to the original by
+  palette entry, 0 pixels): rows 0 Audio (`0x105dc(1)`), 1 Graphics detail (`0x32d08(0)`), 2
+  Controls setup (`0x22bd0(1)`), 3 Load and save (`0x3c0c8(1)` from the checkpoint menu,
+  `0x3d4c4(1)` from the finish menu; not in a network game, `loam` drawn then), 4 Done, 5
+  Cancel; lit `audl gral conl loal donl canl`. The mouse: y 0..0x9b, 0x9d..0xe9,
+  0xeb..0x136, 0x138..0x1a4, then x ≤ 0x141 / ≥ 0x143 from 0x1a6 (the gaps keep the
+  choice); keys put it at (100, 119 196 271 345), (40, 450), (565, 450). Up: one less,
+  round to Done; Down: (sel + 1) mod 5 (Cancel → Graphics); Left / Right swap Done and
+  Cancel. After a screen the pointer is put back on the row only if the mouse is not in
+  use; the pointer drawn (`mouse_draw` `0x52288`) marks it in use (`0x156604` = 1).
+  Esc and Cancel put +9..+0xb4 back and `0x721ec(+0x77)`; the end saves CONFIG.DAT
+  (`0x3a134`). Both race menus call it (the finish menu's Options is `0x12760(1)`, not
+  the chat `0x195d8`).
+
 ### 4.3 The race
 
 ```
@@ -2924,7 +2989,7 @@ loop3 loop7 loopx; the circuits' files by track tr1 tr2 tr6 tr3 tr7 tr4, `0x3629
 palette entry: each entry one colour): continue, replay and graphics chosen, 156 pixels of
 307,200 differ in each, the mouse pointer and single pixels of DOSBox's scaling. Continue
 brings the race back where it stood (`build/shots/pause/back.png`), Quit with Yes ends it.
-Not yet: Replay, Audio and Graphics (their screens), the network's chat and messages, the
+Replay and Audio since (§4.22, §4.2). Not yet: Graphics (its screen), the network's chat and messages, the
 ticket's picture put back after the menu, the audio settings' per-player volumes
 (`0x12da67`, `0x12da6b`).
 
@@ -3087,7 +3152,7 @@ the music is the stack's, set only by Quit: Continue fades it.)
 
 **`race_menu_finish` `0x1b6a0`** (CHECK/FINMENU.QFS): rows conl repl higl gmol gmsl
 chal; up wraps 0 → 4 past the chat, down (sel + 1) % 6, the chat → 0; Esc, two minutes or
-the right button = done; Replay / Highlights +0xaf 1 / 2, Options `0x195d8`, Standings =
+the right button = done; Replay / Highlights +0xaf 1 / 2, Options `0x12760(1)` (`0x195d8` is the chat), Standings =
 the standings again as after a race not finished (0, last); the music carries on into
 Control Central; returns 1. Both race menus (and every standings page) draw everything
 again on the pass after a change (the pointer shown again).

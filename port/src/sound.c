@@ -32,6 +32,10 @@ void fe_sound_bank_free(void)
     g_bank = 0;
 }
 
+/* the last of sound 0x4a (the audio screen's test of the effects' volume, 0x15662c): kept
+   to be stopped or heard to its end */
+static int g_test_sound = -1;
+
 void fe_play_sound(int n)
 {
     static short out[2 * 65536];
@@ -48,12 +52,83 @@ void fe_play_sound(int n)
     /* the data is in the file, not in the record */
     frames = eacs_stream_block(&h, g_bank + h.data, g_bank_len - h.data, out,
                                h.samples < 65536 ? (int)h.samples : 65536);
+    if (n == 0x4a)
+        fe_test_sound_stop();
     s = audio_stream_open(h.rate, h.channels);
     if (s < 0)
         return;
     audio_stream_volume(s, config_word(CFG_SFX_VOLUME));
     audio_stream_put(s, out, frames);
-    audio_stream_release(s);
+    if (n == 0x4a)
+        g_test_sound = s;
+    else
+        audio_stream_release(s);
+}
+
+int fe_test_sound_done(void)
+{
+    return g_test_sound < 0 || audio_stream_queued(g_test_sound) == 0;
+}
+
+void fe_test_sound_stop(void)
+{
+    audio_stream_close(g_test_sound);
+    g_test_sound = -1;
+}
+
+void fe_sfx_volume(int v)
+{
+    if (g_test_sound >= 0)
+        audio_stream_volume(g_test_sound, v);
+}
+
+/* F5's silence: the three volumes kept (0x15d148, 0x15d14a, 0x15d14c) and set to 0 */
+static int g_muted;            /* 0xf748e */
+static int g_kept[3];
+static const int g_volume_at[3] = { CFG_MUSIC_VOLUME, CFG_MENU_VOLUME, CFG_SFX_VOLUME };
+
+int fe_sound_muted(void)
+{
+    return g_muted;
+}
+
+int fe_sound_kept(int at)
+{
+    for (int i = 0; i < 3; i++)
+        if (g_volume_at[i] == at)
+            return g_kept[i];
+    return 0;
+}
+
+void fe_sound_unmute(void)
+{
+    if (!g_muted)
+        return;
+    for (int i = 0; i < 3; i++)
+        config_set_word(g_volume_at[i], g_kept[i]);
+    g_muted = 0;
+}
+
+void fe_sound_mute(void)
+{
+    if (g_muted) {
+        fe_sound_unmute();
+        fe_sfx_volume(config_word(CFG_SFX_VOLUME));
+        music_volume(config_word(CFG_MENU_VOLUME));
+    } else {
+        for (int i = 0; i < 3; i++) {
+            g_kept[i] = config_word(g_volume_at[i]);
+            config_set_word(g_volume_at[i], 0);
+        }
+        fe_sfx_volume(0);
+        music_volume(0);
+        g_muted = 1;
+    }
+    /* a third of a second for the key to be let go */
+    settimeout(0x21);
+    while (!timedout() && !g_quit)
+        video_retrace();
+    settimeout(12000);
 }
 
 /* the music */
@@ -64,6 +139,16 @@ static struct {
     int has_header, stream, fading, volume;
     unsigned fade_start;
 } g_music = { .stream = -1, .volume = 127 };
+
+/* the volume a stream starts at, as the service that starts it sets it: the menus'
+   (fe_service_music 0x71c20, +0x77), the race music's (0x71cec, +0x75), or -1 the
+   stream's own (127) */
+static int g_music_level = CFG_MENU_VOLUME;
+
+void music_level_from(int at)
+{
+    g_music_level = at;
+}
 
 static unsigned long g_music_counter;  /* 0xed0fc */
 
@@ -126,6 +211,8 @@ static void music_service(void)
         if (n < 0)
             break;
         if (g_music.stream < 0 && g_music.has_header) {
+            if (g_music_level >= 0)
+                g_music.volume = config_word(g_music_level);
             g_music.stream = audio_stream_open(g_music.h.rate, g_music.h.channels);
             audio_stream_volume(g_music.stream, g_music.volume);
         }
@@ -267,6 +354,11 @@ void speech_stop(void)
 {
     audio_stream_close(g_speech);
     g_speech = -1;
+}
+
+void music_stop_now(void)
+{
+    music_stop();
 }
 
 void music_fade_out(void)

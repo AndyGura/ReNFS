@@ -12,6 +12,7 @@
 #include "fsh.h"
 #include "mainmenu.h"
 #include "menu.h"
+#include "options.h"
 #include "sound.h"
 #include "standings.h"
 #include "video.h"
@@ -68,8 +69,7 @@ static void replay_from_menu(int sel)
     memset(g_config + 0x3b, 0, 0x20);
     memcpy(g_config + 0x3b, "REPLAY.RPL", 10);
     config_set_word(0xaf, sel == REPLAY ? 1 : 2);
-    /* (0xf748e: the volumes put back when the audio screen's F5 has silenced the menus:
-       not yet) */
+    fe_sound_unmute();         /* (0xf748e: F5's silence ends) */
     race_run();
     {
         /* what the original keeps lies in 0x15cb68 .. 0x15d11e; the rest is the
@@ -180,7 +180,10 @@ int race_menu_checkpoint(void)
                     first = redraw = 1;
                     break;
                 case OPTIONS:              /* 0x12760: the game's options (chkopts.qfs) */
-                    fprintf(stderr, "renfs: that screen is not written yet\n");
+                    pal_fade_down(0, 256);
+                    race_menu_options(0);
+                    place(sel);
+                    first = redraw = 1;
                     break;
                 case STANDINGS:
                     /* the segment's standings again (a race's and a tournament's, the
@@ -318,8 +321,11 @@ int race_menu_finish(void)
                     place(sel);
                     first = redraw = 1;
                     break;
-                case OPTIONS:              /* 0x195d8: the game's options: not yet */
-                    fprintf(stderr, "renfs: that screen is not written yet\n");
+                case OPTIONS:              /* 0x12760(1): the game's options */
+                    pal_fade_down(0, 256);
+                    race_menu_options(1);
+                    place(sel);
+                    first = redraw = 1;
                     break;
                 case STANDINGS:
                     /* the standings again, as after a race not finished */

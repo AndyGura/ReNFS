@@ -176,6 +176,9 @@ the session (`0x1add8`), the pause menu's keeps the clocks and races on after Do
 the attract mode plays REPLAY1..3 from its second round (`0x34284`).
 Menus: held keys, letters blended per pixel, an inverse colour table after every fade up
 (NOTES §4.2).
+The race menus' Game options `0x12760`; the audio screen `0x105dc(where)` (+0x73 song, +0x75
+race music, +0x77 menu music, +0x79 effects, +0x7b speech, +0x71 the card's mode, +0x7d 3D);
+the menus' F5 silences all (`0x72638`, kept in `0x15d148..`, `0xf748e`).
 
 ## File formats (details in `docs/NOTES.md`, "Formats")
 
@@ -241,10 +244,10 @@ Sound: SDL's device at 44.1 kHz 16-bit stereo, each stream converted by an
 queued), the pictures timed by the sound heard, as the original with sound on.
 `src/files.c` (case-insensitive paths), `unpack.c` (all of EA's packers on the CD),
 `fsh.c`, `video.c` (screen, clock, keys), `audio.c`, `eacs.c` (EA sound blocks), `tgv.c`
-and `movie.c` (the movies), `fe.c` (front end screens), `mainmenu.c` (Control Central), `options.c` (the options screen), `menu.c` (what the menus share:
+and `movie.c` (the movies), `fe.c` (front end screens), `mainmenu.c` (Control Central), `options.c` (the options screen, the race menus' Game options), `menu.c` (what the menus share:
 keys, mouse, text styles, the yes/no dialog), `font.c` (FFN, letters blended pixel by
 pixel, `nearest_colour`, the inverse table), `sound.c` (the front end's sound bank and
-music, the race's music `0x63d88` and speech `0x722b4`), `config.c` (CONFIG.DAT; the built-in defaults, equal byte for byte,
+music, the race's music `0x63d88` and speech `0x722b4`), `audioopt.c` (the audio screen), `config.c` (CONFIG.DAT; the built-in defaults, equal byte for byte,
 `tools/config_emu.py`), `main.c`.
 The race so far: `raster.c` (the quad and triangle painters), `poly.c` (projection, quad cutting),
 `road.c` (the frame's points, into the view; the mirror's five sections behind), `roaddraw.c` (the road painted far to near,

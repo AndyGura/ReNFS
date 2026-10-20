@@ -12,6 +12,7 @@
 #define RATE 44100
 
 static SDL_AudioDeviceID g_dev;
+static int g_bits8, g_mono;    /* the audio screen's mode (CONFIG.DAT +0x71) */
 static FILE *g_wav;            /* RENFS_SNDWAV: what is heard, written to a file */
 static unsigned long g_wav_bytes;
 
@@ -125,9 +126,15 @@ static void mix(void *unused, Uint8 *out, int len)
         }
     }
     voices_mix(acc, frames);
+    if (g_mono)                    /* one channel: both sides heard alike */
+        for (int i = 0; i < frames; i++)
+            acc[2 * i] = acc[2 * i + 1] = (acc[2 * i] + acc[2 * i + 1]) / 2;
     for (int i = 0; i < frames * 2; i++) {
         int v = acc[i];
-        ((short *)out)[i] = (short)(v > 32767 ? 32767 : v < -32768 ? -32768 : v);
+        v = v > 32767 ? 32767 : v < -32768 ? -32768 : v;
+        if (g_bits8)               /* an 8-bit card: the top 8 bits only */
+            v &= ~0xff;
+        ((short *)out)[i] = (short)v;
     }
     if (len > frames * 4)
         memset(out + frames * 4, 0, len - frames * 4);
@@ -155,6 +162,16 @@ int audio_init(void)
         wav_header();
     SDL_PauseAudioDevice(g_dev, 0);
     return 1;
+}
+
+void audio_mode(int mode)
+{
+    if (g_dev)
+        SDL_LockAudioDevice(g_dev);
+    g_bits8 = mode == 1 || mode == 2;
+    g_mono = mode == 2;
+    if (g_dev)
+        SDL_UnlockAudioDevice(g_dev);
 }
 
 void audio_done(void)

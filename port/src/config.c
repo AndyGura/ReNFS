@@ -2,6 +2,7 @@
    bytes the game keeps); until there is one, the game's built-in settings and records, as
    an installed copy of the original starts (the CD's CONFIG.DAT is never read). */
 #include "config.h"
+#include "audio.h"
 #include "exe.h"
 #include "files.h"
 #include <stdio.h>
@@ -143,7 +144,7 @@ static void config_defaults(void)
     config_set_word(0x5ea0, 9);
 }
 
-int config_load(void)
+static int config_find(void)
 {
     char path[1024];
     if (getenv("RENFS_CONFIG") && config_read(getenv("RENFS_CONFIG")))
@@ -153,6 +154,13 @@ int config_load(void)
         return 1;
     config_defaults();
     return 0;
+}
+
+int config_load(void)
+{
+    int found = config_find();
+    audio_mode(config_word(CFG_AUDIO_MODE));   /* the card as the audio screen left it */
+    return found;
 }
 
 int config_word(int at)

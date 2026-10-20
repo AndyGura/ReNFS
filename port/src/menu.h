@@ -49,6 +49,9 @@ void fe_text(const char *s, int x, int y);
 void fe_button_text(const char *s, int x, int y);
 void fe_text_centre(const char *s, int x, int y);
 
+/* 0x74234: a line in red in a darkened box with two red frames, centred, at y 210 (the
+   box text_width + 20 by 60), left on the screen */
+void fe_message_box(const char *text);
 /* fe_yes_no_dialog 0x73b04: the question in a box over the screen; 1 yes */
 int fe_yes_no_dialog(const char *question);
 /* "Exit to system ?" (German "Zurück zum system ?") */

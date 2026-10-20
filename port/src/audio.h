@@ -4,6 +4,9 @@
 
 int audio_init(void);          /* 0: no sound (none asked for, or no device) */
 void audio_done(void);
+/* the card's mode, as the audio screen sets it (CONFIG.DAT +0x71): 0 16-bit stereo, 1
+   8-bit stereo, 2 8-bit mono */
+void audio_mode(int mode);
 
 /* a stream at its own rate (1 or 2 channels, 16-bit): -1 if none is free */
 int audio_stream_open(int rate, int channels);
