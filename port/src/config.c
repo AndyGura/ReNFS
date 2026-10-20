@@ -2,6 +2,7 @@
    bytes the game keeps); until there is one, the game's built-in settings and records, as
    an installed copy of the original starts (the CD's CONFIG.DAT is never read). */
 #include "config.h"
+#include "joystick.h"
 #include "audio.h"
 #include "exe.h"
 #include "files.h"
@@ -159,6 +160,18 @@ static int config_find(void)
 int config_load(void)
 {
     int found = config_find();
+    /* (0x39d08) without a joystick, a control left on it goes back to the keys */
+    if (!g_joy.on) {
+        static const int ctl[3][3] = { { 0x5f36, 0x4b00, 0x4d00 }, { 0x5f3a, 0x41, 0x5a },
+                                       { 0x5f38, 0x4800, 0x5000 } };
+        static const int keys[3] = { 0x5f3c, 0x5f44, 0x5f40 };
+        for (int i = 0; i < 3; i++)
+            if (config_word(ctl[i][0]) > 0 && config_word(ctl[i][0]) < 4) {
+                config_set_word(ctl[i][0], 0);
+                config_set_word(keys[i], ctl[i][1]);
+                config_set_word(keys[i] + 2, ctl[i][2]);
+            }
+    }
     audio_mode(config_word(CFG_AUDIO_MODE));   /* the card as the audio screen left it */
     return found;
 }

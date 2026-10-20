@@ -16,6 +16,8 @@
 #include "files.h"
 #include "unpack.h"
 #include "video.h"
+#include "joystick.h"
+#include "timing.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -172,27 +174,92 @@ void drive_keys_from_config(void)
     g_drive.map_key = drive_key_scan(config_word(0x5f4e) & 0xffff);
 }
 
+/* 0x47b78: the mouse across (kept in 0..256 by 0..64) as the steering, 0..0x3c with 0x20
+   from 0x1e to 0x21, while the player's own car is watched and races (else straight on,
+   the buttons as last read) */
+static int g_mouse_btn;                    /* 0x12d9e8 */
+
+static int mouse_steer(int mirrored)
+{
+    int x, s;
+
+    if (g_drive.viewed != g_player || g_timing.stopped)
+        return 0x20;
+    mouse_relative(1);                     /* (the port: its movement, not its place) */
+    mouse_limits(0, 0, 256, 64);
+    g_mouse_btn = mouse_read(&x, 0);
+    s = x >> 2;
+    if (mirrored)
+        s = 0x40 - s;
+    return s > 0x1d && s < 0x22 ? 0x20 : s > 0x3c ? 0x3c : s < 0 ? 0 : s;
+}
+
 unsigned drive_keyboard(int mirrored)
 {
-    int left = key_down(g_drive.keys[0]), right = key_down(g_drive.keys[1]);
+    int p = g_player, sk = g_drive.steer_kind[p], pk = g_drive.pedal_kind[p];
+    int gk = g_drive.gear_kind[p], held, mouse = 0;
     unsigned steer = 0x20, pedal = 0x1e, b = 0;
 
-    if (left != right)
-        steer = left != !mirrored ? 0x3c : 0;
-    if (key_down(g_drive.keys[2]))
-        pedal = 5;
-    if (key_down(g_drive.keys[3]))
-        pedal = 0x3c;
-    if (key_down(g_drive.keys[4]))
-        b = 1;
-    else if (key_down(g_drive.keys[5]))
-        b = 2;
+    joy_race_read();                       /* 0x4e0b8 */
+    held = g_joy.held;
+    if (sk == 0) {
+        int left = key_down(g_drive.keys[0]), right = key_down(g_drive.keys[1]);
+        if (left != right)
+            steer = left != !mirrored ? 0x3c : 0;
+    } else if (sk == 1) {
+        int v = g_joy.steer;
+        if (mirrored && (v == 0x1f || v == -0x20))
+            v = ++g_joy.steer;
+        steer = (unsigned)(mirrored ? 0x20 - v : v + 0x20);
+    } else {
+        steer = (unsigned)mouse_steer(mirrored);
+        mouse = 1;
+    }
+    if (pk == 0) {
+        if (key_down(g_drive.keys[2]))
+            pedal = 5;
+        if (key_down(g_drive.keys[3]))
+            pedal = 0x3c;
+    } else if (pk == 1)
+        pedal = (unsigned)(g_joy.pedal + 0x1e);
+    else if (pk == 3) {
+        if (held & 1)
+            pedal = 5;
+        if (held & 2)
+            pedal = 0x3c;
+    } else {
+        if (!mouse)
+            mouse_steer(mirrored);
+        mouse = 1;
+        if (g_mouse_btn == 1)
+            pedal = 5;
+        if (g_mouse_btn == 2)
+            pedal = 0x3c;
+    }
+    if (gk == 0) {
+        if (key_down(g_drive.keys[4]))
+            b = 1;
+        else if (key_down(g_drive.keys[5]))
+            b = 2;
+    } else if (gk == 3) {
+        if (held & 1)
+            b = 1;
+        else if (held & 2)
+            b = 2;
+    } else {
+        if (!mouse)
+            mouse_steer(mirrored);
+        if (g_mouse_btn == 1)
+            b |= 1;
+        else if (g_mouse_btn == 2)
+            b |= 2;
+    }
     if (key_down(0x30) && key_down(0x13) && key_down(0x11) && g_cars[g_player]
         && g_cars[g_player]->gearbox)
         b |= 3;
-    if (key_down(g_drive.keys[6]))
+    if (key_down(g_drive.keys[6]) || (g_joy.on && (held & 8)))
         b |= 8;
-    if (key_down(g_drive.keys[7]))
+    if (key_down(g_drive.keys[7]) || (g_joy.on && pk != 3 && gk != 3 && (held & 1)))
         b |= 4;
     return b << 12 | pedal << 6 | steer;
 }

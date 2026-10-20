@@ -28,8 +28,13 @@ typedef struct {
     int laps;                  /* 0x13c160 */
     int last_node;             /* 0x13c164: an open road's finish */
     unsigned controls[DRIVE_PLAYERS];  /* 0x12d954: each player's control word */
-    int steer_kind[DRIVE_PLAYERS];     /* 0x12d974 (+12 a player): 0 keys, else a slope */
-    int pedal_kind[DRIVE_PLAYERS];     /* 0x12d978: 1 the joystick's pedals */
+    int steer_kind[DRIVE_PLAYERS];     /* 0x12d974 (+12 a player): 0 keys, 1 the
+                                          joystick, 2 the mouse (a slope, not full lock) */
+    int pedal_kind[DRIVE_PLAYERS];     /* 0x12d978: 0 keys, 1 the joystick's pedals (by
+                                          how far), 2 the mouse's buttons, 3 the
+                                          joystick's buttons */
+    int gear_kind[DRIVE_PLAYERS];      /* 0x12d97c: 0 keys, 2 the mouse's buttons, 3 the
+                                          joystick's */
     int nitro;                 /* 0x12cca0: the NITRO code typed */
     int revving[DRIVE_PLAYERS];/* 0x12ccac: held at full revs (the start) */
     int gave_up[DRIVE_PLAYERS];/* 0x12a150: Shift+End: no more racing, the controls
@@ -90,9 +95,11 @@ void drive_keys_from_config(void);
 /* key_scan_code 0x36758 + key_scancode 0x91d60: a key as the controls screen keeps it
    (its character, or an extended key's code << 8) made a PC scan code, 0 if none */
 int drive_key_scan(int code);
-/* 0x48bec: the keyboard's control word for the player: steering full or none (the keys
-   swapped on a mirrored track), the pedals all or nothing, the gear keys, the handbrake,
-   the horn; B, R and W together with the automatic both gear keys */
+/* 0x48bec: the control word for the player from the keys, the joystick (0x4e0b8) or the
+   mouse (0x47b78), as the controls' kinds ask: steering full or none from the keys (the
+   keys swapped on a mirrored track) or by how far, the pedals all or nothing or by how
+   far, the gears, the handbrake, the horn (the joystick's buttons 4 and 1 too); B, R and
+   W together with the automatic both gear keys */
 unsigned drive_keyboard(int mirrored);
 
 /* every second step (flag 4): the control word applied (0x10400) */

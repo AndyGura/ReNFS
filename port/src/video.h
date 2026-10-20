@@ -50,10 +50,18 @@ int mouse_read(int *x, int *y);
 void mouse_limits(int x0, int y0, int x1, int y1);
 /* mouse_set 0x71ad4: the mouse put there */
 void mouse_place(int x, int y);
+/* the mouse driven by its movement (on: a race steered with it), not its place */
+void mouse_relative(int on);
 /* the pointer's picture (palette numbers, 255 see-through), drawn over the screen at
    the mouse while shown */
 void mouse_pointer(const unsigned char *pixels, int w, int h);
 void mouse_show(int on);
+
+/* the joystick as the PC's game port gave it (EA's 0x94fa8): the four axes' counts
+   (0..511: the stick's middle 256; the third axis a brake pedal, the fourth a throttle,
+   at rest 511, pressed 0; 0 an axis it lacks), the buttons held (1, 2, 4, 8); returns
+   the axes it has (bits 0..3), 0 without a joystick */
+int joy_device(int count[4], int *buttons);
 
 /* called at every retrace (the music is fed from it) */
 extern void (*g_retrace_hook)(void);

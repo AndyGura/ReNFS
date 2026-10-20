@@ -1,5 +1,6 @@
 /* The race's keys beside the driving (NOTES §4.19). */
 #include "racekeys.h"
+#include "joystick.h"
 #include "camera.h"
 #include "cardraw.h"
 #include "config.h"
@@ -78,8 +79,8 @@ void race_keys(race_camera *cam)
     static const int drawn[3] = { 0x1c, 0xe, 9 };
     int n;
 
-    if (!key_down(g_rkeys.view_key)) {
-        /* (or the joystick's view button, 0x12f1d8 and 0x12f274 & 4: no joystick yet) */
+    if (!key_down(g_rkeys.view_key) && !(g_joy.on && (g_joy.held & 4))) {
+        /* (the view key, or the joystick's third button) */
         if (!key_down(K_ALT) || !key_down(K_CTRL))
             g_rkeys.view_up = 1;
         else

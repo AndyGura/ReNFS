@@ -155,6 +155,7 @@ static void menu(void)
     /* the settings as before the race (0x565c1), with the detail as the keys left it
        (0x56b48); the race's palette kept, its sounds stopped, the screen faded down and
        640x480 */
+    mouse_relative(0);                     /* (a mouse steering: the pointer back) */
     memcpy(g_config + 9, g_session.kept, sizeof g_session.kept);
     race_keys_to_config();
     video_get_palette(race_pal, 0, 256);

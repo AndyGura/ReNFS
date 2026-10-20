@@ -2,6 +2,7 @@
 #include "menu.h"
 #include "files.h"
 #include "fsh.h"
+#include "joystick.h"
 #include "sound.h"
 #include "video.h"
 #include <stdio.h>
@@ -40,8 +41,10 @@ int fe_read_keys(void)
     for (size_t i = 0; i < sizeof raw / sizeof raw[0]; i++)
         if (key_down(raw[i]))
             return raw[i];
-    /* Tab: nothing; else the joystick's buttons (0x4dfe0): to come */
-    return 0;
+    /* Tab: nothing; else the joystick's buttons, else its direction (0x4dfe0) */
+    if (key_down(0x0f))
+        return 0;
+    return joy_menu_key();
 }
 
 void fe_flush_keys(void)
@@ -463,7 +466,9 @@ int fe_text_field(char *text, int maxlen, int cx, int y, int names)
     /* the mouse buttons are read once before the loop, after they were let go: a click
        in it does nothing (the original's code would take left as Enter, right as Esc) */
     while (result < 0 && !g_quit) {
-        int k = key_get();
+        int j = joy_menu_key(), k = key_get();
+        if (!k && (j == 0x20 || j == 0x0d))
+            k = 0x0d;                      /* (a joystick's button, 0x70426) */
         if (k == 0x0d) {
             int i = 0;
             while (i < len && buf[i] == ' ')

@@ -6,6 +6,7 @@
    it all, Cancel and Esc put the controls back. From the options screen and the race
    menus' options. */
 #include "ctrlopt.h"
+#include "joystick.h"
 #include "config.h"
 #include "exe.h"
 #include "fe.h"
@@ -35,9 +36,10 @@ enum { STEERING, PEDALS, SHIFT, CAMERA, HANDBRAKE, HORN, CALIBRATE, DONE, CANCEL
 #define C_HORN 0x5f4c
 #define CONTROLS_SIZE 26       /* to the map's key +0x5f4e */
 
-/* a joystick (0x12f1d8, 0x12f1c0: calibrated, the last row) and the mouse (0xec408) to
-   drive with: the port reads neither in a race yet */
-static const int g_joystick = 0, g_mouse_driving = 0;
+/* the kinds a joystick offers once calibrated (0x12f1d8; the Calibrate row with one
+   found, 0x12f1c0), the mouse's with a mouse (0xec408: the port always has one) */
+#define g_joystick g_joy.on
+static const int g_mouse_driving = 1;
 
 /* the mouse put on a row by the keys (0x229c0, 0x229d2) */
 static const int row_x[9] = { 200, 200, 200, 200, 200, 200, 200, 50, 565 };
@@ -397,7 +399,7 @@ int fe_controls_setup(int race_menu)
             over = HANDBRAKE;
         else if (my >= 300 && my <= 0x14e)
             over = HORN;
-        else if (g_joystick && my >= 0x152 && my <= 0x18b)
+        else if (g_joy.present && my >= 0x152 && my <= 0x18b)
             over = CALIBRATE;
         else if (mx <= 0x140 && my >= 0x195 && my <= 0x1e0)
             over = DONE;
@@ -468,7 +470,19 @@ int fe_controls_setup(int race_menu)
                         redraw = 1;
                     }
                     break;
-                case CALIBRATE:            /* fe_joystick_calibrate 0x4c6b0: no joystick */
+                case CALIBRATE:            /* fe_joystick_calibrate 0x4c6b0 (0x25145) */
+                    pal_fade_down(0, 256);
+                    fe_joystick_calibrate(1, race_menu);
+                    if (!g_mouse_active)
+                        place(sel);
+                    /* the screen cleared (0x72600) and the palette set: the first pass
+                       fades up the cleared screen (the rows changed, the screen not
+                       shown), the next shows it */
+                    memset(g_fb, 0, (size_t)g_fb_w * g_fb_h);
+                    video_palette(black, 0, 256);
+                    pal_fade_up(pal, 0, 256);
+                    fe_styles_init();
+                    redraw = changed = 1;
                     break;
                 case CANCEL:
                     memcpy(g_config + CONTROLS, keep, sizeof keep);
@@ -494,7 +508,7 @@ int fe_controls_setup(int race_menu)
             } else if (k == 0x4800) {      /* up: from Cancel as from Done, round to Done */
                 fe_mouse_hide();
                 sel = (sel == CANCEL ? DONE : sel) - 1;
-                if (!g_joystick && sel == CALIBRATE)
+                if (!g_joy.present && sel == CALIBRATE)
                     sel = HORN;
                 if (sel < 0)
                     sel = DONE;
@@ -503,7 +517,7 @@ int fe_controls_setup(int race_menu)
             } else if (k == 0x5000) {      /* down: from the buttons to the top */
                 fe_mouse_hide();
                 sel = sel == CANCEL ? STEERING : (sel + 1) % 8;
-                if (!g_joystick && sel == CALIBRATE)
+                if (!g_joy.present && sel == CALIBRATE)
                     sel = DONE;
                 place(sel);
                 changed = 1;

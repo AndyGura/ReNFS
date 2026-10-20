@@ -1,5 +1,6 @@
 /* ReNFS: The Need for Speed Special Edition (1996), written again from its DOS program.
    main 0x4716c -> startup 0x42054 -> fe_outer_loop 0x47000 (NOTES §4.1). */
+#include "joystick.h"
 #include "audio.h"
 #include "collide.h"
 #include "exe.h"
@@ -79,6 +80,8 @@ int main(int argc, char **argv)
     if (!shot && !getenv("RENFS_NOSOUND"))
         audio_init();
     srand(shot ? 1 : (unsigned)time(0));   /* pictures without a window: the same each time */
+    if (race || replay)
+        joy_startup();         /* (fe_outer_loop's, for the tests straight into a race) */
     if (race)
         race_test(race);
     else if (replay)

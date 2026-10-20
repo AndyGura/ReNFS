@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "replay.h"
+#include "joystick.h"
 #include "camera.h"
 #include "cardraw.h"
 #include "config.h"
@@ -1286,7 +1287,7 @@ static int held_key(void)
     for (i = 0; i < 8; i++)
         if (key_down(scan[i]))
             return code[i];
-    return 0;
+    return joy_menu_key();                 /* (0x4dfe0: the joystick's) */
 }
 
 /* 0x5e4ec: the buttons by the mouse (moved or pressed; the play button's look kept up

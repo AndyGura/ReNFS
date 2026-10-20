@@ -53,7 +53,7 @@ SIG = IMG[SIG_AT:SIG_AT + 64]
 env = dict(os.environ, DISPLAY=":77", NFS_DOS_FLATPAK="--nosocket=wayland --socket=x11 "
            "--env=DISPLAY=:77 --env=SDL_AUDIODRIVER=dummy --env=SDL_VIDEODRIVER=x11")
 env.pop("WAYLAND_DISPLAY", None)
-proc = subprocess.Popen([os.path.expanduser("~/.local/bin/nfs-dos")], env=env,
+proc = subprocess.Popen([os.environ.get("NFS_DOS_LAUNCHER", os.path.expanduser("~/.local/bin/nfs-dos"))], env=env,
                         stdout=open(out + ".log", "w"), stderr=subprocess.STDOUT)
 d = display.Display(":77")
 code = lambda n: d.keysym_to_keycode(XK.string_to_keysym(n))

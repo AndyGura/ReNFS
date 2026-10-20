@@ -4,6 +4,8 @@
    from the window (0x9d8d0 with the records 0xf79a4, 0xf79cc, 0xf7a50), cut to the
    window's clip. */
 #include "hud.h"
+#include "joystick.h"
+#include "cardraw.h"
 #include "config.h"
 #include "dash.h"
 #include "drive.h"
@@ -1147,9 +1149,11 @@ static void hud_keys(void)
             status_bar();
             g_keys_up = 0;
         }
-    } else if (key_down(g_drive.map_key)) {    /* M: the settings' +0x5f4e (or the
-                                              joystick's map button, 0x12f1d8: no
-                                              joystick yet) */
+    } else if (key_down(g_drive.map_key)   /* M: the settings' +0x5f4e, or the
+                                              joystick's second button when the pedals
+                                              and gears are not on its buttons */
+               || (g_joy.on && g_drive.pedal_kind[g_player] != 3
+                   && g_drive.gear_kind[g_player] != 3 && (g_joy.held & 2))) {
         if (g_keys_up) {
             g_hud.map = 1 - g_hud.map;
             if (!g_hud.map) {

@@ -242,7 +242,8 @@ static void race_step(race_car *player, race_camera *cam, int done)
 {
     int st = g_drive.steps, i;
     /* (0x48bec) given up: straight on, no pedals, the handbrake */
-    unsigned w = g_drive.gave_up[g_player] ? 0x87a0 : drive_keyboard(g_road_mirror);
+    unsigned w = g_drive.gave_up[g_player] ? 0x87a0
+               : g_drive.state == 1 ? drive_keyboard(g_road_mirror) : 0;
 
     g_drive.flags = (st & 1 ? 0 : 1) | (st & 3 ? 0 : 4) | (st & 7 ? 0 : 0x10);
     /* (the keyboard read for the recording: played back, the controls are the ring's) */
@@ -443,6 +444,7 @@ int race_run(void)
     /* (race_run) the controls' kinds from the entry: a replay's those it was driven with */
     g_drive.steer_kind[0] = rec_get(REC_ENTRY + ENT_STEER);
     g_drive.pedal_kind[0] = rec_get(REC_ENTRY + ENT_PEDALS);
+    g_drive.gear_kind[0] = rec_get(REC_ENTRY + ENT_PEDALS + 4);
     /* the computer's cars (car_setup 0x51200; their size the PDN's or the model's,
        0x512e8, as car_load left it): driven by the computer (kind 3), a metre along
        until their first step: the opponent's puts it on the road from the grid, the
@@ -749,6 +751,7 @@ int race_run(void)
 
     mouse_show(0);             /* (the replay's pointer: the films and menus after show
                                   their own) */
+    mouse_relative(0);         /* (a mouse steering: the pointer back) */
     replay_end();              /* (0x5de88: REPLAY.RPL, not after a replay) */
     rsnd_free();               /* (0x52a70) */
     /* race_run 0x37228 after race_main: the detail settings as the keys left them back

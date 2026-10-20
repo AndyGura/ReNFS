@@ -1,5 +1,6 @@
 /* The front end. */
 #include "fe.h"
+#include "joystick.h"
 #include "session.h"
 #include "mainmenu.h"
 #include "font.h"
@@ -304,6 +305,7 @@ void fe_outer_loop(void)
 {
     int state = 2, again = 1, first = 1;
     fe_font_load();                        /* 0x42250, at start-up */
+    joy_startup();                         /* 0x4d1fc: a joystick, calibrated */
     do {
         if (again) {
             music_fade_out();
