@@ -229,9 +229,7 @@ Ghidra project and `build/decomp`, one command). The git history was started aga
   (`build/shots/smoke560.ppm`).
   Not yet: the gear gate (`0x2e4f0`, map off), the
   HUD's keys (`0x2f644`), the map at 640x480, the replay's buttons (`0x5c5d0`), the doubled BAMF lists (detail),
-  one-colour polygons (`0xaa990`), the police lights, the circuits' sky ring (`0x4ace8`),
-  the roadside walls (`0x59294`, other tracks than the cities), 3D roadside models
-  (`0x66738`), the cameras from the car ahead and the police car (modes 6, 7), the dust
+  one-colour polygons (`0xaa990`), the police lights, the cameras from the car ahead and the police car (modes 6, 7), the dust
   (`smo1`.., `dir1`..), the traffic's driving, the race's setup from
   the front end.
 
@@ -330,6 +328,18 @@ Ghidra project and `build/decomp`, one command). The git history was started aga
   equal. Pictures: `build/shots/keys/` (keys.png, cams.png, watch.png); F5 heard in
   `build/snd_port/race_f5.wav` (silent from 14 to 17 s).
 
+- **The circuits drawn whole** (NOTES §4.7): the sky ring round a circuit (`0x4ace8`,
+  set up by `0x4a64c`: seven panels of the horizon picture ahead, tilted with the car, the
+  sky's and ground's colours above and below; F4 too), the roadside walls (`0x59294`:
+  raised from the road's edge, textured by the track's tiles) and the 3D roadside objects
+  (`0x66738`: the family's models, e.g. Rusty Springs' gantries and towers, turned,
+  sorted with the rest of the road and painted). `--race` takes the track's number from
+  its name, so the grid, records, laps, map and sounds are the track's own. **Equal**
+  pixel for pixel on six Rusty Springs snapshots (t1..t6, new, the way to make them in
+  NOTES §5) and the city's (`tools/sky_emu.py`, `tools/roadpic_emu.py --walls --models`,
+  `roaddraw_emu.py` call for call); the other checks still equal. Picture:
+  `build/shots/walls/vs.png`.
+
 **Progress page for Danik**: https://claude.ai/artifact/VZdxTpYC3oLXYeBVJpoDoM (every step,
 its percent done and weight). Update its steps file after each finished step.
 
@@ -359,16 +369,13 @@ races 320x200 / 320x240; commit locally as the work goes.
    timing, the camera outside and the crash's smoke, the opponent's driving, and cars
    meeting cars, the roadside objects knocked over, the traffic, the police and the
    sounds, and the race's keys, P's pause and the pause menu (NOTES §4.20; its Replay,
-   Audio and Graphics wait for their screens), Shift+End's giving up, the race's music and its speech (NOTES §4.18's end). Next:
-   what the race still draws wrong or not at all: the roadside walls `0x59294` and the
-   circuits' sky ring `0x4ace8` (`--race tr1` shows the circuits now), the 3D roadside
-   objects `0x66738`; then the race started from Control Central with its choices, then
+   Audio and Graphics wait for their screens), Shift+End's giving up, the race's music and its speech (NOTES §4.18's end). , the circuits' sky ring, walls and 3D objects. Next:
+   the race started from Control Central with its choices (the menu's Race button into
+   `race_from_menu` `0x3770c`, the cars and track chosen, back to the menu after), then
    the results screens and the records.
    (`0x136618`, the sections drawn: the settings' +0x85 and F3, NOTES §4.19.)
    Open: the race's sound reaches full scale at the hits and the horn (0.2 to 0.7 % of
-   the samples in `build/snd_port/`): how EA's mixer sums the voices is still to compare. The walls `0x59294`
-   and the circuits' sky ring `0x4ace8` can be checked on CY1 memory with made-up input,
-   or on snapshots of another track (`tools/nfsdos.py`).
+   the samples in `build/snd_port/`): how EA's mixer sums the voices is still to compare. Model polygons of one colour (`0xaa990`) are not ported (none met so far).
 4. Front end (menus, car and track choice), then the race (track, cars, physics, HUD,
    sound), then the rest (replays, championship/tournament, cops, the showcase).
 5. MiSTer (`~/MiSTer-ReNFS`): the skill's steps 5–8 — `MISTER_HYBRID`, `mister_port.[ch]`,
