@@ -19,6 +19,12 @@ __attribute__((constructor)) static void test_camera_set(void)
         g_camera = &test_camera;
 }
 
+/* the replay's highlights, left out on the original's side too */
+void replay_mark(int event)
+{
+    (void)event;
+}
+
 #define I(o, f) { o, offsetof(race_car, f), 4 }
 #define V(o, f) I(o, f.x), I(o + 4, f.y), I(o + 8, f.z)
 #define B(o, f) { o, offsetof(race_car, f), 1 }

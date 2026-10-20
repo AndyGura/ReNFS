@@ -115,8 +115,7 @@ void camera_check(race_camera *cam, const race_car *watched)
     camera_set_mode(cam, mode);
 }
 
-/* 0x50428: the police in a chase, from just ahead of the player's car to 12 nodes behind */
-static int police_close(void)
+int camera_police_close(int lo, int hi)
 {
     const race_car *p = g_cars[2];
     int d;
@@ -124,18 +123,29 @@ static int police_close(void)
     if (!g_drive.chase || !((p->bits[1] & 0x24) || (p->bits[2] & 4)))
         return 0;
     d = g_cars[g_player]->node - p->node;
-    return d > -1 && d <= 12;
+    return d > lo && d <= hi;
 }
 
-/* 0x50478: the other racer (not a traffic car) from 10 nodes ahead to 12 behind */
-static int rival_close(void)
+int camera_rival_close(int lo, int hi)
 {
     int d;
 
     if (g_opp.rival_car == 9)
         return 0;
     d = g_cars[g_player]->node - g_cars[1 - g_player]->node;
-    return d > -10 && d <= 12;
+    return d > lo && d <= hi;
+}
+
+/* the view key's: the police from just ahead of the player's car to 12 nodes behind, the
+   other racer from 10 nodes ahead */
+static int police_close(void)
+{
+    return camera_police_close(-1, 12);
+}
+
+static int rival_close(void)
+{
+    return camera_rival_close(-10, 12);
 }
 
 int g_cam_look_first = -1;

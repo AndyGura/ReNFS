@@ -19,6 +19,9 @@ The plan is a comma-separated list of steps:
     mem:<a>:<n>:<f>     n bytes (hex count) at the flat address a (hex) in the data object
     poke:<a>:<hex>      the bytes (hex digits, as in memory) written at the flat address a
                         (hex) in the data object: a test's state put into the game
+    follow:<s>:<n>      for <s> seconds, each time the step counter 0x145c94 passes another
+                        50: the counter, the race state 0xf6b74 and car n's road node and
+                        speed (a replay's course, compared with the port's)
     car:<n>             car n's record (through the pointers at 0x13c24c): position +0 +4 +8
                         (16.16), road node +0x48, across the road +0x80, speed +0x70
     snap:<f>            the game paused and its whole memory (32 MB, by the game's own
@@ -122,6 +125,22 @@ def car(n):
         rd(0x70) / 65536))
 
 
+def follow(secs, n):
+    if base is None:
+        find()
+    t0 = time.time()
+    last = None
+    while time.time() - t0 < secs:
+        c = i32(0x145C94)
+        if last is None or c // 50 != last // 50:
+            p = i32(0x13C24C + 4 * n)
+            if p:
+                rd = lambda o: struct.unpack("<i", dos(p + o, 4))[0]
+                print("count %6d state %d node %4d speed %8d" % (c, i32(0xF6B74), rd(0x48), rd(0x70)))
+            last = c
+        time.sleep(0.002)
+
+
 def watch(secs):
     if base is None:
         find()
@@ -179,6 +198,8 @@ try:
             watch(float(p[1]))
         elif p[0] == "peek":
             peek(float(p[1]), p[2])
+        elif p[0] == "follow":
+            follow(float(p[1]), int(p[2]))
         elif p[0] == "car":
             car(int(p[1]))
         elif p[0] == "dump":

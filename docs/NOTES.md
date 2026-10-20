@@ -3174,6 +3174,115 @@ into the game at the circuit's page (seen after Laps → back), `mem:` reads the
 `RENFS_SESSION` puts the same bytes into the port as its standings begin. (Shift+End does
 not end a circuit race: the car stops; quit from the pause menu instead.)
 
+### 4.22 The replay (2026-10-20; playing back equal to the original)
+
+A replay drives the race again from its controls (§3.15). The state `0xf6b74`: 1 racing,
+2 playing back, 3 running fast to a point (`0x145538`) before showing it, 4 held (the
+bar's buttons waiting); `0x145c94` the step counter (2 a step), `0x144ba4` = it mod
+28,800 (the ring), `0x143edc` the counter at the last step recorded.
+
+**Recording** (`race_update_cars` `0x519d8` first calls `0x5efb0` when the state is not
+0): every second step (flag 4) `0x144ba4` set, and racing `replay_record_step` `0x5d888`:
+`controls_read` (the keyboard's word for the player: the port reads it every step), the
+first 120 counts every racer's word `0x7a0`; every 450 calls (`0x143ee8`, 27 s, at
+`0x144ba4` a multiple of 1800) a snapshot s = `0x144ba4` / 1800: the fallen objects'
+bytes copied (`0x5f18c`: byte 1 = byte 0, 2 a TRI object at `0xea5d8`), into the 0xa2
+bytes at `0x143eec + s · 0xa2`: the orders `0x13c298` (+0) and `0x13c274` (+0x24) a word
+a car, +0x50 the cars kept (other than racers), +0x54 `0x129fac`, +0x58 `0xf74a8`,
++0x5c.. the two zones `0x15d29c` (12 bytes each: +2 of `0x15d29a`, `0x15d2a0`, `0x15d2a4`),
++0x74 `0x15d4b8`, +0x78 `0xf7770`, +0x7c `0xeab70` (EA's random), +0x80 `0xf7510`, +0x84
+`0x15d154`, +0x88 `0x15d158`, +0x8c `0x15d480`, +0x90 `0x13c21c`, +0x98 byte `0xeab6c`,
++0x99 byte `0x15d468`, +0x9a `0x14e794`, +0x9e `0x14e798`; then the controls, then each
+car `replay_record_car` `0x5d0e4` (a racer, slot < `0x12da30`: 0x1a4 bytes at `+0x7080 +
+s·0x1a4 + slot·0x1a40`; the others 0x172 bytes at `+0xa500 + s·0xb90 + j·0x172`, j
+counting them) and `0x5d2e4(0x144ba4, -1)` (the snapshot put back at once, as a check of
+what it keeps). Otherwise the controls only (`0x5cac4`: low byte at k·7200 + t, high at
+14,400 + k·7200 + t, t = `0x144ba4` / 4).
+- **A car's snapshot** (`0x5cbd0`, back `0x5cd2c`): +0 car +0x50e (the routine of the
+  table `0x13c1e0`, 0 none), +4 +0x512, +8 +0x516 << 24 | +0x51a << 8, +0xc..+0x2c car
+  +0..+0x20, +0x30 the turn +0x24 (9), +0x54 +0x48, +0x58 +0x50, +0x5c +0x54 .. +0x68
+  (4), +0x74 +0x70 .. +0x84 (6), +0x8c +0x8c .. +0xb8 (12 words), +0xbc +0x174, +0xc0
+  +0xbc, +0xc4 the body (0x94 bytes at the pointer +0xc0), +0x158 +0x15c, +0x15c +0x158,
+  +0x160 +0x33c, +0x164 +0x4f2. Back: also +0x405 = +0x409 = 0 and +0x4c = (lap − 1) ·
+  `0x13bb8c` · 4 + node. A racer's adds (`0x5d0e4`): +0x168..+0x16a bytes +0x3b1, +0x3b5,
+  +0x3b9; +0x16b +0x3bd + 100; +0x16c +0x3c5 << 16 | +0x3c1; +0x170 +0x3c9, +0x174 +0x3cd,
+  +0x178 +0x3d1, +0x17c +0x6c, +0x180 +0x40d, +0x184 byte +0x3e9, +0x185 +0x3ed + 2, +0x186
+  bits +0x3fd (1), +0x3f9 (2), +0x3f5 (4), +0x3f1 (8), +0x426 & 2 (0x20); +0x188 +0x401,
+  +0x18c +0x3d5, +0x190 +0x3d9, +0x194 +0x3dd, +0x198 +0x3e1, +0x19c +0x3e5, +0x1a0 +0x4a2;
+  back also +0x425 = 0, `0xf7768` = `0xf776c` = −1. The others' adds: +0x168 +0x160,
+  +0x16c +0x164, +0x170 byte +0x3fd, +0x171 byte +0x340.
+- **Highlights**: `replay_mark_highlight` `0x5c6d4(event)` racing only: slot `0x144ba4`
+  / 60 of `0x144da8` (480 words: the counter / 60 << 8 | event + 0x80), the greatest
+  event of each slot kept; 11 callers (`0x1cb9e`, `0x1e534`, `0x1e560`, `0x38a8f`,
+  `0x40576`, `0x41704`, `0x4173b`, `0x41764`, `0x419e1`, `0x77f59`, `0x7b921`).
+  `0x5c768` makes the list `0x144ba8` (start, end, event; `0x144d88` of them): 30 times
+  the greatest slot above 0x80 (and not before the ring's start) taken, sorted by time,
+  start (slot − 2) · 60, end (slot + 5) · 60, both down to a multiple of 4, overlapping
+  ones joined (the greater event kept); none → one from 0 to the end, event 200.
+- **The file** `replay_file` `0x5c3b0` at the race's end (`replay_end` `0x5de88`, not
+  when `0x13c17c` is 0x20 or 0x40: a replay's end): §3.15's five blocks.
+
+**Playing back.** `race_run`: CONFIG +0xaf (`0x156cc3`) 0 racing (`0x5e4c4(0)`), 1 the
+replay → `0x14554c` = 4, 2 the highlights → 5, 3 (the attract mode) → 8, and
+`replay_settings` `0x5c340` reads the file's race record (no file: `0x14554c` = 6, the
+race ends at once with 0x20). `0x5e948` each step: 4 → `replay_load` `0x5c4a4`, then mode
+3; 5 or 8 (8: `0x1455f8` = 1, the attract mode's) → load, mode 2; modes 1..3 →
+`0x5e118`: 1 the pause menu's (back 600 counts, 9 s), 3 the whole (back 27,000), both to
+a multiple of 4 by `0x5d690(counter, 0x143edc)`; 2 the highlights (`0x5c768`, the first
+one by `0x5d690(start, end)`). Mode 7 (Done): with `0x145554` (a replay from the menus:
+modes 4, 5, 8 set it) the race ends (0x20; 0x40 the attract mode's), else `0x5e020`: run
+fast to the last step recorded − 8 and race on (state `0xf6b78` = 1 after).
+- **`0x5d690(to, end)`**: `0x145534` = end (at most `0x143edc`); to a snapshot's count
+  (a multiple of 1800): put back there (state 2); else from the snapshot below, state 3
+  until `0x145538` = to. Racing before: the clocks kept (`0x144b94` race clock, `0x144b98`
+  / `0x144b9c` steps done / due). Then the flags from the counter, the smoke cleared
+  (`0x64588`), `0x2d2e4`, the sounds (`0x65094`, `0x133d4`).
+- **`0x5d2e4(count, k)`** puts snapshot count / 1800 back: k ≥ 0 the counter from
+  `0x144d98`[k]; the fallen objects (`0x5f1e0` byte 0 = byte 1, `0x5f138(s)`: fallen at
+  or after s → 0), the 0xa2 bytes, every car's +0x4ea = +0x4ee = 0, the racers (`0x145540`
+  = 1 when k ≥ 0) then the others; the camera's car again (modes 6, 7 the opponent's view
+  `0x50428`, `0x50478`).
+- **Each step played** (`0x5ee14`, state 2): speed `0xf6b7c` 0 with `0xf6b80` < 1 (held):
+  only the flags; else below `0x145534` `0x5dc54` (a snapshot's count: put back; the
+  controls from the ring `0x5cb58`; when `0x14553c`, the camera's car, the director
+  `0x5dac4` for highlights); at the end (`0x145534` = `0x143edc`, no highlights): racing
+  on (state `0xf6b78`) with the clocks kept, or else back to `0x144d98` and on; with
+  highlights the next one (`0x5ec04`; after the last, again from the first, or the attract
+  mode's end).
+- **The bar** (`0x5e4ec`): buttons 1..8 (rectangles at `0x145618`..): Done (mode 7), |<
+  (1), << (3), >> (4), >| (2), play (6: the speeds `0xf6b58`[1..3] in turn), pause (7: 5),
+  camera (8: 10); the mouse, left/right keys `0x4b00`/`0x4d00` move, Space/Return press.
+  `0x5decc(button, held)`: |< to `0x143edc` − 27,900, >| to − 300, << and >> by held / 16
+  · 4 (4 at first), state 4; `0x5e308` the speeds: 6 full (`0xf6b7c` 4), 7 (3, wait 2),
+  8 (2, 4), 9 (1, 8), 5 pause.
+- **Cameras** (`0x5dac4`, highlights): the event decides: two racers near → 6 or 7 (the
+  opponent's views), events 0xd6..0xf7 with a random 10 ≥ 8 → 2, 0xdb..0xe3 → random 5,
+  else random 4 + 1.
+- **The controls' kinds go with the replay** (found 2026-10-20): race_run copies the
+  entry's +0x33 / +0x37 / +0x3b into `0x12d974` / `0x12d978` / `0x12d97c` (the template's
+  from `0x36a0c`: CONFIG.DAT +0x5f36 steering 0 keys, 1..3 → 1, else 2; +0x5f38 and
+  +0x5f3a pedals 0, 3 → 3, 1..2 → 1, else 2). `0x10400` steers with `car_steer_2` when
+  `0x12d974` ≠ 0 and uses `car_pedals_2` when `0x12d978` = 1. **The CD's four replays were
+  driven with a joystick's steering** (+0x33 = 1, +0x37 = 3): with the keys' routines
+  the port drifted from count ~350 (a few hundred units of speed, then off the road).
+  The original's own recordings here: +0x33 = 0.
+- **Checked** (`RENFS_REPLAYCHECK=1`: each snapshot reached by playing on is compared
+  instead of put back; every byte of each car's snapshot but the body's +0x48..+0x5f,
+  the human's +0x187 (nothing writes them) and the others' +0x171 (not in the port);
+  the 0xa2 bytes but +0x90..+0x99 (+0x99 the long chases, counted only while racing)):
+  **the CD's REPLAY, REPLAY1, REPLAY2, REPLAY3 and a replay the original recorded here
+  (cy1) are equal at every snapshot to their ends**, all cars. The original's attract
+  mode on REPLAY2 (`nfsdos.py follow:`) reaches node 212 at count 1804, as the port.
+- **The highlight marks** (`replay_mark_highlight` `0x5c6d4`, racing only; the slot
+  pos / 60 keeps its first event of that time): `0x1cb14` a crash begins 0x5c;
+  `0x1e314` two cars hit, by the table `0xea5dc`[hard·8 + a player·4 + car 1·2 + car 2]
+  (soft only with both above 16 m/s along the road); `0x38808` landing after more than 10
+  steps in the air 0x54; `0x40230` a wall hit faster than 20 m/s across 0x32; `0x408e0`
+  (every 2nd step) sliding sideways faster than half the speed 0x57, a tyre skidding with
+  a slide at over 20 m/s 0x28, the first move 0x78, the rear sliding while turning
+  faster than 0x320000 0x57; `0x77ef4` a change of places 0x50; `0x7b34c` a police car
+  spinning out near a player 0x52.
+
 ## 5. The original in DOSBox (2026-10-19)
 
 - The game for DOSBox is a COPY of the installed game in `~/dosgames/nfs` (`NFSSE/` +

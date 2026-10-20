@@ -3,6 +3,7 @@
    either round towards zero (the compiler's signed division: / here) or down (sar:
    >> here), each as the machine code does. */
 #include "drive.h"
+#include "replay.h"
 #include "hud.h"
 #include "sound.h"
 #include "cardraw.h"
@@ -1034,6 +1035,8 @@ static void road_edges(race_car *c)
                 rsnd_where(g_cars[g_drive.viewed], &angle, &dist);
             rsnd_hit(2, 9, v * 20, dist, angle);
         }
+        if (!kind && v > 0x140000)
+            replay_mark(0x32);
         if (v < 0x180000)
             across = across > 0x20000 ? 0x20000 : across < -0x20000 ? -0x20000 : across;
         else
@@ -1404,13 +1407,26 @@ static void physics(race_car *c)
     road_edges(c);
     if (g_player == c->player)
         node_kind(c);
-    if ((g_drive.flags & 4) && g_drive.state == 1 && !g_drive.first_move
-        && iabs(c->speed) > 0xccc)
-        g_drive.first_move = g_drive.steps + 1;
+    if ((g_drive.flags & 4) && g_drive.state == 1) {
+        /* the replay's highlights (0x5c6d4): sliding sideways, the tyres skidding fast,
+           the start */
+        if (iabs(c->side_speed) > iabs(c->speed / 2) && c->side_speed > 0x8000)
+            replay_mark(0x57);
+        if ((c->slide_front || c->slide_rear) && c->speed_abs > 0x140000
+            && ((c->tyres[1] & 1) || (c->tyres[0] & 1)))
+            replay_mark(0x28);
+        if (!g_drive.first_move && iabs(c->speed) > 0xccc) {
+            replay_mark(0x78);
+            g_drive.first_move = g_drive.steps + 1;
+        }
+    }
     if (c->player < DRIVE_RESULTS && iabs(c->speed) > g_drive.top_speed[c->player])
         g_drive.top_speed[c->player] = iabs(c->speed);
     if (g_race_type == 0 && g_drive.kind == 3)
         rusty_springs_test(c);
+    /* (a highlight: spinning with the rear sliding) */
+    if (c->tyres[1] && iabs(c->yaw_rate) > 0x320000)
+        replay_mark(0x57);
     if (c->roll_phase > 1)
         c->roll_phase -= 2;
     if (c->pitch_phase > 0)
@@ -1489,6 +1505,8 @@ void drive_on_road(race_car *c, int place)
         if (c->air_steps > 10) {
             /* a long jump's landing: laid flat on the road, the view shaken */
             int s;
+
+            replay_mark(0x54);
 
             c->air_steps = -2;
             c->pitch = pitch;

@@ -18,6 +18,7 @@ typedef struct {
     unsigned char *placements;         /* 16 bytes each, to an i32 -1 (0x13bb94) */
     int nplacements;                   /* 0x1365dc */
     unsigned char *fallen;             /* 2 bytes a placement, 0: standing (0xea5d8) */
+    int nfallen;                       /* how many (the TRI's +0x16218) */
     unsigned char *slices;             /* "TrackSlices" (0x136604) */
     int loop;                          /* a circuit (0x13bb80) */
     unsigned sec_mask, node_mask;      /* 0x13bb90, 0x13bb88: -1 on an open road */

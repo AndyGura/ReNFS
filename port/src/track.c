@@ -72,7 +72,8 @@ int track_load(const char *name)
     for (t->nplacements = 0; t->nplacements < 1000 &&
          rd32(t->placements + t->nplacements * 16) != -1; t->nplacements++)
         ;
-    t->fallen = calloc((size_t)rd32(f + 0x16218) + 1, 2);   /* (0x1c630) */
+    t->nfallen = rd32(f + 0x16218);
+    t->fallen = calloc((size_t)t->nfallen + 1, 2);   /* (0x1c630) */
     if (!t->fallen) {
         track_free();
         return 0;

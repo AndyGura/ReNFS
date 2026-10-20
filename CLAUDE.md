@@ -167,6 +167,11 @@ the results and ranks, `fe_standings_segment` `0x6a9d0`, `race_menu_checkpoint` 
 final/tournament standings `0x6f070` (points `0x689f8`), a circuit's `0x6cb24` with its laps `0x6e1ac`
 (lap record `0x69438`; Rusty Springs' time trial measures the car, `0x417a2`); after a race the
 menus get six colours back (`0x31bf4`).
+The replay (NOTES §4.22): the race record `0x12da0c` (`race_setup_record` `0x36c5c`), recording
+`0x5d888` (controls every 2nd step, snapshots every 1800 counts), REPLAY.RPL `0x5c3b0`/`0x5c4a4`,
+playing `0x5efb0`→`0x5e948`/`0x5ee14`/`0x5dc54`, jumps `0x5d690`, highlights `0x5c768` from the
+marks `0x5c6d4`, the bar `0x5e4ec`/`0x5fcf0`; the controls' kinds (+0x33/+0x37 → `0x12d974`) go
+with the file (the CD's were driven with a joystick).
 Menus: held keys, letters blended per pixel, an inverse colour table after every fade up
 (NOTES §4.2).
 
@@ -226,6 +231,7 @@ once; for `--shot` tests);
 `RENFS_LAPS=n`: n laps of a circuit in `--race` (else the settings' race length, as Control Central `0x437fc`: 8 on TR1 by default);
 `RENFS_CONFIG=f`: a CONFIG.DAT for the test (the original's, `nfsdos.py mem:156c14:5f52:f`).
 `RENFS_SEED=n`: the race's random numbers seeded with n (else the time, as the original).
+`RENFS_REPLAYCHECK=1`: a replay played from the start compared with each of its snapshots instead of put back (2: every word that differs).
 `RENFS_SESSION=f`: the original's results (`nfsdos.py mem:` of `0x15cb68`, `0x12a150`, `0x14fae0`)
 put in as the standings begin (comparing the pages; `nfsdos.py poke:` writes test numbers in).
 Sound: SDL's device at 44.1 kHz 16-bit stereo, each stream converted by an
@@ -269,6 +275,8 @@ checkpoint and finish menus, the winner's and the police's films),
 `pause.c` (P's hold `0x63110`, the check `0x63304`, the pause menu `0x56474` with its map; NOTES §4.20), `racekeys.c` (`race_keys` `0x47c88`: C the camera `camera_next` `0x1494c`, Alt+Ctrl+1..8
 the car watched, F1..F6 view size, pixels, road distance, sky, sound, markers, Shift+End giving up `0x1f0b4`; the view
 key equal, `tools/camera_emu.py`; NOTES §4.19),
+`replay.c` (the race record, recording, REPLAY.RPL, playing back, the highlights; equal to the
+CD's four replays at every snapshot, `RENFS_REPLAYCHECK=1`; `--replay <file> [highlights]`),
 `collide.c` (cars meeting cars: `0x1c878`'s loop, the boxes pushed apart `0x2b864`/`0x26324`,
 the hit `0x2afb8`, EA's random numbers `0x91e04`; equal, `tools/collide_emu.py`, NOTES §4.14;
 the roadside objects knocked over `0x1ebf4`, NOTES §4.15),

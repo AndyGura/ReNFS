@@ -1,6 +1,7 @@
 /* A race (NOTES §4.3, §4.7): the loading of race_main 0x6356c and the frame of
    race_draw_frame 0x5bc40, as far as the port has them. */
 #include "race.h"
+#include "replay.h"
 #include "opponent.h"
 #include "camera.h"
 #include "collide.h"
@@ -54,12 +55,6 @@ static const char *const track_names[9] = { "cy", "cl", "al", "tr1", "tr2", "tr6
 
 /* 0x36c1c: a car as the menus number it (CONFIG.DAT +0x9b, +0x91) to the game's (the
    names 0xf6b10: 0 the Supra .. 7 the RX-7, 8 a mixed field, 11 the Warrior) */
-static int car_number(int menu)
-{
-    const unsigned char *p = exe_at(0x36250 + 2 * (menu & 15), 2);
-    return p ? (short)(p[0] | p[1] << 8) : 0;
-}
-
 /* 0x653a4: the race's cars, by their ids (200 + the car the racers, or 100 + the car,
    the far models, for the computer's racers when the settings' +0x87 asks for less
    detail; 400 the police car; below 100 the traffic). A single race: seven of the
@@ -223,10 +218,13 @@ static void race_step(race_car *player, race_camera *cam, int done)
     unsigned w = g_drive.gave_up[g_player] ? 0x87a0 : drive_keyboard(g_road_mirror);
 
     g_drive.flags = (st & 1 ? 0 : 1) | (st & 3 ? 0 : 4) | (st & 7 ? 0 : 0x10);
-    g_drive.revving[g_player] = (w & 0x3000) == 0x3000;
-    if (g_drive.revving[g_player])
-        w &= 0xcfff;
-    g_drive.controls[g_player] = w;
+    /* (the keyboard read for the recording: played back, the controls are the ring's) */
+    if (g_drive.state == 1) {
+        g_drive.revving[g_player] = (w & 0x3000) == 0x3000;
+        if (g_drive.revving[g_player])
+            w &= 0xcfff;
+        g_drive.controls[g_player] = w;
+    }
     /* NITRO's keys: N with a shift or B */
     g_drive.nitro_keys = key_down(0x31) && (key_down(0x2a) || key_down(0x36) || key_down(0x30));
     g_drive.clock = (int)clock_ticks();
@@ -235,6 +233,23 @@ static void race_step(race_car *player, race_camera *cam, int done)
     race_keys(cam);
     race_throw(player, st);
     race_place(player, st);
+    /* race_update_cars 0x519d8: the replay first (once the race has begun), then the
+       first 120 counts nothing pressed; while playing held or running back the cars only
+       kept where they are drawn */
+    replay_step();
+    if (g_drive.steps < 0x78)
+        for (i = 0; i < g_humans; i++)
+            g_drive.controls[i] = 0x7a0;
+    if (g_drive.state == 4 || (g_drive.state == 2 && g_replay.speed == 0 && g_replay.hold < 1)) {
+        for (i = 0; i < g_ncars; i++) {
+            race_car *c = g_cars[i];
+
+            c->draw_node = c->mirror_node = c->node;
+            c->yaw_drawn = c->yaw;
+        }
+        return;
+    }
+    st = g_drive.steps;        /* (where the replay put the race) */
     if (g_drive.flags & 4)
         drive_controls(player);
     /* (race_update_cars 0x519d8) the finish, the driving, the cars sorted round the
@@ -258,6 +273,8 @@ static void race_step(race_car *player, race_camera *cam, int done)
        end freed first, as the mixer frees them) */
     snd_time(clock_ticks());
     rsnd_step();
+    if (g_replay.hold > 0)
+        g_replay.hold--;
     g_drive.steps = st + 2;
 }
 
@@ -287,35 +304,61 @@ int race_run(void)
        mercy" (the codes' 4), which also stops the leader waiting (0x12dd10) */
     memset(&g_drive, 0, sizeof g_drive);
     g_drive.state = 1;
-    g_drive.kind = config_word(CFG_TRACK);
+    replay_setup_record();
+    /* (0x5e4b8, 0x5e4c4) a race, or a replay (CONFIG.DAT +0xaf: 1 the whole of
+       REPLAY.RPL, 2 its highlights, 3 the attract mode's): the race record from the file
+       (0x5c340), the rest of it read at the first step */
+    g_replay.from_menu = 0;
+    g_replay.mode = 0;
+    g_replay.end = 0;
+    if (config_word(0xaf)) {
+        g_replay.mode = config_word(0xaf) == 1 ? 4 : config_word(0xaf) == 2 ? 5 : 8;
+        g_replay.from_menu = 1;
+        if (!replay_settings())
+            return 0x20;
+    }
+    g_drive.kind = rec_get(REC_TRACK);
     if (g_drive.kind < 0 || g_drive.kind > 8)
         g_drive.kind = 0;
-    g_drive.segment = g_drive.kind < 3 ? config_word(CFG_SEGMENT) : 0;
+    g_drive.segment = g_drive.kind < 3 ? rec_get(REC_SEGMENT) : 0;
     if (g_drive.segment < 0 || g_drive.segment > 2)
         g_drive.segment = 0;
-    type = config_word(CFG_RACE_TYPE);
+    type = rec_get(REC_TYPE);
     if (type < 0 || type > 3)
         type = 1;
-    field = type == 0 ? 1 : type == 1 ? 2 : 8;
-    chase = type == 1 && !(g_cheat_flags & 4) && g_drive.kind < 3;
-    traffic = chase ? 6 : 0;
-    player = car_number(config_word(CFG_CAR));
-    opp = car_number(config_word(CFG_OPPONENT));
-    g_drive.catch_up = !(g_cheat_flags & 4);
-    g_drive.options = (int)g_cheat_flags;
-    g_drive.rally = g_race_codes.rally;
+    field = rec_get(REC_RACERS);
+    if (field != 1 && field != 2 && field != 8)
+        field = type == 0 ? 1 : type == 1 ? 2 : 8;
+    chase = rec_get(REC_POLICE) != 0;
+    traffic = rec_get(REC_TRAFFIC);
+    if (traffic < 0 || traffic > 6)
+        traffic = 0;
+    player = rec_get(REC_ENTRY + ENT_CAR);
+    opp = rec_get(REC_ENTRY + REC_ENTRY_SIZE + ENT_CAR);
+    g_drive.catch_up = rec_get(REC_CATCH_UP);
+    g_drive.options = rec_get(REC_FLAGS);
+    if (!g_replay.mode) {
+        rec_put(REC_RALLY, g_race_codes.rally);
+        rec_put(REC_MIRROR, g_race_codes.mirror);
+    }
+    g_drive.rally = rec_get(REC_RALLY);
     g_drive.nitro = g_race_codes.nitro;
-    g_road_mirror = g_race_codes.mirror;
+    g_road_mirror = rec_get(REC_MIRROR);
     /* the track's files: an open road's by its segment, Rusty Springs' rally tr5 */
     if (g_drive.kind < 3)
         snprintf(name, sizeof name, "%s%d", track_names[g_drive.kind], g_drive.segment + 1);
     else
         snprintf(name, sizeof name, "%s", g_drive.rally && g_drive.kind == 3 ? "tr5"
                                           : track_names[g_drive.kind]);
+    snprintf((char *)g_rec + REC_STEM, 10, "%s", name);
     /* race_run 0x37228: EA's random numbers and the race's own from the clock's
-       seconds (0x91d9b), then the cars chosen (0x653a4) and their grid places (0x370bc:
-       in a single race or a tournament's first segment 7 6 2 3 4 5 1 0) */
-    now = getenv("RENFS_SEED") ? (unsigned)strtoul(getenv("RENFS_SEED"), 0, 0) : (unsigned)time(0);
+       seconds (0x91d9b, kept in the record: a replay's are the race's), then the cars
+       chosen (0x653a4) and their grid places (0x370bc: in a single race or a
+       tournament's first segment 7 6 2 3 4 5 1 0) */
+    if (!g_replay.mode)
+        rec_put(REC_TIME, getenv("RENFS_SEED") ? (int)strtoul(getenv("RENFS_SEED"), 0, 0)
+                                                : (int)time(0));
+    now = (unsigned)rec_get(REC_TIME);
     collide_seed(now);
     opponent_seed(now);
     ncars = race_car_ids(ids, type, player, opp, field, chase, traffic);
@@ -331,9 +374,9 @@ int race_run(void)
        0x12dd14) (or RENFS_LAPS for a test) */
     g_drive.laps = 1;
     if (g_track.loop) {
-        g_drive.laps = config_word(CFG_LAPS);
-        if (getenv("RENFS_LAPS"))
-            g_drive.laps = atoi(getenv("RENFS_LAPS"));
+        if (getenv("RENFS_LAPS") && !g_replay.mode)
+            rec_put(REC_LAPS, atoi(getenv("RENFS_LAPS")));
+        g_drive.laps = rec_get(REC_LAPS);
         if (g_drive.laps < 1 || g_drive.laps > DRIVE_LAPS - 1)
             g_drive.laps = 1;
     }
@@ -367,9 +410,12 @@ int race_run(void)
     /* the player's car ready to drive (cars_create 0x51388: load_car_pbs, car_reset),
        with the options' gearbox, traction control and ABS */
     cars[0].slot = 0;
-    if (!drive_load(&cars[0], config_word(CFG_AUTO), config_word(CFG_TCS) == 0,
-                    config_word(CFG_ABS) == 0))
+    if (!drive_load(&cars[0], rec_get(REC_ENTRY + ENT_AUTO), rec_get(REC_ENTRY + ENT_TCS),
+                    rec_get(REC_ENTRY + ENT_ABS)))
         return 0;
+    /* (race_run) the controls' kinds from the entry: a replay's those it was driven with */
+    g_drive.steer_kind[0] = rec_get(REC_ENTRY + ENT_STEER);
+    g_drive.pedal_kind[0] = rec_get(REC_ENTRY + ENT_PEDALS);
     /* the computer's cars (car_setup 0x51200; their size the PDN's or the model's,
        0x512e8, as car_load left it): driven by the computer (kind 3), a metre along
        until their first step: the opponent's puts it on the road from the grid, the
@@ -424,6 +470,12 @@ int race_run(void)
     race_keys_start();         /* (the settings' detail, 0x5ba1c's 0x1440c) */
     /* (the opponent keeps the grid's node until its first step: the road's axes it
        drives by are worked out as that step moves it to the nearest, drive_opponent) */
+    for (i = 0; i < 8; i++) {
+        if (g_replay.mode)
+            grid[i] = rec_get(REC_GRID + 4 * i);
+        else
+            rec_put(REC_GRID + 4 * i, grid[i]);
+    }
     for (i = 0; i < field; i++)
         car_grid_place(&cars[i], grid[i], field, g_drive.kind);
     track_follow(&cars[0].pos, &cars[0].node);
@@ -435,8 +487,11 @@ int race_run(void)
     for (i = 0; i < ncars; i++) {
         cars[i].slot = i;
         cars[i].yaw_drawn = cars[i].yaw;
+        cars[i].routine = i ? 2 : 1;
         g_cars[i] = &cars[i];
     }
+    rec_put(REC_CARS, ncars);
+    rec_put(REC_HUMANS, 1);
     g_ncars = ncars;
     g_player = 0;
     if (getenv("RENFS_VIEW"))  /* a test: the race watched from camera mode n */
@@ -451,7 +506,7 @@ int race_run(void)
     /* the race's timing (race_start 0x506dc): the settings' laps (CONFIG.DAT +0xb1,
        0x12dd14, as Control Central left them), the race length's times (+0xb3, 0x12dd24) */
     g_timing.lap_limit = g_drive.laps;
-    g_timing.table = config_word(0xb3) < 0 || config_word(0xb3) > 2 ? 1 : config_word(0xb3);
+    g_timing.table = rec_get(REC_TABLE) < 0 || rec_get(REC_TABLE) > 2 ? 1 : rec_get(REC_TABLE);
     timing_cars();
     timing_start();
     /* the computer's driving (load_traffic_cfg 0x7de84): the drivers by the grid places,
@@ -512,16 +567,23 @@ int race_run(void)
     /* the race's music, the loading's last (race_main 0x6356c: 0x63d88, with 0xf749a) */
     race_music_start();
     start = clock_ticks();
+    /* (race_main 0x6368a, 0x639b0) the recording ready, its first step a snapshot */
+    replay_start();
+    replay_race_begins();
+    g_replay.cam = &cam;
 
-    while (!g_quit && !g_pause.quit && !g_timing.result) {
+    while (!g_quit && !g_pause.quit && !g_timing.result && !g_replay.end) {
         const int *m;
 
         /* the race's steps: one each three ticks of the clock (the race clock's
            three-cycle, race_timer_tick 0x4c454), the player's car driven */
         g_rkeys.race_clock = race_clock(clock_ticks() - start - g_pause.held_ticks);
-        while (done < (unsigned)g_rkeys.race_clock) {
+        while (done < (unsigned)g_rkeys.race_clock && !g_replay.end) {
             race_step(&cars[0], &cam, done);
             done++;
+            /* running fast to a point of the replay: no frames between */
+            while (g_drive.state == 3 && !g_replay.end && !g_quit)
+                race_step(&cars[0], &cam, done);
         }
         /* the dials the player's car's, the status bar's numbers the car watched's
            (Alt+Ctrl and a number) */
@@ -627,6 +689,7 @@ int race_run(void)
         video_retrace();
     }
 
+    replay_end();              /* (0x5de88: REPLAY.RPL, not after a replay) */
     rsnd_free();               /* (0x52a70) */
     /* race_run 0x37228 after race_main: the detail settings as the keys left them back
        into the settings and their copy (0x144cc: the outside view's size; on 320x200
@@ -660,6 +723,8 @@ int race_run(void)
     dash_free();
     trackfam_free();
     track_free();
+    if (g_replay.end)
+        return g_replay.end;
     return g_pause.quit ? 2 : g_timing.result;
 }
 
@@ -812,3 +877,18 @@ int race_test(const char *name)
     return race_run();
 }
 
+int race_replay_test(const char *name, int kind)
+{
+    int r;
+
+    if (!exe_load())
+        return -1;
+    config_load();
+    session_new();
+    memset(g_config + 0x3b, 0, 0x20);
+    snprintf((char *)g_config + 0x3b, 0x20, "%s", name);
+    config_set_word(0xaf, kind);
+    r = race_run();
+    config_set_word(0xaf, 0);
+    return r;
+}

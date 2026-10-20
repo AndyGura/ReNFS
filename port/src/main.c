@@ -16,7 +16,7 @@ static const char usage[] =
     "ReNFS: The Need for Speed SE, for Linux.\n"
     "\n"
     "    renfs [-data <folder>] [-home <folder>] [--shot <file.ppm> <frames>]\n"
-    "          [--race <track>]\n"
+    "          [--race <track>] [--replay <file.rpl> [highlights]]\n"
     "\n"
     "  -data <folder>   the game: the CD's files as they are (else $RENFS_DATA, else\n"
     "                   ./NFSSE, else NFSSE beside the program)\n"
@@ -25,6 +25,8 @@ static const char usage[] =
     "  --race <track>   straight into a race on the track (cy1 .. al3, tr1 .. tr7,\n"
     "                   tr5 the rally) with the car, opponent and race type last\n"
     "                   chosen in Control Central; P holds it, Esc the pause menu\n"
+    "  --replay <f>     a replay: the last race's (replay.rpl in the home folder) or the\n"
+    "                   CD's (REPLAY1.RPL ..); with \"highlights\" only those\n"
     "\n"
     "  RENFS_LANG=de    the German art (GART, ...)\n"
     "  RENFS_NOSOUND=1  no sound\n"
@@ -40,8 +42,8 @@ static const char usage[] =
 
 int main(int argc, char **argv)
 {
-    const char *data = 0, *home = 0, *shot = 0, *race = 0;
-    int shot_frames = 0;
+    const char *data = 0, *home = 0, *shot = 0, *race = 0, *replay = 0;
+    int shot_frames = 0, highlights = 0;
 
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "-data") && i + 1 < argc)
@@ -53,6 +55,11 @@ int main(int argc, char **argv)
             shot_frames = atoi(argv[++i]);
         } else if (!strcmp(argv[i], "--race") && i + 1 < argc)
             race = argv[++i];
+        else if (!strcmp(argv[i], "--replay") && i + 1 < argc) {
+            replay = argv[++i];
+            if (i + 1 < argc && !strcmp(argv[i + 1], "highlights"))
+                highlights = ++i;
+        }
         else {
             fputs(usage, strcmp(argv[i], "--help") && strcmp(argv[i], "-h") ? stderr : stdout);
             return strcmp(argv[i], "--help") && strcmp(argv[i], "-h") ? 1 : 0;
@@ -74,6 +81,8 @@ int main(int argc, char **argv)
     srand(shot ? 1 : (unsigned)time(0));   /* pictures without a window: the same each time */
     if (race)
         race_test(race);
+    else if (replay)
+        race_replay_test(replay, highlights ? 2 : 1);
     else
         fe_outer_loop();
 

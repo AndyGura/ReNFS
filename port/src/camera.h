@@ -51,6 +51,11 @@ void camera_set_mode(race_camera *cam, int mode);
    tables; while the race is not running, a car close ahead of or behind the player and
    the police close behind are looked at first (after mode 5) */
 void camera_next(race_camera *cam);
+/* 0x50428: the police in a chase (its bits) between lo (not) and hi nodes behind the
+   player's car */
+int camera_police_close(int lo, int hi);
+/* 0x50478: the other racer (not a traffic car) between lo (not) and hi nodes behind */
+int camera_rival_close(int lo, int hi);
 /* camera_check_mode 0x6324c, every step before the update: the camera outside (13)
    while the car watched is not upright along the road, and for a second after; then
    back into the mode wanted, through 10 or 11 for the driver's */

@@ -4,6 +4,7 @@
    A car's "lane" is 0..7 across the road, 4 the first right of the middle; a node's
    road has lanes offL..offR (its +4 byte), the edge lanes the first and last of them. */
 #include "opponent.h"
+#include "replay.h"
 #include "cardraw.h"
 #include "crash.h"
 #include "drive.h"
@@ -167,8 +168,8 @@ static void zone_swap(int a, int b, int c)
     }
 }
 
-/* 0x77ef4: the stretches given out by the racers' order, the leader first. (The
-   replay's highlight 0x50 at a change is left out) */
+/* 0x77ef4: the stretches given out by the racers' order, the leader first; a change of
+   places is a highlight */
 static void zone_rank(void)
 {
     int rank = 0, i;
@@ -178,8 +179,10 @@ static void zone_rank(void)
 
         if (c->slot < 0 || c->slot >= g_field)
             continue;
-        if (rank != c->zone)
+        if (rank != c->zone) {
             zone_swap(c->slot, rank, c->zone);
+            replay_mark(0x50);
+        }
         rank++;
     }
 }
@@ -1079,12 +1082,15 @@ void opponent_drive(race_car *c)
             c->slide_front = iabs(c->steer - c->steer_to) * 20;
         } else
             c->slide_rear = c->slide_front = 0;
-        /* turned too far: it spins out (0x1ca9c), a police car's chase dropped. (The
-           replay's highlight 0x52 near a player: not in the port) */
+        /* turned too far: it spins out (0x1ca9c), a police car's chase dropped (near a
+           player, a highlight) */
         if (iabs(c->steer) > (WORD(c) & 0x404 ? 0x200000 : 0x160000) && !(c->bits[2] & 2)) {
             crash_spin_out(c);
-            if (POLICE(c))
+            if (POLICE(c)) {
+                if (opponent_near(c->node))
+                    replay_mark(0x52);
                 opponent_chase_drop(0);
+            }
         }
     } else
         c->slide_rear = c->slide_front = 0;

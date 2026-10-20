@@ -4,6 +4,7 @@
    its half sizes along them are half[0..2]. The program's switches for these routines
    (0xea62c .. 0xea64c) are never written: only the paths they leave live are here. */
 #include "collide.h"
+#include "replay.h"
 #include "cardraw.h"
 #include "crash.h"
 #include "drive.h"
@@ -454,11 +455,14 @@ static int moving(const car_body *b)
 /* car_car_impact 0x1e314: the two bodies parted and pushed; a light hit leaves both
    driven as before (from their bodies), a hard one (above 0xea5b0, 0xea5b4 with a
    player in it) throws both about (kind 4), a player's car knocked over once, the car
-   heard falling silent. (The replay's highlights 0x5c6d4: not in the port) */
+   heard falling silent. Both fast, or a hard hit, is a highlight, weighed by the table
+   0xea5dc: hard or not, a player's car in it, car 1, car 2 */
 static int impact(race_car *a, race_car *b)
 {
     vec3 pt, n;
     int ha = human(a), hb = human(b), limit = exe_i32(ha || hb ? 0xea5b4 : 0xea5b0);
+    int weigh = ((ha || hb) ? 4 : 0) + (a == g_cars[1] || b == g_cars[1] ? 2 : 0)
+              + (a == g_cars[2] || b == g_cars[2] ? 1 : 0);
 
     if (!box_separate(&a->body, &b->body, &pt, &n) || !box_impulse(a, b, &pt, &n))
         return 0;
@@ -470,8 +474,11 @@ static int impact(race_car *a, race_car *b)
             crash_set_kind(b, b->state);
         a->road_speed = crash_body_road_speed(a);
         b->road_speed = crash_body_road_speed(b);
+        if (iabs(a->road_speed) > 0x100000 && iabs(b->road_speed) > 0x100000)
+            replay_mark(exe_i32(0xea5dc + 4 * weigh));
         return 1;
     }
+    replay_mark(exe_i32(0xea5dc + 4 * (8 + weigh)));
     if (a == rsnd_heard() && a->state != 4)
         rsnd_engine_off();
     if (b == rsnd_heard() && b->state != 4)

@@ -89,4 +89,7 @@ int crash_len3(const vec3 *v);
 int crash_recip(int x);
 void crash_normalize(vec3 *v);
 
+/* 0x64588 on the player's smoke (the replay's jumps) */
+void crash_smoke_reset(void);
+
 #endif

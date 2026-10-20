@@ -372,6 +372,22 @@ Ghidra project and `build/decomp`, one command). The git history was started aga
   Autumn Valley's single race, Burnt Sienna's tournament race (`build/circ/`; the
   original's numbers put in with `nfsdos.py poke:` and `RENFS_SESSION`).
 
+- **The replay, first part** (NOTES §4.22): the race recorded as the original records it
+  (the controls every second step into a ring, a snapshot of every car and of the race
+  every 27 s) and written to `replay.rpl` in the home folder at the race's end; a replay
+  file played back (`--replay REPLAY2.RPL [highlights]`), the highlights picked from the
+  events the race marks (crashes, hits, jumps, slides, places changed, the police
+  spinning). **Equal**: the CD's four replays and one the original recorded here play
+  back byte for byte like the files' own snapshots to their ends (`RENFS_REPLAYCHECK=1`);
+  the original's attract mode in DOSBox reaches the same road node (`nfsdos.py follow:`).
+  The CD's were driven with a joystick: the steering and pedal kinds now come from the
+  race record. Not yet: the replay bar and its buttons, slow motion, the pause menu's
+  replay, the race menus' Replay / Highlights buttons, the attract mode's replays.
+  Open (older, found 2026-10-20): `tools/timing_emu.py` puts the second racer's finish
+  time one lap slot earlier than the original in 7 of its 13 runs (the game code writes
+  `0x14ea7c` + racer · 0x1d2 + lap · 4 on both sides: look at the check's set-up of the
+  second car's lap first).
+
 **Progress page for Danik**: https://claude.ai/artifact/VZdxTpYC3oLXYeBVJpoDoM (every step,
 its percent done and weight). Update its steps file after each finished step.
 

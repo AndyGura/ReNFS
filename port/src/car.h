@@ -49,6 +49,8 @@ typedef struct {
     const unsigned char *pics_pal[2]; /* +0x522, +0x65a: their palettes ("!PAL"), tinted */
 
     /* what drawing it needs (cardraw.c) */
+    int routine;               /* +0x50e: the routine of 0x13c1e0 it runs each step: 1
+                                  the player's, 2 the others' (0 none) */
     int state;                 /* +0x512: how it is driven (the routine 0x13c1b8 holds):
                                   2 the player's, 4 thrown about (crash.c), 6 off the road
                                   (not drawn) */
@@ -60,7 +62,7 @@ typedef struct {
     int yaw_drawn;             /* +0x351: its heading as drawn */
     int half_len, half_wid;    /* +0x78, +0x7c: half its size, 16.16 */
     int braking;               /* +0x3b9: above 10 its brake lights are on */
-    unsigned char bits[3];     /* +0x174 .. +0x176 */
+    unsigned char bits[4];     /* +0x174 .. +0x177 */
     vec3 ground;               /* +0x385: the road under it (0x38548 with 0) */
     vec3 seen;                 /* +0x391: from the camera, in the view, 1/128 units */
     int far;                   /* +0x78e: drawn by its far model */

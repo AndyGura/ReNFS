@@ -25,4 +25,7 @@ void race_from_menu(void);
    settings; -1 if unknown */
 int race_test(const char *name);
 
+/* --replay: the file `name` played (kind 1 the whole, 2 the highlights) */
+int race_replay_test(const char *name, int kind);
+
 #endif

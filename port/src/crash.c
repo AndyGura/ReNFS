@@ -4,6 +4,7 @@
    the machine code does, 32-bit sums wrapping. The body's coordinates are the car's with
    z turned round: its turn's elements 2, 5, 6 and 7 and its z change sign between them. */
 #include "crash.h"
+#include "replay.h"
 #include "racesnd.h"
 #include "cardraw.h"
 #include "collide.h"
@@ -293,6 +294,11 @@ static void smoke_reset(crash_smoke *s)
         s->age[i] = -1;
     s->next = 0;
     s->timer = 0;
+}
+
+void crash_smoke_reset(void)
+{
+    smoke_reset(&g_crash.smoke);
 }
 
 /* a random spread: ±0.5 by 1/512ths */
@@ -653,6 +659,7 @@ static void crash_begin(race_car *c)
     smoke_reset(&g_crash.smoke);
     c->bits[1] &= ~2;
     c->body.wait = 300;
+    replay_mark(0x5c);
     if (c == rsnd_heard())
         rsnd_engine_off();
 }
