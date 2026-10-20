@@ -24,7 +24,7 @@ add_executable(renfs
   src/fe.c
   src/audio.c
   src/sndlib.c
-  src/racesnd.c src/racekeys.c
+  src/racesnd.c src/racekeys.c src/pause.c
   src/eacs.c
   src/tgv.c
   src/movie.c

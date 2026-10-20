@@ -374,6 +374,13 @@ void hud_redraw_due(void)
     g_redraw = 1;
 }
 
+void hud_paused(void)
+{
+    window_set(&g_hud_screen);
+    clip_set(0, g_hud_screen.w, 0, g_hud_screen.h);
+    blit_own(named(&g_mask, "paus"), COPY);
+}
+
 /* ---- the police's ticket or warning (0x30424, 0x306e8) -------------------------------- */
 
 static fsh_file g_ticket;

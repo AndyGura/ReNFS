@@ -2725,6 +2725,34 @@ snapshots. The F keys, Alt+Ctrl+n and F5 are seen and heard in `--race` (picture
 `build/shots/keys/`). Not yet: Shift+End, Alt+M, the joystick's view button, the replay's
 keys, the pause (`0x63304`, its menu `0x1f988`), the music's volume under F5.
 
+### 4.20 The pause (2026-10-20)
+
+`race_step` `0x6348c` starts with the calls due (`race_timed_calls` `0x1fa1c`: the table
+`0xea61c`, each call's step in `0x129fb0[i]`, set by `0x1f988(step, i, 1)`; [0] the pause
+menu `0x56474`, [1] P's hold `0x63110`), then `race_check_pause` `0x63304` (the step
+counter `0x145c94`, 2 a step), then `race_keys`.
+
+- `0x63304`: below 0x3c on the counter, `0x145c7c` (a pause asked) and `0x145c80` (the
+  counter when last asked) are cleared. **Esc** (held, racing (`0xf6b74` = 1), the counter
+  above 0x78, none asked): in a network race with a Shift held the race is given up
+  (`0x15d138` = 1, `0x13c17c` = 2); else, at least 0xb4 since the last, the menu is due at
+  the next step (none in a replay) and the road's distance asked again as F3 left it
+  (`0x5b19c`: 28, 14, 9). Else **P** (no network, the counter above 0x78, none asked, no
+  ticket or warning shown (`0x2d2ac`), at least 0x78 since the last): the hold due next step.
+- `0x63110`, P's hold: `0x12f1b8` = 1 (the race clock `0xed0f8` stops in `0x4c454`),
+  MASKLO's `paus` drawn at its own place (`0x2dac4`: "PAUSED, Press 'P' to continue",
+  centred over the view), every channel's volume and the music's 0 (`0x52618`); it waits
+  for P up, then down; the dashboard drawn again (`0x2d284`) and the camera's mode taken up
+  again (`0x14b00`); waits for P up; (network: `0x2db34`, `0x1fa94`, `0x1fb30`); the
+  music's volume back unless F5 has it off (`0x52640`); none asked, the last = now, and
+  `0x4d700`; `0x12f1b8` = 0.
+
+**Ported (`port/src/pause.c`): P's hold.** The race stands still while held: a race paused
+300 retraces from retrace 600 gives at retrace 1200 the same picture, byte for byte, as an
+unpaused race at 900 (`build/shots/pause/`); the original's own pause in DOSBox looks the
+same (`build/dos/ppause/`). Esc still ends the race (after its first 60 steps) until the
+menu is ported.
+
 ## 5. The original in DOSBox (2026-10-19)
 
 - The game for DOSBox is a COPY of the installed game in `~/dosgames/nfs` (`NFSSE/` +

@@ -60,6 +60,8 @@ void rsnd_engine_off(void);
 /* 0x525b8 (on) / 0x525ec: every channel's volume 0 and kept there, or the sounds heard
    again as they are next set (F5, the pause) */
 void rsnd_mute(int on);
+/* 0x52618: every channel's volume 0 for now (P's pause; the next step sets them again) */
+void rsnd_quiet(void);
 /* 0x52a70: every channel stopped and the banks freed (the race's end) */
 void rsnd_free(void);
 /* race_update_cars' sounds, once a step after the camera (0x80974, 0x7fef8, 0x7fcbc,

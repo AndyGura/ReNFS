@@ -40,7 +40,7 @@ static int upright_on_road(const race_car *c)
 }
 
 /* the mode's settings taken up (0x14b00) */
-static void set_mode(race_camera *cam, int mode)
+void camera_set_mode(race_camera *cam, int mode)
 {
     const camera_mode *m;
     int old = cam->mode;
@@ -91,7 +91,7 @@ void camera_set_car(race_camera *cam, const race_car *c, int mode)
     if (c != cam->car)
         cam->yaw_follow = heading(c->node);
     cam->car = c;
-    set_mode(cam, mode);
+    camera_set_mode(cam, mode);
 }
 
 void camera_check(race_camera *cam, const race_car *watched)
@@ -112,7 +112,7 @@ void camera_check(race_camera *cam, const race_car *watched)
             return;
         mode = cam->wanted == 0 ? 10 : cam->wanted == 1 ? 11 : cam->wanted;
     }
-    set_mode(cam, mode);
+    camera_set_mode(cam, mode);
 }
 
 /* 0x50428: the police in a chase, from just ahead of the player's car to 12 nodes behind */
@@ -188,7 +188,7 @@ void camera_next(race_camera *cam)
     camera_set_car(cam, c, mode);
     if (cam->wanted == 5)
         g_cam_look_first = 1;
-    set_mode(cam, cam->wanted);
+    camera_set_mode(cam, cam->wanted);
 }
 
 int shake_wave(int amount, int phase)
@@ -366,7 +366,7 @@ static int outside(race_camera *cam, camera_mode *mt)
             cam->frames = 0;
             if (mt->next >= 0) {
                 cam->wanted = mt->next;
-                set_mode(cam, mt->next);
+                camera_set_mode(cam, mt->next);
                 return 1;
             }
         }

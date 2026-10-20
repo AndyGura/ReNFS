@@ -45,6 +45,8 @@ void camera_init(int eye_height);
 void camera_set_car(race_camera *cam, const race_car *c, int mode);
 /* the camera this step (0x136b0) */
 void camera_update(race_camera *cam);
+/* the mode's settings taken up again (0x14b00) */
+void camera_set_mode(race_camera *cam, int mode);
 /* camera_next 0x1494c: the view key: the next mode for the car watched, by the modes'
    tables; while the race is not running, a car close ahead of or behind the player and
    the police close behind are looked at first (after mode 5) */

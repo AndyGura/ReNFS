@@ -14,6 +14,7 @@
 #include "files.h"
 #include "racepal.h"
 #include "smoke.h"
+#include "pause.h"
 #include "racekeys.h"
 #include "racesnd.h"
 #include "sndlib.h"
@@ -113,7 +114,7 @@ static void race_place(const race_car *player, int st)
    flags from the step counter, the keyboard's word (controls_read 0x49248: both gear
    keys at once hold the engine at full revs), every second step the controls applied,
    then the driving; the counter on by 2 */
-static void race_step(race_car *player, race_camera *cam)
+static void race_step(race_car *player, race_camera *cam, int done)
 {
     int st = g_drive.steps, i;
     unsigned w = drive_keyboard(g_road_mirror);
@@ -126,7 +127,8 @@ static void race_step(race_car *player, race_camera *cam)
     /* NITRO's keys: N with a shift or B */
     g_drive.nitro_keys = key_down(0x31) && (key_down(0x2a) || key_down(0x36) || key_down(0x30));
     g_drive.clock = (int)clock_ticks();
-    /* (race_step 0x6348c: the pause's keys 0x63304, not yet; then the race's other keys) */
+    /* race_step 0x6348c: the calls due and the pause's keys, then the race's other keys */
+    race_pause_step(cam, done);
     race_keys(cam);
     race_throw(player, st);
     race_place(player, st);
@@ -263,6 +265,7 @@ int race_test(const char *name)
     view_setup(&g_view_ahead, g_view_ahead.mode);
     view_setup(&g_view_mirror, g_view_mirror.mode);
     view_setup(&g_view_ahead, g_view_ahead.mode);
+    memset(&g_pause, 0, sizeof g_pause);
     race_keys_start();         /* (the settings' detail, 0x5ba1c's 0x1440c) */
     /* (the opponent keeps the grid's node until its first step: the road's axes it
        drives by are worked out as that step moves it to the nearest, drive_opponent) */
@@ -354,13 +357,13 @@ int race_test(const char *name)
     hud_redraw_due();
     start = clock_ticks();
 
-    while (!g_quit && key_get() != 0x1b && !g_timing.result) {
+    while (!g_quit && !g_pause.quit && !g_timing.result) {
         const int *m;
 
         /* the race's steps: one each three ticks of the clock (the race clock's
            three-cycle, race_timer_tick 0x4c454), the player's car driven */
-        while (done < (clock_ticks() - start) / 3) {
-            race_step(&cars[0], &cam);
+        while (done < (clock_ticks() - start - g_pause.held_ticks) / 3) {
+            race_step(&cars[0], &cam, done);
             done++;
         }
         /* the dials the player's car's, the status bar's numbers the car watched's
