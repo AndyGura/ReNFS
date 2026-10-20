@@ -469,7 +469,9 @@ races 320x200 / 320x240; commit locally as the work goes.
    (`0x4dfe0`). Equal to the original in DOSBox with a 4-axis joystick (pictures,
    `joystick.cfg`, the control words; `build/shots/joy/`). `RENFS_JOY=1|2` a test
    stick. A pad drives without the controls set to it too (the port's: a control on the
-   keys takes the stick, the shoulders shift; NOTES §4.23). `tools/checks.sh` runs every check in one command. Next: the cars' showcase
+   keys takes the stick, the shoulders shift; NOTES §4.23) Start is Esc. **Analogue steering and pedals need
+   Joystick chosen in Options → Controls**, as in the original (Danik, 2026-10-20: keep it
+   so, no automatic switch; documented in `README.md` and `--help`). `tools/checks.sh` runs every check in one command. Next: the cars' showcase
    (`fe_showcase` `0x17724`) and the track records from Control Central, then the
    MiSTer core. The dashboard's keys F7 / F8 / M / F9 and Rusty Springs' measurements on the
    status bar: done (NOTES §4.11). Not yet: races at 640x480 (settings +0x7f = 0).

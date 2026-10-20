@@ -194,6 +194,9 @@ the key `0x733a0`; the race's scan codes `0x36a0c` (`0x36758` German → US, `ke
 The joystick and the mouse (NOTES §4.23): EA's game port `0x94fa8`, the poll `0x4e3e8`, start-up
 `0x4d1fc`, `joystick.cfg` `0x4d4a0`/`0x4d5ec` (`0x12f294`, 23 ints), the calibration `0x4c6b0`, the race
 `0x4e0b8`, the control word by kinds `0x48bec`, the mouse `0x47b78`, the menus `0x4dfe0`.
+A pad drives on the Keyboard kinds too (all or nothing; the shoulders shift, Start is Esc);
+**analogue steering and pedals need Joystick chosen in Options → Controls**, as the original
+(Danik, 2026-10-20: no automatic switch). The player's controls: `README.md`.
 `tools/checks.sh`: every check in one command (logs `build/logs/chk`).
 
 ## File formats (details in `docs/NOTES.md`, "Formats")

@@ -39,7 +39,14 @@ static const char usage[] =
     "  RENFS_LAPS=n     n laps of a circuit (tr1 ..; else the race length's, 8 by default)\n"
     "  RENFS_VIEW=n     a test: the race watched from camera n (2..5, 8..12 outside)\n"
     "\n"
-    "Keys: Space, Enter or Esc pass a movie or the title.\n";
+    "Keys: Space, Enter or Esc pass a movie or the title.\n"
+    "\n"
+    "A pad or joystick: calibrated the first time (or Options, Controls, Calibrate\n"
+    "joystick). It drives even with the controls on Keyboard, but all or nothing; for\n"
+    "analogue steering and pedals choose Joystick for Steering and Accelerate/brake in\n"
+    "Options, Controls, as in the original. Pad: left stick steers, right trigger\n"
+    "gas, left trigger brake, shoulders gear up / down, A horn, B map, X camera,\n"
+    "Y handbrake, Start Esc.\n";
 
 int main(int argc, char **argv)
 {
