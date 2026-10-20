@@ -420,7 +420,7 @@ int race_run(void)
     if (!smoke_load(&g_crash.smoke))       /* (after cars_create 0x51388) */
         return 0;
     crash_start();
-    drive_default_keys();
+    drive_keys_from_config();      /* (race_run: 0x36a0c) */
     g_view.min_z = exe_i32(0xf7938);
     g_view.far_shift = *exe_at(0xf6aa4, 1);
     g_view.max_level = exe_i32(0xeaad8);

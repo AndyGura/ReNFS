@@ -5,6 +5,7 @@
 #include "options.h"
 #include "audioopt.h"
 #include "gfxopt.h"
+#include "ctrlopt.h"
 #include "config.h"
 #include "fe.h"
 #include "files.h"
@@ -210,6 +211,11 @@ int fe_options_screen(void)
                     first = redraw = 1;
                     break;
                 case CONTROLS:             /* fe_controls_setup 0x22bd0 */
+                    pal_fade_down(0, 256);
+                    fe_controls_setup(0);
+                    place(sel);
+                    first = redraw = 1;
+                    break;
                 case LOAD_SAVE:            /* fe_load_save_screen 0x3c0c8 (sets `loaded`) */
                 case CREDITS:              /* fe_credits 0x25600, with credits.asf */
                     fprintf(stderr, "renfs: that options screen is not written yet\n");
@@ -382,6 +388,12 @@ int race_menu_options(int finish)
                     first = redraw = 1;
                     break;
                 case R_CONTROLS:           /* fe_controls_setup 0x22bd0(1) */
+                    pal_fade_down(0, 256);
+                    fe_controls_setup(1);
+                    if (!g_mouse_active)
+                        mouse_place(rx[sel], ry[sel]);
+                    first = redraw = 1;
+                    break;
                 case R_LOAD_SAVE:          /* 0x3c0c8(1) at a checkpoint, 0x3d4c4(1) after */
                     fprintf(stderr, "renfs: that options screen is not written yet\n");
                     break;

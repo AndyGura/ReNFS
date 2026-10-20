@@ -1147,8 +1147,9 @@ static void hud_keys(void)
             status_bar();
             g_keys_up = 0;
         }
-    } else if (key_down(0x32)) {           /* M: the settings' +0x5f4e (or the joystick's
-                                              map button, 0x12f1d8: no joystick yet) */
+    } else if (key_down(g_drive.map_key)) {    /* M: the settings' +0x5f4e (or the
+                                              joystick's map button, 0x12f1d8: no
+                                              joystick yet) */
         if (g_keys_up) {
             g_hud.map = 1 - g_hud.map;
             if (!g_hud.map) {

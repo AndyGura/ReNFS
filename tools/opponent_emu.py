@@ -166,7 +166,7 @@ def lib():
     subprocess.check_call(["cc", "-O1", "-g", "-fwrapv", "-shared", "-fPIC", "-o", out] +
                           ["port/src/" + f for f in SOURCES] +
                           ["tools/drive_test.c", "tools/timing_test.c", "tools/opponent_test.c", "tools/collide_test.c",
-                           "tools/sound_test.c",
+                           "tools/sound_test.c", "tools/replay_stub.c",
                            "-Iport/src"] +
                           subprocess.check_output(["sdl2-config", "--cflags", "--libs"]).decode().split())
     L = ctypes.CDLL(os.path.abspath(out))

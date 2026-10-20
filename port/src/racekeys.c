@@ -27,7 +27,7 @@ void race_keys_start(void)
 {
     static const int drawn[3] = { 0x1c, 0x12, 0xd };    /* (0x5bbd3) */
 
-    g_rkeys.view_key = 0x2e;   /* C: the settings' +0x5f4a 'C' through 0x36758's table */
+    g_rkeys.view_key = drive_key_scan(config_word(0x5f4a) & 0xffff);  /* (0x36a0c) C */
     g_rkeys.view_up = 0;
     g_rkeys.fkey_up = 0;
     g_rkeys.muted = 0;

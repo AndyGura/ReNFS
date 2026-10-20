@@ -27,7 +27,7 @@ def lib():
     out = "build/collide_test.so"
     subprocess.check_call(["cc", "-O1", "-g", "-fwrapv", "-shared", "-fPIC", "-o", out] +
                           ["port/src/" + f for f in D.SOURCES] +
-                          ["tools/drive_test.c", "tools/collide_test.c", "-Iport/src"] +
+                          ["tools/drive_test.c", "tools/collide_test.c", "tools/replay_stub.c", "-Iport/src"] +
                           subprocess.check_output(["sdl2-config", "--cflags", "--libs"]).decode().split())
     return ctypes.CDLL(os.path.abspath(out))
 

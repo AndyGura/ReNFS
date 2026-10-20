@@ -3,6 +3,7 @@
    either round towards zero (the compiler's signed division: / here) or down (sar:
    >> here), each as the machine code does. */
 #include "drive.h"
+#include "config.h"
 #include "replay.h"
 #include "hud.h"
 #include "sound.h"
@@ -113,6 +114,62 @@ void drive_default_keys(void)
     static const int keys[8] = { 0x4b, 0x4d, 0x48, 0x50, 0x1e, 0x2c, 0x39, 0x23 };
 
     memcpy(g_drive.keys, keys, sizeof keys);
+    g_drive.map_key = 0x32;    /* M */
+}
+
+/* key_scan_code 0x36758: in the German game the keys were typed through the German
+   keyboard's layout; each becomes the US character of the same key (Y and Z change
+   places), 0 if it has none */
+static int us_char(int c)
+{
+    static const struct { unsigned char de, us; } t[] = {
+        { 0x21, 0x30 }, { 0x22, 0x32 }, { 0x23, 0x5c }, { 0x24, 0x34 }, { 0x25, 0x35 },
+        { 0x26, 0x36 }, { 0x27, 0x5c }, { 0x28, 0x38 }, { 0x29, 0x39 }, { 0x2a, 0x5d },
+        { 0x2b, 0x5d }, { 0x2c, 0x2c }, { 0x2d, 0x2f }, { 0x2e, 0x2e }, { 0x2f, 0x37 },
+        { 0x30, 0x3d }, { 0x31, 0x31 }, { 0x32, 0x32 }, { 0x33, 0x33 }, { 0x34, 0x34 },
+        { 0x35, 0x35 }, { 0x36, 0x36 }, { 0x37, 0x37 }, { 0x38, 0x38 }, { 0x39, 0x39 },
+        { 0x3a, 0x2e }, { 0x3b, 0x2c }, { 0x3d, 0x3d }, { 0x3f, 0x2d }, { 0x40, 0x51 },
+        { 0x5b, 0x38 }, { 0x5c, 0x2d }, { 0x5d, 0x39 }, { 0x5f, 0x2f }, { 0x7b, 0x37 },
+        { 0x7d, 0x3d }, { 0x7e, 0x5d }, { 0x81, 0x5b }, { 0x84, 0x27 }, { 0x8e, 0x27 },
+        { 0x94, 0x3b }, { 0x99, 0x3b }, { 0x9a, 0x5b }, { 0xe1, 0x2d },
+    };
+
+    if ((c >= 0x21 && c <= 0x40) || (c >= 0x5b && c <= 0x60) || (c >= 0x7b && c <= 0x9a)
+        || c == 0xe1) {
+        for (size_t i = 0; i < sizeof t / sizeof t[0]; i++)
+            if (t[i].de == c)
+                return t[i].us;
+        return 0;
+    }
+    return c == 'Y' ? 'Z' : c == 'Z' ? 'Y' : c;
+}
+
+int drive_key_scan(int code)
+{
+    /* key_scancode 0x91d60: the first place of the character in EA's five tables of the
+       keys' characters (0xf7b74, 0x5b keys each), a key of the extended block by its
+       code's high byte with bit 7 */
+    const unsigned char *t = exe_at(0xf7b74, 0x1c7);
+    int c;
+
+    if (g_german)
+        code = us_char(code);
+    c = code & 0xff00 ? (code >> 8 & 0xff) | 0x80 : code & 0xff;
+    for (int i = 0; t && i < 0x1c7; i++)
+        if (t[i] == c)
+            return i % 0x5b;
+    return 0;
+}
+
+void drive_keys_from_config(void)
+{
+    /* 0x36a0c: left, right, faster, brake, gear up, gear down, handbrake (+0x5f3c ..
+       +0x5f48), the horn (+0x5f4c); the map's (+0x5f4e) */
+    static const int at[8] = { 0x5f3c, 0x5f3e, 0x5f40, 0x5f42, 0x5f44, 0x5f46, 0x5f48, 0x5f4c };
+
+    for (int i = 0; i < 8; i++)
+        g_drive.keys[i] = drive_key_scan(config_word(at[i]) & 0xffff);
+    g_drive.map_key = drive_key_scan(config_word(0x5f4e) & 0xffff);
 }
 
 unsigned drive_keyboard(int mirrored)

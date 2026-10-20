@@ -36,6 +36,14 @@ static void key_put(int c)
         g_keys[g_nkeys++] = c;
 }
 
+static int g_scans[16], g_nscans;    /* the keys pressed, by their PC scan codes */
+
+static void scan_put(int scan)
+{
+    if (scan > 0 && g_nscans < 16)
+        g_scans[g_nscans++] = scan;
+}
+
 /* the mouse, in the 640x480 picture's pixels, and its pointer drawn over the picture */
 static int g_mouse_x = 320, g_mouse_y = 240, g_mouse_buttons;
 static const unsigned char *g_cursor;
@@ -126,6 +134,7 @@ static void script_step(unsigned long retrace)
             g_mouse_y = e->y;
         }
         if (retrace == e->at) {            /* a press, for the key queue too */
+            scan_put(e->scan);
             key_put(e->scan == 0x01 ? 0x1b : e->scan == 0x1c ? 0x0d : e->scan == 0x39 ? 0x20 :
                     e->scan == 0x0e ? 8 : e->scan == 0x53 ? 0x5300 : 0);
             for (const char *t = e->text; *t; t++)
@@ -268,6 +277,10 @@ static void poll(void)
             else
                 g_mouse_buttons &= ~bit;
         } else if (e.type == SDL_KEYDOWN) {
+            for (int k = 1; k < 0x59; k++)
+                if (e.key.keysym.scancode == g_pc_keys[k][0] || (g_pc_keys[k][1]
+                    && e.key.keysym.scancode == g_pc_keys[k][1]))
+                    scan_put(k);
             /* the keys that type no character; held, they repeat as the BIOS's do */
             static const struct { SDL_Keycode k; int c; } typed[] = {
                 { SDLK_ESCAPE, 0x1b }, { SDLK_RETURN, 0x0d }, { SDLK_KP_ENTER, 0x0d },
@@ -389,6 +402,17 @@ int key_get(void)
         return 0;
     c = g_keys[0];
     memmove(g_keys, g_keys + 1, --g_nkeys * sizeof g_keys[0]);
+    return c;
+}
+
+int scan_get(void)
+{
+    int c;
+    poll();
+    if (!g_nscans)
+        return 0;
+    c = g_scans[0];
+    memmove(g_scans, g_scans + 1, --g_nscans * sizeof g_scans[0]);
     return c;
 }
 

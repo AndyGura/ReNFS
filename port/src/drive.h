@@ -61,6 +61,7 @@ typedef struct {
     int keys[8];               /* the controls' keys (0x12d92c ..): left, right, faster,
                                   brake, gear up, gear down, handbrake, horn; PC scan
                                   codes */
+    int map_key;               /* 0x12d950: the map's key (+0x5f4e) */
     int best_lap;              /* 0x13c20c: the best lap's time (the track's lap record
                                   as the race starts) */
     int new_best;              /* 0x13c208: a new best lap, the status bar to show it */
@@ -84,6 +85,11 @@ int drive_load(race_car *c, int automatic, int tcs, int abs);
 /* the keys' default places (the original's controls settings 0x15cb4e .. as a new
    installation has them): the arrows, A and Z, the space bar, H */
 void drive_default_keys(void);
+/* 0x36a0c: the keys chosen on the controls screen (CONFIG.DAT +0x5f3c ..) */
+void drive_keys_from_config(void);
+/* key_scan_code 0x36758 + key_scancode 0x91d60: a key as the controls screen keeps it
+   (its character, or an extended key's code << 8) made a PC scan code, 0 if none */
+int drive_key_scan(int code);
 /* 0x48bec: the keyboard's control word for the player: steering full or none (the keys
    swapped on a mirrored track), the pedals all or nothing, the gear keys, the handbrake,
    the horn; B, R and W together with the automatic both gear keys */

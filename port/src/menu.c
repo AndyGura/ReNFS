@@ -48,6 +48,8 @@ void fe_flush_keys(void)
 {
     while (key_get())
         ;
+    while (scan_get())
+        ;
 }
 
 void fe_draw_shape(const shape *s, int see_through)

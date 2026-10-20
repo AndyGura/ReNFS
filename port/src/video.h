@@ -34,6 +34,10 @@ int timedout(void);
    0x20 space, letters and digits as they are; 0 if none */
 int key_get(void);
 
+/* the next key pressed, by its PC scan code (set 1), whatever the keyboard's layout;
+   0 if none */
+int scan_get(void);
+
 /* the keyboard's state (0x84742): is the key of that PC scan code (set 1) held? */
 int key_down(int scan);
 
