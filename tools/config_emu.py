@@ -14,7 +14,7 @@ from unicorn.x86_const import UC_X86_REG_ESP, UC_X86_REG_EIP, UC_X86_REG_EAX
 import cars_emu
 
 SIZE, AT = 0x5f52, 0x156c14
-SPEED = 500                    # the port's answer to the speed test (0x1a4..599)
+SPEED = 200                    # the port's answer to the speed test (below 300)
 
 
 def original(path, german):

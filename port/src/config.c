@@ -96,10 +96,11 @@ static void config_defaults(void)
         { CFG_TRACK, 0 }, { CFG_ABS, 0 }, { 0xaf, 0 }, { 0x8b, 0 }, { CFG_TCS, 2 },
         { 0x93, 0 }, { CFG_TRANSMISSION, 0 }, { CFG_RACE_LENGTH, 1 }, { CFG_LAPS, 4 },
         { CFG_OPPONENT, 7 }, { CFG_CAR, 6 },
-        /* the detail settings by the speed test (0x74ca0): the port answers as the
-           fastest machine that still races at 320x200 (0x1a4..599): 320x200 (+0x7f = 1
-           would be 640x480), the most detail */
-        { 0x7f, 0 }, { 0x83, 2 }, { 0x85, 2 }, { 0x81, 1 }, { 0x89, 0 }, { 0x87, 0 },
+        /* the detail settings by the speed test (0x74ca0): the port answers below 300,
+           as the snapshots' installed original did: 320x200 (+0x7f = 1 would be 640x480),
+           the most detail (the view's pixels 1:1, the road 28 sections ahead, the
+           outside view at its largest) */
+        { 0x7f, 0 }, { 0x83, 0 }, { 0x85, 0 }, { 0x81, 0 }, { 0x89, 0 }, { 0x87, 0 },
         /* the keys (0x15cb4a..), the modem's numbers */
         { 0x5f3c, 0x4b00 }, { 0x5f3e, 0x4d00 }, { 0x5f42, 0x5000 }, { 0x5f36, 0 },
         { 0x5f3a, 0 }, { 0x5f38, 0 }, { 0x5f44, 0x41 }, { 0x5f40, 0x4800 }, { 0x5f4a, 0x43 },

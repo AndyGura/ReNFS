@@ -26,6 +26,7 @@ typedef struct {
     int lens_h;                /* its layout's (+0x18, 0xe8b10 + 52 × +8) +0x20: the
                                   height the mirror's horizon is set by */
     int layout;                /* +8: its layout (0xe8b10 + 0x16c × resolution + 52 × it) */
+    int current;               /* +0xc: the layout it has now (F1 takes the next) */
     int box[4];                /* the layout's +0x24 ..: the box round it on the screen, x y
                                   w h (the border of the views outside, 0x3081c) */
 } view_rec;
@@ -58,12 +59,17 @@ extern view_rec g_view_outside;                 /* 0xe8e08: the cameras outside 
 extern int g_view_redraw;      /* 0x143e00: the view changed, the screen round it drawn
                                   again (0x14210) */
 extern const view_rec *g_view_now;              /* 0x143dfc */
+extern int g_view_detail;   /* 0x143e04: the views' pixels 1:1 (0), twice as wide (1),
+                               twice as wide and high (2) */
 
 /* the windows as the program has them, fitted to the player's car (0x14630's end,
    0x145d0): car its number (+0x48a), horizon its spec's +0x370 */
 void view_init(int res, int car, int horizon);
 /* a view in window `mode` (0x14154): the sky's tables, the lens, the reciprocals */
 void view_setup(view_rec *v, int mode);
+/* the view in its layout `layout` (0x14210): the layout's window for the detail
+   g_view_detail, its box on the screen */
+void view_layout(view_rec *v, int layout);
 /* the view a camera mode's kind (its settings' +0) looks through: 0 the driver's, 1
    outside (0xe8de8 + 32 · kind) */
 view_rec *view_of_kind(int kind);

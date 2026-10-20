@@ -20,6 +20,7 @@ int g_race_type;
 int g_field;
 int g_humans;
 unsigned char g_car_marks[RACE_CARS_MAX];
+int g_no_markers;
 int g_car_ticket;
 unsigned char g_cars_seen[CARS_SEEN];
 unsigned char g_cars_behind[CARS_BEHIND];
@@ -231,7 +232,7 @@ static void car_marker(int x, int y, int slot, int z)
 {
     int h = 9, w = 4, k, xy[6];
 
-    if (slot < 0)              /* (and while a key has them off, 0x12d9db) */
+    if (g_no_markers || slot < 0)
         return;
     if (!g_view_res || z > 0xbb8) {
         h = 3;

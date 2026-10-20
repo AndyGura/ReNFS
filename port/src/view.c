@@ -9,6 +9,7 @@ view_window g_windows[2][VIEW_WINDOWS];
 int g_view_res;
 view_rec g_view_ahead, g_view_mirror, g_view_outside;
 const view_rec *g_view_now;
+int g_view_detail;
 int g_view_redraw;
 
 static int layout(int rec, int res)
@@ -41,6 +42,7 @@ void view_init(int res, int car, int horizon)
 
         for (k = 0; k < 3; k++) {
             v[k]->layout = exe_i32(rec[k] + 8);
+            v[k]->current = v[k]->layout;
             for (i = 0; i < 4; i++)
                 v[k]->box[i] = exe_i32(layout(rec[k], res) + 0x24 + 4 * i);
         }
@@ -83,6 +85,17 @@ void view_setup(view_rec *v, int mode)
     sky_tables(w->w, v->fov / 2, (short)((v->fov << 8) / 360 * 5), w->squash * w->w / 320);
     lens(w->x + w->dx, w->y + w->dy, w->w, w->h, v->fov);
     view_set_focal(g_view.focal);
+}
+
+void view_layout(view_rec *v, int n)
+{
+    int at = 0xe8b10 + 0x16c * g_view_res + 52 * n, i;
+
+    v->current = n;
+    v->lens_h = exe_i32(at + 0x20);
+    for (i = 0; i < 4; i++)
+        v->box[i] = exe_i32(at + 0x24 + 4 * i);
+    view_setup(v, exe_i32(at + 4 + 4 * g_view_detail));
 }
 
 view_rec *view_of_kind(int kind)

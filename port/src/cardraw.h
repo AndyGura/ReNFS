@@ -22,6 +22,7 @@ extern int g_race_type;                      /* 0x12da20: CONFIG.DAT +0x6d, 0 ti
 extern int g_field;                          /* 0x12da2c: the cars racing (1, 2 or 8) */
 extern int g_humans;                         /* 0x12da30: the players' cars, the first slots */
 extern unsigned char g_car_marks[RACE_CARS_MAX]; /* 0x14e5bc: each one's palette entry */
+extern int g_no_markers;                     /* 0x12d9db: the racers' markers off (F6) */
 extern int g_car_ticket;                     /* 0xea81c or 0xea820: the police's ticket or
                                                 warning shown (its lights flash) */
 extern unsigned char g_cars_seen[CARS_SEEN];     /* 0x14e5d0 */

@@ -721,3 +721,15 @@
 0x80974 snd_horns
 0x80a60 horn_want
 0x94710 load_flat_ds
+0x1494c camera_next
+0x50428 police_close
+0x50478 rival_close
+0x14324 view_next_layout
+0x14370 view_set_detail
+0x5b19c road_drawn_ask
+0x525b8 snd_mute
+0x525ec snd_unmute
+0x1f0b4 player_give_up
+0x1440c views_start
+0x5e93c replay_view_key
+0x36758 key_scan_code

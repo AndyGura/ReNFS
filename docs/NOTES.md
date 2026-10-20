@@ -510,8 +510,14 @@ three settings in its entry). The attract mode (`fe_attract_mode` `0x34284`) put
   +0x83 2, +0x85 2, +0x81 1; from 600 **+0x7f 1 = races at 640x480** (`0x1af78`:
   `initgraphics(640, 480, 8)`) with +0x85 0, 1, 2 and +0x81 0, 0, 1 below 0x2d0, 900 and
   above. +0x87, +0x89 0. The detail words are the graphics screen's (`fe_graphics_options`
-  `0x32d08`: `win` `ima` `van` `car` `hor`). The port answers as 0x1a4..599: 320x200, the
-  most detail (races stay 320x200 for now, Danik's choice for the MiSTer).
+  `0x32d08`: `win` `ima` `van` `car` `hor`). The test's number is the frames drawn in a
+  given time (more: faster), yet 0 is the most detail in every word: +0x83 → `0x12d9d9`
+  (the view's pixels 1:1, doubled across, doubled both ways), +0x85 → `0x12d9d5` (the road
+  drawn 28, 18 or 13 sections ahead at the start, 28, 14, 9 by F3), +0x81 → `0x12d9d4`
+  (the outside view's size), +0x89 → `0x12d9d6` (the sky's picture off) (§4.19). **The
+  port answers below 300** (all 0: 320x200, the most detail), as the snapshots' installed
+  original has them (an earlier answer, 0x1a4..599, was read the wrong way round: it gave
+  the least detail). Races stay 320x200 for now, Danik's choice for the MiSTer.
   The records from text tables of six strings (name, time, car, speed, +0x13, kind; each
   number by `atoi` `0x89903`; +0x17 = 1): each track's record 36 from `0xeab80` + 0x18·t;
   City, Coast, Alpine records 6..15 from `0xeae98`, `0xeaf88`, `0xeb078` and 0..5 from
@@ -2660,6 +2666,64 @@ path in `0x800a0`; the wrapper `0x52ea8`; the library's random spreads (`0x95aba
 In the port a voice's end is worked out from the clock (`snd_time`), not by the mixer, so
 that the game's side stays deterministic. Not yet: the race's music (voice 0 is held
 for it), the speech, the race keys' calls (`0x47c88`: the camera's changes, the pause).
+
+### 4.19 The race keys (2026-10-20)
+
+`race_keys` `0x47c88`, once a race step after `race_check_pause` `0x63304` and before
+`race_update_cars`. The keys are the table of keys held (`0xf7ac8` + scan code).
+
+- **The view key** (`0x12d94c`: the settings' +0x5f4a, 'C' by default, made a scan code
+  by `0x36758`; or the joystick's button, `0x12f1d8` / `0x12f274` & 4): once a press
+  (`0xec5c8` set while it is up), and only while a player's car is watched (`0x12dd54` <
+  `0x12da30`; in a replay not in its mode 5, `0x145544`), **`camera_next` `0x1494c`**
+  then `0x5e93c` (the replay's `0x145530` = 0). camera_next: racing (`0xf6b74` = 1) the
+  next mode is the mode's +0x24 when the player's car is watched (no replay, `0x145c90`
+  = 0), else its +0x1c; not racing, its +0x20 (7 becomes 0 without the police,
+  `0x12da34`), but first, once after mode 5 was chosen (`0xe8f68`), the police camera (7)
+  when `0x50428` (the police chasing, `0x13c254` +0x174 & 0x42400, from just ahead of the
+  player to 12 nodes behind) or the rival's (6) when `0x50478` (the rival not a traffic
+  car, `0x12da9e` ≠ 9, from 10 nodes ahead to 12 behind) and the mode is not 10. Mode 6
+  or 7 with its car not close: the mode taken as the current one and the next looked up
+  again. The driver's modes (≤ 3, 10, 11) refused while the tumble's view waits
+  (`0x145c98`). Then `camera_set_car(0x129ecc, car, mode)` and `0x14b00` again. Racing,
+  the player's car: 0 → 1 → 2 → 3 → 10 (→ 0); another car: 4 → 5 → 11 → .. **In
+  `camera_update` `0x136b0`** modes 6 and 7 keep the rival's (car 1) or the police car
+  while it is close and upright (`0x14de8`), else `camera_set_car(the player's, 13)`.
+- **Alt+Ctrl and 1 .. 8** (codes 2..9; 3..8 only with `0x12da20` ≥ 2 or the right
+  Shift): `0x12dd54` = the car, `camera_set_car(.., 4)`, the engine heard again
+  (`0x53214`), `0x15d71c` = 1. The dials stay the player's (`0x31171`), the status bar's
+  numbers and the map follow the car watched (`0x31e87`).
+- **Shift+End** (no replay; past 100 steps of the race clock `0xed0f8`, 400 in a network
+  race): `0x1f0b4(player)`, the player gives up: unless a time trial (+0x6d = 0), `0x12a150[car]`
+  = 1, `0x12a14e` = 10, with `0x12dd5c` the finish time 999,999. **Alt+M**
+  (`0xf4568` ^= 1): the frame prints the camera's node and mode letter (`0x5bfa9`, a
+  developer's display).
+- **Ctrl held: no F key.** Each F key once a press (`0xec5cc`):
+  F1 `0x14324` the view's next layout (the layout's +0: outside 1 → 2 → 3 → 1, 320x160,
+  256x128, 204x101 inside a border; the driver's has none), `0x12d9da` = 1 at detail 3;
+  F2 `0x12d9d9` + 1 mod 4 (at 320x200, `0x12c308` = 0, back to 0 above 1) through
+  `0x14370`: `0x143e04` = min(it, 2), the view's window the layout's +4 + 4·detail (1:1,
+  half width doubled, half both); F3 `0x12d9d5` + 1 mod 3, `0xf6b48` = 28, 14, 9: the frame
+  (`0x5bcf5`) takes it into `0x136618` (the sections drawn ahead) and gathers the road
+  again (`0x5004c`); F4 `0x12d9d6` (the sky's colours only); F5 `0xec528`: `0x525b8` every
+  channel's volume 0, the music's 0 (`0x72224`), `0xeded0` = 1, or `0x525ec` the music's
+  volume back and `0xeded0` = 0; F6 `0x12d9db` (the racers' markers, `0x66b98`).
+- **At the race's start** (`0x37290`): `0x12d9d4` .. `0x12d9d6` from CONFIG.DAT +0x81,
+  +0x83, +0x85, +0x89 (+0x87 the mirror's `0x12d9d7`); `0x5ba1c`: `0xf6b48` = 28, 18 or 13
+  by `0x12d9d5`, `0x1440c(0x12d9d4, 0x12d9d9)`: the detail min(`0x12d9d9`, 2), the view
+  ahead in its own layout, the outside one in its own + `0x12d9d4`. After the race at
+  320x200 `0x12d9d9` is kept at most 1 (`0x375e8`).
+- `0x12da04`: the keys End, Ins, the arrows, PgUp, PgDn, Space, Enter, Tab as bits, for the
+  replay (`0x5efb6`).
+
+**Ported (`port/src/racekeys.c`, `camera.c`'s `camera_next` and modes 6 and 7, `view.c`'s
+`view_layout`): the view key equal to the original.** `tools/camera_emu.py` presses it
+every 13 steps in five more runs (racing, racing through a tumble, watching the rival,
+not racing with the rival and the police placed ahead, the same without a chase) and
+compares the camera record each step: all 14 modes reached, all equal on the 11
+snapshots. The F keys, Alt+Ctrl+n and F5 are seen and heard in `--race` (pictures
+`build/shots/keys/`). Not yet: Shift+End, Alt+M, the joystick's view button, the replay's
+keys, the pause (`0x63304`, its menu `0x1f988`), the music's volume under F5.
 
 ## 5. The original in DOSBox (2026-10-19)
 

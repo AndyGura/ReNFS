@@ -292,6 +292,19 @@ void rsnd_engine_on(void)
     g_rsnd.sound[5] = 0x29;
 }
 
+void rsnd_mute(int on)
+{
+    int c;
+
+    if (on) {
+        for (c = 0; c < SND_CHANNELS; c++)
+            snd_volume(g_rsnd.voice[c], 0);
+        /* (0x72224(0, 1, 0x80): the music's volume 0 too; the race's music: not yet) */
+    }
+    /* (off, 0x721ec gives the music its volume again) */
+    g_rsnd.muted = on;
+}
+
 void rsnd_engine_off(void)
 {
     channel_stop(g_rsnd.engine_chan);

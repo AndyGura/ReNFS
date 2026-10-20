@@ -14,6 +14,7 @@
 #include "files.h"
 #include "racepal.h"
 #include "smoke.h"
+#include "racekeys.h"
 #include "racesnd.h"
 #include "sndlib.h"
 #include "road.h"
@@ -37,7 +38,6 @@
 static const int race_ids[RACE_CARS] = { 204, 201, 400, 7, 5, 0, 11, 6, 4 };
 #define RACERS 2
 #define MIRROR_SECTIONS 4      /* 0x13661c */
-#define DRAWN 28               /* the sections drawn ahead (0x136618) */
 
 static int quarter(int node)
 {
@@ -126,6 +126,8 @@ static void race_step(race_car *player, race_camera *cam)
     /* NITRO's keys: N with a shift or B */
     g_drive.nitro_keys = key_down(0x31) && (key_down(0x2a) || key_down(0x36) || key_down(0x30));
     g_drive.clock = (int)clock_ticks();
+    /* (race_step 0x6348c: the pause's keys 0x63304, not yet; then the race's other keys) */
+    race_keys(cam);
     race_throw(player, st);
     race_place(player, st);
     if (g_drive.flags & 4)
@@ -261,6 +263,7 @@ int race_test(const char *name)
     view_setup(&g_view_ahead, g_view_ahead.mode);
     view_setup(&g_view_mirror, g_view_mirror.mode);
     view_setup(&g_view_ahead, g_view_ahead.mode);
+    race_keys_start();         /* (the settings' detail, 0x5ba1c's 0x1440c) */
     /* (the opponent keeps the grid's node until its first step: the road's axes it
        drives by are worked out as that step moves it to the nearest, drive_opponent) */
     for (i = 0; i < RACERS; i++)
@@ -360,19 +363,32 @@ int race_test(const char *name)
             race_step(&cars[0], &cam);
             done++;
         }
+        /* the dials the player's car's, the status bar's numbers the car watched's
+           (Alt+Ctrl and a number) */
         driver.steer = cars[0].steer;
         driver.rpm = cars[0].rpm;
-        driver.speed = cars[0].speed;
-        driver.road_speed = cars[0].road_speed;
-        driver.gear = cars[0].gear;
-        driver.lap = cars[0].lap;
-        driver.node = cars[0].node;
+        {
+            const race_car *v = g_cars[g_drive.viewed];
+
+            driver.viewed = g_drive.viewed;
+            driver.human = g_drive.viewed < g_humans;
+            driver.player = v->player;
+            driver.speed = v->speed;
+            driver.road_speed = v->road_speed;
+            driver.gear = v->gear;
+            driver.lap = v->lap;
+            driver.node = v->node;
+        }
 
         /* the road's points (0x50070): its sections kept, gathered again when the
            camera is on another quarter (or an object was knocked over) */
+        /* (race_draw_frame 0x5bcf5: the road drawn as far as F3 asked, gathered again) */
+        if (race_keys_frame())
+            road_refresh();
+        g_hud.detail = g_view_detail;
         track_keep_sections(quarter(cam.node));
         if (g_track.last_node < 0 || quarter(g_track.last_node) != quarter(cam.node))
-            road_gather(cam.node, quarter(cam.node), DRAWN);
+            road_gather(cam.node, quarter(cam.node), g_rkeys.drawn);
         /* (the road behind for the mirror: 0x50070's end, when the camera's node changed
            or an object was knocked over: 0x5004c sets the camera's flag) */
         if (cam.flags || g_track.last_kinds < 0)
@@ -404,16 +420,16 @@ int race_test(const char *name)
         /* the view painted off the screen (0xf4578), then the dashboard puts it on the
            screen through its windows (0x31684), or from outside the HUD's lists (0x314e4) */
         raster_window(g_hud_view.pix, g_hud_view.w, win.x, win.y, win.x + win.w, win.y + win.h);
-        sky_draw(cam.yaw, m, &win, 0);
+        sky_draw(cam.yaw, m, &win, g_rkeys.plain_sky);
         g_car_ticket = g_opp.ticket_up || g_opp.warning_up;
         g_road_steps = g_drive.steps;
         road_objects_start();
-        road_draw(DRAWN, cam.node, near, &win);
+        road_draw(g_rkeys.drawn, cam.node, near, &win);
         g_hud.steps = g_drive.steps;
         g_hud.ahead = g_timing.split;
         g_hud.splits = g_timing.split_shown;
         g_hud.best_lap = g_drive.best_lap;
-        map.node = (short)cars[0].node;
+        map.node = (short)g_cars[g_drive.viewed]->node;
         for (i = 0; i < RACERS; i++)
             map.nodes[i] = (short)cars[i].node;
         map.place = g_timing.place_shown;   /* (the last frame's, as the map comes first) */
@@ -429,7 +445,7 @@ int race_test(const char *name)
                 hud_redraw_due();
             hud_frame(&driver);
         } else
-            hud_outside_frame(&driver, redraw, cam.ahead->layout);
+            hud_outside_frame(&driver, redraw, cam.ahead->current);
         in_seat = cam.mode == 0;
         /* (after the ticket, the screen round the view drawn again: 0xeaaa8) */
         g_view_redraw = k == 2;

@@ -314,6 +314,22 @@ Ghidra project and `build/decomp`, one command). The git history was started aga
   `--race cy1` is heard (`RENFS_SNDWAV=f` writes it). A voice's end comes from the clock
   (`snd_time`), not the mixer. Not yet: the race's music (voice 0 held for it), the speech.
 
+- **The race keys** (`port/src/racekeys.c`, NOTES §4.19): C changes the camera
+  (`camera_next` `0x1494c`; racing: the seat, behind, further back, higher, the seat
+  again), and the views from the rival's and the police car (modes 6 and 7, reached when
+  the race is not running) are in `camera_update`; Alt+Ctrl+1..8 watches another car (the
+  status bar and the map follow it); F1 the outside view's size (three, inside a border),
+  F2 the view's pixels doubled, F3 the road drawn 28, 14 or 9 sections ahead, F4 the sky
+  plain, F5 the sounds off and on, F6 the racers' markers. The race starts from the
+  settings' detail (+0x81, +0x83, +0x85, +0x89). **Equal**: `camera_emu.py` presses the
+  view key in five more runs a snapshot (racing, through a tumble, watching the rival,
+  not racing with the rival and the police close), every camera field equal each step, all
+  14 modes. **Changed on the way**: the port's answer to the speed test was read the
+  wrong way round (it gave the least detail: the road 13 sections ahead, the pixels
+  doubled); it now answers as the snapshots' original (all detail 0), `config_emu.py`
+  equal. Pictures: `build/shots/keys/` (keys.png, cams.png, watch.png); F5 heard in
+  `build/snd_port/race_f5.wav` (silent from 14 to 17 s).
+
 **Progress page for Danik**: https://claude.ai/artifact/VZdxTpYC3oLXYeBVJpoDoM (every step,
 its percent done and weight). Update its steps file after each finished step.
 
@@ -342,11 +358,12 @@ races 320x200 / 320x240; commit locally as the work goes.
    drives and crashes (equal step for step), and the status bar's numbers and the race's
    timing, the camera outside and the crash's smoke, the opponent's driving, and cars
    meeting cars, the roadside objects knocked over, the traffic, the police and the
-   sounds. Next: the race's keys (`race_keys` `0x47c88`: the cameras, among them 6 and 7
-   from the car ahead and the police car, the watched car, the pause and its mute
-   `0xeded0`), then the race's music (`0x34xxx`, the loops "loop1".., "p1".."p8") and the
-   speech (`0x722b4`/`0x72438`).
-   Open: who writes `0x136618` (28 sections drawn: a detail setting?). The walls `0x59294`
+   sounds, and the race's keys. Next: the pause (`race_check_pause` `0x63304`, its menu
+   `0x1f988`, Esc / P; Shift+End's giving up `0x1f0b4` with it), then the race's music
+   (`0x34xxx`, the loops "loop1".., "p1".."p8") and the speech (`0x722b4`/`0x72438`).
+   (`0x136618`, the sections drawn: the settings' +0x85 and F3, NOTES §4.19.)
+   Open: the race's sound reaches full scale at the hits and the horn (0.2 to 0.7 % of
+   the samples in `build/snd_port/`): how EA's mixer sums the voices is still to compare. The walls `0x59294`
    and the circuits' sky ring `0x4ace8` can be checked on CY1 memory with made-up input,
    or on snapshots of another track (`tools/nfsdos.py`).
 4. Front end (menus, car and track choice), then the race (track, cars, physics, HUD,

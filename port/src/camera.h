@@ -1,7 +1,7 @@
 /* The race's camera (camera_update 0x136b0, NOTES §4.7): where the frame is seen from,
-   once a race step. The driver's eyes (modes 0 and 1), the cameras outside (2 .. 13;
-   not 6 and 7, from the car ahead and from the police), the crash's view (13) and the
-   way back into the car (10, 11). */
+   once a race step. The driver's eyes (modes 0 and 1), the cameras outside (2 .. 13; 6
+   and 7 from the rival's car and the police car), the crash's view (13) and the way back
+   into the car (10, 11). */
 #ifndef RENFS_CAMERA_H
 #define RENFS_CAMERA_H
 
@@ -15,7 +15,11 @@ typedef struct {
     int ahead;                 /* +0x14: how far along the road the camera looks */
     int follow;                /* +0x18: 1, 2 the eye moved across with the car, 3 the car's
                                   yaw followed, 4 the road's */
-    int fill1c[4];             /* +0x1c .. */
+    int key_other;             /* +0x1c: the mode the view key gives next, racing, the
+                                  car watched not the player's */
+    int key_held;              /* +0x20: .. while the race is not running */
+    int key_player;            /* +0x24: .. racing, the player's car watched */
+    int fill28;
     int shift;                 /* +0x2c: a move's step: 1 / 2^shift of the way (or 1 / it) */
     int divide;                /* +0x30: the step 1 / shift instead */
     int fill34;
@@ -31,6 +35,8 @@ typedef struct {
 
 extern camera_mode g_cam_modes[CAMERA_MODES];
 extern int g_cam_pitch_bias;   /* 0x12ba20: the dashboard's (0 so far) */
+extern int g_cam_look_first;   /* 0xe8f68: the rival or the police may be looked at next
+                                  by the view key (-1: not yet read from the image) */
 
 /* the settings as the program has them, the driver's eye height the car's (its spec's
    +0x36c: modes 0 and 10, 0x147b2) */
@@ -39,6 +45,10 @@ void camera_init(int eye_height);
 void camera_set_car(race_camera *cam, const race_car *c, int mode);
 /* the camera this step (0x136b0) */
 void camera_update(race_camera *cam);
+/* camera_next 0x1494c: the view key: the next mode for the car watched, by the modes'
+   tables; while the race is not running, a car close ahead of or behind the player and
+   the police close behind are looked at first (after mode 5) */
+void camera_next(race_camera *cam);
 /* camera_check_mode 0x6324c, every step before the update: the camera outside (13)
    while the car watched is not upright along the road, and for a second after; then
    back into the mode wanted, through 10 or 11 for the driver's */

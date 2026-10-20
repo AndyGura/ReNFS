@@ -45,9 +45,9 @@ void (*g_retrace_hook)(void);
 
 /* RENFS_INPUT: keys and the mouse played in at given retraces, for pictures without a
    window: "<retrace>:<what>" or "<from>-<to>:<what>" (held from .. until) separated by
-   spaces; <what> is a key (up down left right enter esc space y n j tab f1..f4 bksp
-   del), "click", "rclick" (held 6 retraces unless a span is given), "m<x>,<y>",
-   "t<text>": those letters typed, or "k<letter>": that letter's key held */
+   spaces; <what> is a key (up down left right enter esc space y n j tab f1..f6 bksp
+   del ctrl alt lshift rshift end), "click", "rclick" (held 6 retraces unless a span is given), "m<x>,<y>",
+   "t<text>": those letters typed, or "k<letter>": that letter's (or digit's) key held */
 typedef struct {
     unsigned long at, until;
     int scan, buttons, x, y;
@@ -62,7 +62,8 @@ static const struct { const char *name; int scan; } g_script_keys[] = {
     { "esc", 0x01 }, { "enter", 0x1c }, { "space", 0x39 }, { "up", 0x48 }, { "down", 0x50 },
     { "left", 0x4b }, { "right", 0x4d }, { "tab", 0x0f }, { "y", 0x15 }, { "n", 0x31 },
     { "j", 0x24 }, { "f1", 0x3b }, { "f2", 0x3c }, { "f3", 0x3d }, { "f4", 0x3e },
-    { "bksp", 0x0e }, { "del", 0x53 },
+    { "bksp", 0x0e }, { "del", 0x53 }, { "f5", 0x3f }, { "f6", 0x40 }, { "ctrl", 0x1d },
+    { "alt", 0x38 }, { "lshift", 0x2a }, { "rshift", 0x36 }, { "end", 0x4f },
 };
 
 static const SDL_Scancode g_pc_keys[0x59][2];
@@ -94,6 +95,8 @@ static void script_parse(const char *s)
             ;
         else if (what[0] == 't' && what[1])
             snprintf(e->text, sizeof e->text, "%s", what + 1);
+        else if (what[0] == 'k' && what[1] >= '1' && what[1] <= '9' && !what[2])
+            e->scan = 2 + (what[1] - '1');
         else if (what[0] == 'k' && what[1] >= 'a' && what[1] <= 'z' && !what[2]) {
             for (int k = 0; k < 0x59; k++)
                 if ((int)g_pc_keys[k][0] == SDL_SCANCODE_A + (what[1] - 'a'))

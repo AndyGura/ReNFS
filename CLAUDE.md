@@ -206,8 +206,8 @@ Data folder: `-data`, else `$RENFS_DATA`, else `./NFSSE`, else `NFSSE` beside th
 (the port's own formats, never the game's files). `RENFS_LANG=de`: the German art;
 `RENFS_NOSOUND=1`: no sound; `RENFS_SNDWAV=f`: what is heard written to a WAV (checking);
 `RENFS_INPUT="<retrace>:<key> .."`: keys and mouse given at those retraces (esc enter
-space up down left right tab y n j f1-f4 bksp del click rclick m<x>,<y>, t<text> typed,
-k<letter> held; `<from>-<to>:<key>` holds a key through those retraces, several at
+space up down left right tab y n j f1-f6 bksp del ctrl alt lshift rshift end click
+rclick m<x>,<y>, t<text> typed, k<letter> or k<digit> held; `<from>-<to>:<key>` holds a key through those retraces, several at
 once; for `--shot` tests);
 `RENFS_SHOTRAW=f`: `--shot` also writes the palette numbers (comparing by entry);
 `RENFS_THROW=s:x,y,z`: the car given a speed at race step s (to see a crash);
@@ -250,6 +250,9 @@ and the frame, a step every 3 ticks),
 pitch and sides; NOTES §4.18) and `racesnd.c` (the race's 16 channels: engine, road, tyres,
 horns, siren and radar, the two nearest cars, the hits; equal step for step,
 `tools/opponent_emu.py --full --sound`), the samples mixed by `audio.c`'s voices,
+`racekeys.c` (`race_keys` `0x47c88`: C the camera `camera_next` `0x1494c`, Alt+Ctrl+1..8
+the car watched, F1..F6 view size, pixels, road distance, sky, sound, markers; the view
+key equal, `tools/camera_emu.py`; NOTES §4.19),
 `collide.c` (cars meeting cars: `0x1c878`'s loop, the boxes pushed apart `0x2b864`/`0x26324`,
 the hit `0x2afb8`, EA's random numbers `0x91e04`; equal, `tools/collide_emu.py`, NOTES §4.14;
 the roadside objects knocked over `0x1ebf4`, NOTES §4.15),

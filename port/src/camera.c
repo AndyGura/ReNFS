@@ -2,7 +2,9 @@
 #include "camera.h"
 #include "cardraw.h"
 #include "crash.h"
+#include "drive.h"
 #include "exe.h"
+#include "opponent.h"
 #include "poly.h"
 #include "timing.h"
 #include "track.h"
@@ -68,9 +70,10 @@ static void set_mode(race_camera *cam, int mode)
         cam->eye = m->eye2;
     cam->tilt[0] = cam->tilt[1] = cam->tilt[2] = 0;
     camera_update(cam);
-    /* the view's window (0x14210: the layout's for the detail, 0 here), the screen round
-       it to be drawn again */
-    view_setup(cam->ahead, cam->ahead->mode);
+    /* the view's window (0x14210: its layout's for the detail), the screen round it to be
+       drawn again */
+    if (cam->ahead->current > -1)
+        view_layout(cam->ahead, cam->ahead->current);
     g_view_redraw = 1;
 }
 
@@ -110,6 +113,82 @@ void camera_check(race_camera *cam, const race_car *watched)
         mode = cam->wanted == 0 ? 10 : cam->wanted == 1 ? 11 : cam->wanted;
     }
     set_mode(cam, mode);
+}
+
+/* 0x50428: the police in a chase, from just ahead of the player's car to 12 nodes behind */
+static int police_close(void)
+{
+    const race_car *p = g_cars[2];
+    int d;
+
+    if (!g_drive.chase || !((p->bits[1] & 0x24) || (p->bits[2] & 4)))
+        return 0;
+    d = g_cars[g_player]->node - p->node;
+    return d > -1 && d <= 12;
+}
+
+/* 0x50478: the other racer (not a traffic car) from 10 nodes ahead to 12 behind */
+static int rival_close(void)
+{
+    int d;
+
+    if (g_opp.rival_car == 9)
+        return 0;
+    d = g_cars[g_player]->node - g_cars[1 - g_player]->node;
+    return d > -10 && d <= 12;
+}
+
+int g_cam_look_first = -1;
+
+void camera_next(race_camera *cam)
+{
+    int was = cam->wanted, mode;
+    const race_car *c;
+
+    if (g_cam_look_first < 0)  /* (the image's, kept from race to race) */
+        g_cam_look_first = exe_i32(0xe8f68);
+    for (;;) {
+        const camera_mode *m = &g_cam_modes[cam->mode];
+
+        if (g_drive.state == 1)
+            cam->wanted = g_drive.viewed == g_player && !g_timing.stopped ? m->key_player
+                                                                         : m->key_other;
+        else if (cam->mode != 7 && g_drive.police && police_close() && g_cam_look_first) {
+            g_cam_look_first = 0;
+            cam->wanted = 7;
+        } else if (cam->mode != 6 && rival_close() && g_cam_look_first && cam->mode != 10) {
+            g_cam_look_first = 0;
+            cam->wanted = 6;
+        } else
+            cam->wanted = m->key_held == 7 && !g_drive.police ? 0 : m->key_held;
+        mode = cam->wanted;
+        /* the rival's camera and the police's: the mode passed over when its car is not
+           close */
+        if (mode == 6) {
+            if (rival_close()) {
+                c = g_cars[g_player == 0];
+                break;
+            }
+        } else if (mode == 7 && g_drive.chase) {
+            if (police_close()) {
+                c = g_cars[2];
+                break;
+            }
+        } else {
+            /* not into the driver's seat while a tumble is shown */
+            if ((mode == 10 || mode == 11 || mode <= 3) && g_crash.view) {
+                cam->wanted = was;
+                return;
+            }
+            c = g_cars[g_drive.viewed];
+            break;
+        }
+        cam->mode = cam->wanted;
+    }
+    camera_set_car(cam, c, mode);
+    if (cam->wanted == 5)
+        g_cam_look_first = 1;
+    set_mode(cam, cam->wanted);
 }
 
 int shake_wave(int amount, int phase)
@@ -370,7 +449,13 @@ void camera_update(race_camera *cam)
     const race_car *c = cam->car;
     camera_mode *mt = &g_cam_modes[cam->mode];
 
-    /* (6 and 7, the views from the car ahead and from the police car: not yet) */
+    /* the views from the rival's car (6) and the police car (7), while it is close and
+       upright; else the camera behind the player's car, outside (13) */
+    if ((cam->mode == 6 && (!rival_close() || !upright_on_road(g_cars[1])))
+        || (cam->mode == 7 && (!police_close() || !upright_on_road(g_cars[2])))) {
+        camera_set_car(cam, g_cars[g_player], 13);
+        return;
+    }
     if (cam->mode <= 1) {
         /* the driver's eyes: the car's nodding and leaning (0xea70c = 1, never changed)
            less its shakes; the eye turned with the car */

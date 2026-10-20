@@ -22,7 +22,7 @@ U8 = ctypes.c_ubyte
 def lib():
     out = "build/camera_test.so"
     subprocess.check_call(["cc", "-O1", "-g", "-shared", "-fPIC", "-o", out] +
-                          ["port/src/" + f for f in SOURCES] + ["-Iport/src"] +
+                          ["port/src/" + f for f in SOURCES] + ["tools/camera_test.c", "-Iport/src"] +
                           subprocess.check_output(["sdl2-config", "--cflags", "--libs"]).decode().split())
     return ctypes.CDLL(os.path.abspath(out))
 
@@ -142,7 +142,12 @@ def check(path, L, bad, stats):
 # race_update_cars does): (name, the mode set at the start or None, steps, the car's
 # moves); the car goes along the road from its node, tumbling (state 4) in the crash
 VIEWS = [("crash", None, 220), ("crash, put back", None, 160)] + \
-        [("mode %d" % m, m, 90) for m in (2, 3, 4, 5, 8, 9, 10, 11, 12, 13)]
+        [("mode %d" % m, m, 90) for m in (2, 3, 4, 5, 8, 9, 10, 11, 12, 13)] + \
+        [("keys", None, 240), ("keys, crash", None, 220), ("keys, the rival watched", None, 200),
+         ("keys, not racing", None, 300), ("keys, not racing, no chase", None, 300)]
+# the view key (camera_next 0x1494c) pressed every KEY_EVERY steps in the "keys" runs; not
+# racing, the rival and the police put ahead so the car passes them
+KEY_EVERY = 13
 
 
 def node_xyz(L, n):
@@ -159,7 +164,7 @@ def car_at(L, what, k, n0):
     x += across * (hz >> 8) // 0x600 >> 8 << 8 if hz else 0
     z -= across * (hx >> 8) // 0x600 >> 8 << 8 if hx else 0
     dist = (k % 2) * 0x30000 + 0x1000 * (k % 7)
-    tumble = what.startswith("crash") and k < (120 if what == "crash" else 70)
+    tumble = (what.startswith("crash") or what == "keys, crash") and k < (120 if what != "crash, put back" else 70)
     if tumble:
         p, yw, r = (k * 0x54321) & 0xffffff, (head + k * 0x123456) & 0xffffff, (k * 0x234567 + 0x400000) & 0xffffff
         y += (k % 9) * 0x18000
@@ -209,6 +214,41 @@ def views(path, L, bad, stats):
         k.mirror_on, k.yaw_follow = g(0x68), g(0x78)
         k.step = Vec3(g(0x7c), g(0x80), g(0x84))
         k.car = ctypes.cast(ctypes.pointer(rc), ctypes.POINTER(Car))
+        keys = what.startswith("keys")
+        others = []
+        if keys:
+            # the other racer and the police, standing; not racing, put ahead of the car
+            racing = "not racing" not in what
+            viewed = 1 if "rival" in what else 0
+            chase = 0 if "no chase" in what else 1
+            for i, ahead in ((1, 40), (2, 70)):
+                a = s.u32(0x13c24c + 4 * i)
+                o = RaceCar()
+                n = n0 + ahead if not racing else struct.unpack("<i", s.raw(a + 0x48, 4))[0]
+                x, y, z = node_xyz(L, n)
+                head = ((L.node_i32(n, 0x16) >> 16) << 10) & 0xffffff
+                for off, v in ((0, x), (4, y), (8, z), (0xc, 0), (0x10, head), (0x14, 0), (0x48, n)):
+                    s.mu.mem_write(a + off, struct.pack("<i", v))
+                o.pos, o.yaw, o.node, o.state = Vec3(x, y, z), head, n, 2
+                ga = lambda off: struct.unpack("<i", s.raw(a + off, 4))[0]
+                o.body_roll, o.body_pitch, o.dist = ga(0x365), ga(0x369), ga(0x39d)
+                o.roll_phase, o.pitch_phase = s.raw(a + 0x427, 1)[0], s.raw(a + 0x428, 1)[0]
+                o.roll_shake, o.pitch_shake = ga(0x429), ga(0x42d)
+                o.number, o.player = struct.unpack("<i", s.raw(a + 0x48a, 4))[0], i
+                bits = bytearray(s.raw(a + 0x174, 3))
+                if i == 2:
+                    bits[1] |= 0x20
+                    s.mu.mem_write(a + 0x174, bytes(bits))
+                o.bits[:] = list(bits)
+                (ctypes.c_void_p * 3).in_dll(L, "g_cars")[i] = ctypes.addressof(o)
+                others.append(o)
+            for a, v in ((0xf6b74, 1 if racing else 4), (0x12dd54, viewed), (0x145c90, 0), (0x12da34, 1),
+                         (0x12dd08, chase), (0x12da9e, 0), (0xe8f68, 1)):
+                s.write(a, struct.pack("<i", v))
+            L.camera_test_set(1 if racing else 4, viewed, 0, 1, chase, 0, 1)
+            if viewed:
+                s.call(0x13530, eax=cam, edx=s.u32(0x13c250), ebx=4)
+                L.camera_set_car(ctypes.byref(k), ctypes.byref(others[0]), 4)
         ok = True
         for step in range(steps):
             x, y, z, p, yw, r, n, dist, state = car_at(L, what, step, n0)
@@ -220,9 +260,21 @@ def views(path, L, bad, stats):
             if step == 0 and mode is not None:
                 s.call(0x13530, eax=cam, edx=car, ebx=mode)
                 L.camera_set_car(ctypes.byref(k), ctypes.byref(rc), mode)
-            s.call(0x6324c, eax=car)
+            if keys and step % KEY_EVERY == KEY_EVERY - 1:
+                s.call(0x1494c, eax=cam)
+                L.camera_next(ctypes.byref(k))
+                if os.environ.get("CAM_DEBUG"):
+                    print(what, step, "after the key: the original", g(0), g(4), hex(g(0x90)),
+                          "viewed", s.i32(0x12dd54), "the port", k.mode, k.wanted)
+                stats["keys"] += 1
+                if L.camera_test_look_first() != s.i32(0xe8f68):
+                    bad.append("%s %s, step %d, the rival or police next: the original %d, the port %d" % (
+                        name, what, step, s.i32(0xe8f68), L.camera_test_look_first()))
+                    ok = False
+            watched = s.u32(0x13c24c + 4 * s.i32(0x12dd54))
+            s.call(0x6324c, eax=watched)
             s.call(0x136b0, eax=cam)
-            L.camera_check(ctypes.byref(k), ctypes.byref(rc))
+            L.camera_check(ctypes.byref(k), ctypes.byref(others[0] if keys and s.i32(0x12dd54) else rc))
             L.camera_update(ctypes.byref(k))
             stats["steps"] += 1
             for field, offs, port in CAM_FIELDS:
@@ -250,12 +302,13 @@ def main():
     if not L.track_load(name.encode()):
         sys.exit("no track")
     for p in snaps:
-        bad, stats = [], {"follow": 0, "moved": 0, "steps": 0, "modes": set()}
+        bad, stats = [], {"follow": 0, "moved": 0, "steps": 0, "modes": set(), "keys": 0}
         check(p, L, bad, stats)
         views(p, L, bad, stats)
-        print("%s: the grid, %d node searches (%d moved), the camera, %d steps outside (modes %s): %s" % (
+        print("%s: the grid, %d node searches (%d moved), the camera, %d steps outside (modes %s, "
+              "the view key %d times): %s" % (
             os.path.basename(p), stats["follow"], stats["moved"], stats["steps"],
-            sorted(stats["modes"]), "all equal" if not bad else "%d differ" % len(bad)))
+            sorted(stats["modes"]), stats["keys"], "all equal" if not bad else "%d differ" % len(bad)))
         for b in bad[:12]:
             print("  " + b)
 
