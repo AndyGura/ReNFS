@@ -598,16 +598,19 @@ static int u16(const unsigned char *p)
 
 /* a picture through a BAMF list into the window (0x8b8f0): each span from its place in
    the picture to its place in the window (by 64 KB bank), going on at the start of the
-   next row of both where the window's row ends. Only the 1:1 lists so far */
+   next row of both where the window's row ends. The list's +0xc is the rate the picture
+   is read at across (0x10000 1:1, 0x8000 each pixel twice): the window's i-th pixel of a
+   piece from the picture's (i · rate) >> 16-th (the step table 0x15ed1c, 0xa6240; the
+   rows doubled are the list's own spans) */
 static void bamf_copy(const hud_picture *from, const unsigned char *list)
 {
     const unsigned char *p = list + 0x14;
-    int banks, b, n, i, sr, sc, dr, dc, len, k;
-    unsigned so, d;
+    int banks, b, n, i, sr, sc, dr, dc, len, k, j;
+    unsigned so, d, rate;
 
-    if (!list || memcmp(list, "BAMF", 4) != 0
-        || ((unsigned)u16(list + 0xc) | (unsigned)u16(list + 0xe) << 16) != 0x10000)
+    if (!list || memcmp(list, "BAMF", 4) != 0)
         return;
+    rate = (unsigned)u16(list + 0xc) | (unsigned)u16(list + 0xe) << 16;
     banks = u16(list + 8);
     for (b = 0; b < banks; b++) {
         n = u16(p);
@@ -621,8 +624,15 @@ static void bamf_copy(const hud_picture *from, const unsigned char *list)
             dr = (int)(d / (unsigned)g_win.w);
             dc = (int)(d % (unsigned)g_win.w);
             while (len > 0 && sr < from->h && dr < g_win.h) {
+                const unsigned char *src = from->pix + (long)sr * from->w + sc;
+                unsigned char *dst = g_win.pix + (long)dr * g_win.w + dc;
+
                 k = dc + len > g_win.w ? g_win.w - dc : len;
-                memmove(g_win.pix + (long)dr * g_win.w + dc, from->pix + (long)sr * from->w + sc, k);
+                if (rate == 0x10000)
+                    memmove(dst, src, k);
+                else
+                    for (j = 0; j < k; j++)
+                        dst[j] = src[(unsigned)j * rate >> 16];
                 len -= k;
                 sr++, dr++;
                 sc = dc = 0;

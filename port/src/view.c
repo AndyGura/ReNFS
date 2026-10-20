@@ -87,15 +87,24 @@ void view_setup(view_rec *v, int mode)
     view_set_focal(g_view.focal);
 }
 
-void view_layout(view_rec *v, int n)
+int view_set_mode(view_rec *v, int n, int detail)
 {
     int at = 0xe8b10 + 0x16c * g_view_res + 52 * n, i;
 
+    if (n < 0)
+        return 0;
     v->current = n;
     v->lens_h = exe_i32(at + 0x20);
     for (i = 0; i < 4; i++)
         v->box[i] = exe_i32(at + 0x24 + 4 * i);
-    view_setup(v, exe_i32(at + 4 + 4 * g_view_detail));
+    view_setup(v, exe_i32(at + 4 + 4 * detail));
+    g_view_redraw = 1;
+    return 1;
+}
+
+void view_layout(view_rec *v, int n)
+{
+    view_set_mode(v, n, g_view_detail);
 }
 
 view_rec *view_of_kind(int kind)

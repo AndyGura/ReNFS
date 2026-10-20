@@ -1,6 +1,7 @@
 /* The race held (NOTES §4.20). */
 #include "pause.h"
 #include "audioopt.h"
+#include "gfxopt.h"
 #include "camera.h"
 #include "cardraw.h"
 #include "config.h"
@@ -15,10 +16,12 @@
 #include "racekeys.h"
 #include "racesnd.h"
 #include "replay.h"
+#include "session.h"
 #include "sound.h"
 #include "timing.h"
 #include "video.h"
 #include <stdio.h>
+#include <string.h>
 
 race_pause g_pause;
 
@@ -149,7 +152,11 @@ static void menu(void)
     int ready = 1, released = 1, esc_up = 0, k;
     unsigned held = 0;
 
-    /* the race's palette kept, its sounds stopped, the screen faded down and 640x480 */
+    /* the settings as before the race (0x565c1), with the detail as the keys left it
+       (0x56b48); the race's palette kept, its sounds stopped, the screen faded down and
+       640x480 */
+    memcpy(g_config + 9, g_session.kept, sizeof g_session.kept);
+    race_keys_to_config();
     video_get_palette(race_pal, 0, 256);
     rsnd_stop_all();
     pal_fade_down(0, 256);
@@ -250,7 +257,10 @@ static void menu(void)
                     first = redraw = 1;
                     break;
                 case GRAPHICS:             /* fe_graphics_options 0x32d08(1) */
-                    fprintf(stderr, "renfs: that screen is not written yet\n");
+                    pal_fade_down(0, 256);
+                    fe_graphics_options(GFX_PAUSE);
+                    place(sel);
+                    first = redraw = 1;
                     break;
                 case QUIT:
                     if (fe_yes_no_dialog(g_german ? "Spiel beenden ?" : "End game ?")) {
@@ -308,6 +318,7 @@ static void menu(void)
     music_wait_end();
     video_mode(320, 200);
     video_palette(race_pal, 0, 256);
+    memcpy(g_session.kept, g_config + 9, sizeof g_session.kept);   /* (0x5809d) */
     fe_sound_unmute();                     /* (0x58107: F5's silence ends here) */
     inv_build();                           /* (make_inverse_table 0x8227c) */
     hud_redraw_due();
@@ -334,6 +345,7 @@ void race_pause_step(race_camera *cam, int done)
                 unsigned from = clock_ticks();
                 menu();
                 camera_set_mode(cam, cam->mode);
+                race_keys_from_config();
                 g_pause.held_ticks += clock_ticks() - from;
             }
             else

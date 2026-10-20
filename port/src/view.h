@@ -68,8 +68,11 @@ void view_init(int res, int car, int horizon);
 /* a view in window `mode` (0x14154): the sky's tables, the lens, the reciprocals */
 void view_setup(view_rec *v, int mode);
 /* the view in its layout `layout` (0x14210): the layout's window for the detail
-   g_view_detail, its box on the screen */
+   g_view_detail, its box on the screen; the view changed (g_view_redraw) */
 void view_layout(view_rec *v, int layout);
+/* the same with the window of another detail (0x14568: the detail itself kept); 0 for
+   no layout (-1) */
+int view_set_mode(view_rec *v, int layout, int detail);
 /* the view a camera mode's kind (its settings' +0) looks through: 0 the driver's, 1
    outside (0xe8de8 + 32 · kind) */
 view_rec *view_of_kind(int kind);

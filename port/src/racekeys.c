@@ -15,6 +15,14 @@ race_keys_state g_rkeys;
 enum { K_1 = 2, K_CTRL = 0x1d, K_LSHIFT = 0x2a, K_ALT = 0x38, K_RSHIFT = 0x36, K_END = 0x4f, K_F1 = 0x3b, K_F2, K_F3, K_F4,
        K_F5, K_F6 };
 
+/* 0x1440c: the views' detail and their layouts, the outside's moved on by its size */
+static void views_start(int outside)
+{
+    g_view_detail = g_rkeys.window > 2 ? 2 : g_rkeys.window;
+    view_layout(&g_view_ahead, g_view_ahead.layout);
+    view_layout(&g_view_outside, g_view_outside.layout + outside);
+}
+
 void race_keys_start(void)
 {
     static const int drawn[3] = { 0x1c, 0x12, 0xd };    /* (0x5bbd3) */
@@ -27,10 +35,7 @@ void race_keys_start(void)
     g_rkeys.road = config_word(0x85) & 0xff;
     g_rkeys.plain_sky = config_word(0x89) & 0xff;
     g_no_markers = 0;
-    /* 0x1440c: the views' detail and their layouts, the outside's moved on by +0x81 */
-    g_view_detail = g_rkeys.window > 2 ? 2 : g_rkeys.window;
-    view_layout(&g_view_ahead, g_view_ahead.layout);
-    view_layout(&g_view_outside, g_view_outside.layout + (config_word(0x81) & 0xff));
+    views_start(config_word(0x81) & 0xff);
     g_rkeys.drawn = 0x1c;
     g_rkeys.drawn_next = g_rkeys.road < 3 ? drawn[g_rkeys.road] : -1;
 }
@@ -146,4 +151,24 @@ int race_keys_frame(void)
     g_rkeys.drawn = g_rkeys.drawn_next;
     g_rkeys.drawn_next = -1;
     return 1;
+}
+
+void race_keys_to_config(void)
+{
+    /* (0x56b48: at 320x200 the pixels at most doubled across) */
+    if (!g_view_res && g_rkeys.window > 1)
+        g_rkeys.window = 1;
+    config_set_word(0x83, g_rkeys.window);
+    config_set_word(0x85, g_rkeys.road);
+    config_set_word(0x89, g_rkeys.plain_sky);
+    config_set_word(0x81, g_view_outside.current - g_view_outside.layout);   /* 0x144cc */
+}
+
+void race_keys_from_config(void)
+{
+    /* (0x5818d; the road's distance itself changes at the next Esc or F3) */
+    g_rkeys.window = config_word(0x83) & 0xff;
+    g_rkeys.road = config_word(0x85) & 0xff;
+    g_rkeys.plain_sky = config_word(0x89) & 0xff;
+    views_start(config_word(0x81) & 0xff);
 }

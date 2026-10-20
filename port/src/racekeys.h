@@ -27,6 +27,11 @@ extern race_keys_state g_rkeys;
    outside view's size, +0x83 the pixels, +0x85 the road, +0x89 the sky) and the view
    key */
 void race_keys_start(void);
+/* the pause menu's (0x56b48, 0x5818d): the detail as the keys left it into the settings
+   (+0x81 .. +0x89) for the graphics screen, and back into the race with the views set up
+   again */
+void race_keys_to_config(void);
+void race_keys_from_config(void);
 /* race_keys 0x47c88, once a race step */
 void race_keys(race_camera *cam);
 /* the frame's start (race_draw_frame 0x5bcf5): the road drawn as far as F3 asked; 1 if

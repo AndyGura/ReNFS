@@ -320,7 +320,7 @@ int race_run(void)
     hud_car driver;
     hud_map_state map;
     unsigned start, now;
-    int mirror_skip = 0, redraw, in_seat = 1, seat;
+    int mirror_skip = 0, redraw, in_seat = 1, seat, settle = 0;
     unsigned done = 0;
     const char *car;
 
@@ -664,6 +664,19 @@ int race_run(void)
         cars_list();           /* (the race's step does this) */
 
         m = view_select(&cam, 0);
+        /* the view changed (0x5bdaa): set up again with its 1:1 window for this frame,
+           and with its detail's at the next (0x5bd71); this also makes the projection's
+           table the view ahead's again, whoever's view was set up last */
+        if (settle) {
+            int keep = g_view_redraw;
+            view_set_mode(cam.ahead, cam.ahead->current, g_view_detail);
+            g_view_redraw = keep;
+            settle = 0;
+        }
+        if (g_view_redraw) {
+            view_set_mode(cam.ahead, cam.ahead->current, 0);
+            settle = 1;
+        }
         view_matrix(&cam);
         g_camera_m = m;
         cars_seen(cam.node);
@@ -922,6 +935,7 @@ int race_test(const char *name)
     len = config_word(CFG_RACE_LENGTH);
     len = len < 0 || len > 2 ? 2 : len;
     config_set_word(CFG_LAPS, (i >= 4 && i <= 7 ? (int[]){ 2, 6, 12 } : (int[]){ 4, 8, 16 })[len]);
+    keep_settings();
     return race_run();
 }
 
@@ -936,6 +950,7 @@ int race_replay_test(const char *name, int kind)
     memset(g_config + 0x3b, 0, 0x20);
     snprintf((char *)g_config + 0x3b, 0x20, "%s", name);
     config_set_word(0xaf, kind);
+    keep_settings();
     r = race_run();
     config_set_word(0xaf, 0);
     return r;

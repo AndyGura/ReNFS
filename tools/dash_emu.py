@@ -38,6 +38,8 @@ MAP_MORE = [("mirrored", None), ("cop", None), ("cop", -20), ("cop", -300), ("co
 STEPS = [None, 0, 59, 60, 179, 250, 299, 300, 359]
 RADARS = [None, 0, 1, 2, 3, 5, 7, 7, 0]
 FLASHES = [None, 0, 1, 0, 1, 1, 0, 1, 0]
+# and the detail (0x143e04): the view's pixels 1:1, doubled across, doubled both ways
+DETAILS = [None, 0, 1, 2, 1, 0, 2, 1, 0]
 # then frames after the start, each changing the race (on both sides) for the status
 # bar's numbers: the race's steps, the viewed car's speed, gear, node and lap, the split,
 # the mode (0 the segment, 1 the race), a circuit, kilometres, the finish, a new best lap,
@@ -201,7 +203,8 @@ def original_frames(path):
         for at, v in ((0x18, STEERS[k]), (0x3c1, RPMS[k]), (0x68, SPEEDS[k])):
             if v is not None:
                 s.mu.mem_write(car + at, struct.pack("<i", v))
-        for at, v in ((0x145c94, STEPS[k]), (0xea814, RADARS[k]), (0x12b9f8, FLASHES[k])):
+        for at, v in ((0x145c94, STEPS[k]), (0xea814, RADARS[k]), (0x12b9f8, FLASHES[k]),
+                      (0x143e04, DETAILS[k])):
             if v is not None:
                 s.write(at, struct.pack("<i", v))
         s.call(0x31684, eax=car)
@@ -236,7 +239,8 @@ def port_frames(s, L):
         for f, v in (("steer", STEERS[k]), ("rpm", RPMS[k]), ("speed", SPEEDS[k])):
             if v is not None:
                 setattr(car, f, v)
-        for f, v in (("steps", STEPS[k]), ("radar", RADARS[k]), ("radar_flash", FLASHES[k])):
+        for f, v in (("steps", STEPS[k]), ("radar", RADARS[k]), ("radar_flash", FLASHES[k]),
+                     ("detail", DETAILS[k])):
             if v is not None:
                 setattr(st, f, v)
         L.hud_frame(ctypes.byref(car))
@@ -368,6 +372,8 @@ def port(s, name, L):
 # view drawn (0x3081c), then frames of 0x314e4 (the first a whole copy), the engine's
 # turns of each and the pattern standing in for the road
 OUT_RPMS = [800, 2500, 4000, 6100, 7240, 9999, 300]
+# the detail of each (0x143e04: the lists that double the view's pixels across, both ways)
+OUT_DETAILS = [0, 0, 1, 2, 1, 0, 2]
 LAYOUT = 1
 
 
@@ -392,6 +398,7 @@ def original_outside(path):
     for k, rpm in enumerate(OUT_RPMS):
         s.mu.mem_write(base + 17 * W, pattern(k))
         s.mu.mem_write(car + 0x3c1, struct.pack("<i", rpm))
+        s.write(0x143e04, struct.pack("<i", OUT_DETAILS[k]))
         s.call(0x314e4, eax=car, edx=int(k == 0))
         got.append(bytes(s.mu.mem_read(VGA, W * H)))
     return got
@@ -423,6 +430,7 @@ def port_outside(s, L):
     for k, rpm in enumerate(OUT_RPMS):
         ctypes.memmove(view.pix + 17 * W, pattern(k), 160 * W)
         car.rpm = rpm
+        st.detail = OUT_DETAILS[k]
         L.hud_outside_frame(ctypes.byref(car), int(k == 0), LAYOUT)
         got.append(ctypes.string_at(scr.pix, W * H))
     return got
