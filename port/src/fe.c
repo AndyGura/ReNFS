@@ -8,6 +8,7 @@
 #include "fsh.h"
 #include "menu.h"
 #include "movie.h"
+#include "race.h"
 #include "sound.h"
 #include "video.h"
 #include <stdio.h>
@@ -103,18 +104,38 @@ void fe_title_screen(void)
 
 int fe_attract_mode(void)
 {
-    static int round, attract_n;
+    static int round, attract_n, replay_n;     /* 0xeaaca: a round played, the replay */
     unsigned char black[768] = { 0 };
     int stopped = 0;
 
-    /* from the second round on the original first plays a replay, REPLAY1..3.RPL in
-       turn (race_run in replay mode): to come with the race */
+    /* from the second round on a replay first (0x342b7): REPLAY1..3.RPL in turn from
+       REPLAY2, its highlights (+0xaf 3, race_run in replay mode); Done (Esc) there skips
+       the films. (The original plays it only on a machine its speed test finds fast,
+       0xec414 > 5,400,000: the port's machine is) */
+    if (round) {
+        char name[32], path[64];
+        FILE *f;
+
+        replay_n = (replay_n + 1) % 3;
+        snprintf(name, sizeof name, "REPLAY%d.RPL", replay_n + 1);
+        memset(g_config + 0x3b, 0, 0x20);
+        memcpy(g_config + 0x3b, name, strlen(name));
+        config_set_word(0xaf, 3);
+        snprintf(path, sizeof path, "GAMEDATA/REPLAY/%s", name);
+        if ((f = file_open(path))) {
+            fclose(f);
+            stopped = race_run() == 0x40;      /* (race_run: 1 for the attract mode's
+                                                  0x40) */
+        }
+        config_set_word(0xaf, 0);
+    }
     if (round++ == 0) {
         int r = (rand() & 0x7fff) / 0x2aaa;   /* 0x74aec: Watcom's rand is 15 bits; 3 = 0 */
         attract_n = r > 2 ? 0 : r;
     } else
         attract_n = (attract_n + 1) % 3;
-    stopped = movie_play("EA.TGV") > 0;
+    if (!stopped && !g_quit)
+        stopped = movie_play("EA.TGV") > 0;
     if (!stopped && !g_quit) {
         char name[32];
         snprintf(name, sizeof name, "ATTRACT%d.TGV", attract_n + 1);

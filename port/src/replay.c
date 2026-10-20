@@ -903,6 +903,10 @@ static void highlights(void)
         g_replay.hl[0][2] = 200;
         g_replay.nhighlights = 1;
     }
+    if (getenv("RENFS_REPLAYCHECK"))
+        for (k = 0; k < g_replay.nhighlights; k++)
+            fprintf(stderr, "highlight %d: %d..%d event 0x%x\n", k, g_replay.hl[k][0],
+                    g_replay.hl[k][1], g_replay.hl[k][2]);
 }
 
 /* 0x5dac4: a highlight's camera: the other racer or the police near, theirs (6, 7);
@@ -1078,6 +1082,10 @@ static void back_to_race(void)
     g_bar.speed = 0;
     g_bar.redraw = 1;
     g_replay.cam->wanted = g_replay.camera_kept;
+    /* the driver's seat asked for while the player's car lies rolled over: the camera
+       above it at once */
+    if (g_replay.camera_kept == 0 && g_cars[0]->roll > 0x1e0000 && g_cars[0]->roll < 0xdc0000)
+        g_replay.cam->mode = 4;
     g_replay.highlight = -2;
     rsnd_mute(0);
     rsnd_engine_restart();
@@ -1450,9 +1458,14 @@ void replay_step(void)
             begin(g_replay.mode);
             g_replay.mode = 0;
         } else if (g_replay.mode == 7) {
-            if (!g_replay.from_menu)
-                back_to_race();
-            else
+            /* (the original sends Done again each step Done stays held, each time
+               running fast from the start again to the same end; the port reads the keys
+               and the mouse only between frames, none of which come while running fast:
+               once on the way is enough) */
+            if (!g_replay.from_menu) {
+                if (!(g_drive.state == 3 && g_replay.resume == 1))
+                    back_to_race();
+            } else
                 g_replay.end = g_replay.attract ? 0x40 : 0x20;
             g_replay.auto_camera = 0;
             g_replay.mode = 0;

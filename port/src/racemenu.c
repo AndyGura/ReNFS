@@ -5,6 +5,7 @@
 #include "config.h"
 #include "drive.h"
 #include "movie.h"
+#include "race.h"
 #include "session.h"
 #include "fe.h"
 #include "files.h"
@@ -15,6 +16,7 @@
 #include "standings.h"
 #include "video.h"
 #include <stdio.h>
+#include <string.h>
 #include <time.h>
 
 enum { CONTINUE, REPLAY, HIGHLIGHTS, OPTIONS, STANDINGS, CHAT, QUIT, NONE };
@@ -47,6 +49,56 @@ static int load(unsigned char *pal, const char *name)
         return 0;
     }
     return 1;
+}
+
+/* Replay or Highlights in either menu (0x1add8 in 0x1a5d8, the same in 0x1b6a0): the
+   menus let go, REPLAY.RPL (the race just driven, from the home folder) played by
+   race_run, +0xaf 1 the whole race or 2 its highlights; what the race left (the session
+   0x15cb68 .. 0x15d11e and each racer's points this race) kept and put back, a finished
+   race staying finished; the menus back in the dark */
+static void replay_from_menu(int sel)
+{
+    race_session kept = g_session;
+    int finished = g_session.result == 1;
+
+    music_fade_out();
+    pal_fade_down(0, 256);
+    music_wait_end();
+    fe_sound_bank_free();
+    memset(g_config + 0x3b, 0, 0x20);
+    memcpy(g_config + 0x3b, "REPLAY.RPL", 10);
+    config_set_word(0xaf, sel == REPLAY ? 1 : 2);
+    /* (0xf748e: the volumes put back when the audio screen's F5 has silenced the menus:
+       not yet) */
+    race_run();
+    {
+        /* what the original keeps lies in 0x15cb68 .. 0x15d11e; the rest is the
+           replay's own end (0x68ab0 runs after a replay too) */
+        race_session after = g_session;
+
+        g_session = kept;
+        memcpy(g_session.seg_total, after.seg_total, sizeof after.seg_total);
+        memcpy(g_session.seg_top, after.seg_top, sizeof after.seg_top);
+        memcpy(g_session.order, after.order, sizeof after.order);
+        g_session.place = after.place;
+        g_session.rival_place = after.rival_place;
+        g_session.rival = after.rival;
+        g_session.rank = after.rank;
+        g_session.rival_rank = after.rival_rank;
+        g_session.rival_car = after.rival_car;
+        memcpy(g_session.last_order, after.last_order, sizeof after.last_order);
+        g_session.result = finished ? 1 : after.result;
+    }
+    config_set_word(0xaf, 0);
+    {
+        static const unsigned char black[768];
+
+        video_palette(black, 0, 256);
+        video_mode(640, 480);
+        video_palette(black, 0, 256);
+    }
+    fe_sound_bank_load();
+    music_random();
 }
 
 int race_menu_checkpoint(void)
@@ -121,9 +173,12 @@ int race_menu_checkpoint(void)
                     answer = 1;
                     done = 1;
                     break;
-                case REPLAY:               /* the race again from REPLAY.RPL (+0xaf 1, 2
-                                              the highlights): not yet */
+                case REPLAY:               /* the race again from REPLAY.RPL */
                 case HIGHLIGHTS:
+                    replay_from_menu(sel);
+                    place(sel);
+                    first = redraw = 1;
+                    break;
                 case OPTIONS:              /* 0x12760: the game's options (chkopts.qfs) */
                     fprintf(stderr, "renfs: that screen is not written yet\n");
                     break;
@@ -257,10 +312,12 @@ int race_menu_finish(void)
                 case CONTINUE:
                     done = 1;
                     break;
-                case REPLAY:               /* the race again from REPLAY.RPL (+0xaf 1, 2
-                                              the highlights), the menu's music and art
-                                              after it: not yet */
+                case REPLAY:               /* the race again from REPLAY.RPL */
                 case HIGHLIGHTS:
+                    replay_from_menu(sel);
+                    place(sel);
+                    first = redraw = 1;
+                    break;
                 case OPTIONS:              /* 0x195d8: the game's options: not yet */
                     fprintf(stderr, "renfs: that screen is not written yet\n");
                     break;

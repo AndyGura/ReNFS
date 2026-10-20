@@ -384,8 +384,11 @@ Ghidra project and `build/decomp`, one command). The git history was started aga
   race record. **The replay bar** (second part): Done, |<, <<, >>, >|, play at full, a
   half and a quarter speed, pause, the camera, the time and the line along the bottom,
   by mouse (the pointer) or arrows and Space/Enter, Esc for Done; the highlights keep it
-  across their jumps. Not yet: the pause menu's replay with racing on after it, the race
-  menus' Replay / Highlights buttons, the attract mode's replays.
+  across their jumps (their lists equal the original's, read in its attract mode). The
+  race menus' Replay and Highlight reel play the race just driven and come back to the
+  menu; the pause menu's Replay shows the last seconds and races on after Done, the
+  time watched not counted. The attract mode plays REPLAY2, 3, 1 .. as highlights from its
+  second round, Esc skipping the films. Not yet: the audio screen's silence (`0xf748e`).
   Open (older, found 2026-10-20): `tools/timing_emu.py` puts the second racer's finish
   time one lap slot earlier than the original in 7 of its 13 runs (the game code writes
   `0x14ea7c` + racer · 0x1d2 + lap · 4 on both sides: look at the check's set-up of the

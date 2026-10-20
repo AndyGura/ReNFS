@@ -110,6 +110,33 @@ static int race_clock(unsigned long t)
     return (int)(t / per * 3 + (t % per >= a) + (t % per >= 2 * a));
 }
 
+/* 0x5d690, 0x5ee14: a replay begun while racing (the pause menu's) keeps the race's
+   clock and its steps done; racing on after it they are as they were (the time watched
+   does not count), the dashboard drawn again and the view's window set up again (0x2d278,
+   0x14260) */
+static void replay_clocks(unsigned *done, unsigned long start, race_camera *cam)
+{
+    static unsigned kept_done;
+    static unsigned long kept_ticks;
+
+    if (g_replay.clock_kept[0] == 1) {
+        g_replay.clock_kept[0] = 2;
+        kept_done = *done;
+        kept_ticks = clock_ticks();
+    }
+    if (g_replay.back) {
+        g_replay.back = 0;
+        g_replay.clock_kept[0] = 0;
+        *done = kept_done;
+        g_pause.held_ticks += clock_ticks() - kept_ticks;
+        g_rkeys.race_clock = race_clock(clock_ticks() - start - g_pause.held_ticks);
+        hud_redraw_due();
+        if (cam->ahead->current > -1)
+            view_layout(cam->ahead, cam->ahead->current);
+        g_view_redraw = 1;
+    }
+}
+
 /* load_slide 0x64d28: at 640x480 the player's car in one of its seven pictures
    (SIMDATA/SLIDES/<car>S<n>.QFS, "SCRN" with its palette, n from EA's random numbers),
    left on the screen while the race loads */
@@ -584,6 +611,7 @@ int race_run(void)
                 if (g_bar.wait_left < 1) {
                     g_bar.wait_left = g_replay.wait;
                     race_step(&cars[0], &cam, done);
+                    replay_clocks(&done, start, &cam);
                 }
                 g_bar.wait_left--;
                 done++;
@@ -592,10 +620,13 @@ int race_run(void)
             if (g_drive.state == 2)
                 g_bar.wait_left = 0;
             race_step(&cars[0], &cam, done);
+            replay_clocks(&done, start, &cam);
             done++;
             /* running fast to a point of the replay: no frames between */
-            while (g_drive.state == 3 && !g_replay.end && !g_quit)
+            while (g_drive.state == 3 && !g_replay.end && !g_quit) {
                 race_step(&cars[0], &cam, done);
+                replay_clocks(&done, start, &cam);
+            }
         }
         /* the dials the player's car's, the status bar's numbers the car watched's
            (Alt+Ctrl and a number) */
@@ -702,6 +733,8 @@ int race_run(void)
         video_retrace();
     }
 
+    mouse_show(0);             /* (the replay's pointer: the films and menus after show
+                                  their own) */
     replay_end();              /* (0x5de88: REPLAY.RPL, not after a replay) */
     rsnd_free();               /* (0x52a70) */
     /* race_run 0x37228 after race_main: the detail settings as the keys left them back

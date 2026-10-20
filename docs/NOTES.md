@@ -3274,6 +3274,36 @@ fast to the last step recorded − 8 and race on (state `0xf6b78` = 1 after).
   machines, so another place decides): the same buttons, the arrow keys' light, the
   camera's and the speed's turns (FULL → 1/2 → 1/4), the pause menu's replay starting
   again at its first count after its last.
+- **The highlights checked** (2026-10-20): the original's attract mode read in DOSBox
+  (`peek:` of `0x144d88` and the table `0x144ba8`): REPLAY1's 720..1500, 1620..2820,
+  4800..6960 (0xdc), 7080..7524 (0xd7) and REPLAY2's 180..600 (0xf8), 1320..2820 (0xa8),
+  3540..4980 (0xd4), 5700..6540 (0xd4), 6900..7560 (0xd7): the port's lists
+  (`RENFS_REPLAYCHECK=1` prints them) are the same.
+- **Replay / Highlights in the race menus** (`0x1add8` in `0x1a5d8`, the same in
+  `0x1b6a0`): the music faded, the menus let go, `REPLAY.RPL` into +0x3b (`0xe0630`),
+  +0xaf = 1 Replay or 2 Highlights; the volumes back first when the audio screen's F5
+  silenced the menus (`0xf748e`: `0x15d148..` → +0x75, +0x77, +0x79); each racer's
+  word `0x14ec48` + 0x1d2 · p (this race's points) and the session `0x15cb68` (0x5b6
+  bytes, to `0x15d11e`) kept, `race_run(2)`, both put back, `0x15d122` = 1 again if it
+  was 1 (the rest the replay's `0x68ab0` left: the order, places, ranks); +0xaf 0; the
+  640x480 mode, a black palette, the menus' bank, music `0x63e2c`, art, the inverse
+  table; the menu drawn again and faded up, the mouse on the row.
+- **The pause menu's Replay** (`0x577ea`): `0x5e4c4(1)` and out as Continue. The first
+  jump from racing (`0x5d690`, state 1) keeps the race clock `0xed0f8`, the steps done
+  `0xf6d60` and due `0xf6d64` in `0x144b94..`; the replay goes back 600 counts and loops
+  (`0xf6b78` 4) until Done (`0x5e020`): run fast to the last count − 8, `0xf6b78` 1, the
+  camera asked for back (`0x144d94`, kept only by the highlights), the driver's seat
+  given up for mode 4 at once while car 0 (`0x13c248`) is rolled 0x1e0000..0xdc0000;
+  at the end (`0x5eed6`) state 1, `0x2d278`, `0x14260` (the view's window), the clocks
+  put back, the engine heard again. The pause menu leaving while not racing sends Done
+  (`0x58234`: `0x5e4c4(7)`).
+- **The attract mode's replays** (`fe_attract_mode` `0x34284`, films on `0x15d120`):
+  `0xeaaca` low word a round played, high word the replay (0 in the image). From the
+  second round: the replay (high + 1) % 3, `REPLAY%d.RPL` (+1) into +0x3b, +0xaf 3,
+  `gamedata\replay\` + the name tried (`0x8c8b0`), and only with `0xec414` > 5,400,000
+  (the start-up's speed test, larger faster: a slow machine skips it) `race_run(2)`; then
+  +0xaf 0. race_run returns 1 only for +0xaf 3 ended by Done (`0x13c17c` 0x40, `0x376e2`);
+  then the films (EA, ATTRACT, TITLE) are skipped. The original here played REPLAY2 first.
 - **Cameras** (`0x5dac4`, highlights): the event decides: two racers near → 6 or 7 (the
   opponent's views), events 0xd6..0xf7 with a random 10 ≥ 8 → 2, 0xdb..0xe3 → random 5,
   else random 4 + 1.

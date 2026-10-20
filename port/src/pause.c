@@ -12,6 +12,7 @@
 #include "opponent.h"
 #include "racekeys.h"
 #include "racesnd.h"
+#include "replay.h"
 #include "sound.h"
 #include "timing.h"
 #include "video.h"
@@ -234,7 +235,11 @@ static void menu(void)
                 case CONTINUE:
                     done = 1;
                     break;
-                case REPLAY:               /* 0x5e4c4(1): the replay, not yet */
+                case REPLAY:               /* 0x5e4c4(1): the last 600 counts again
+                                              (Done: racing on), as Continue */
+                    g_replay.mode = 1;
+                    done = 1;
+                    break;
                 case AUDIO:                /* fe_audio_options 0x105dc(2) */
                 case GRAPHICS:             /* fe_graphics_options 0x32d08(1) */
                     fprintf(stderr, "renfs: that screen is not written yet\n");

@@ -171,7 +171,9 @@ The replay (NOTES §4.22): the race record `0x12da0c` (`race_setup_record` `0x36
 `0x5d888` (controls every 2nd step, snapshots every 1800 counts), REPLAY.RPL `0x5c3b0`/`0x5c4a4`,
 playing `0x5efb0`→`0x5e948`/`0x5ee14`/`0x5dc54`, jumps `0x5d690`, highlights `0x5c768` from the
 marks `0x5c6d4`, the bar `0x5e4ec`/`0x5fcf0`; the controls' kinds (+0x33/+0x37 → `0x12d974`) go
-with the file (the CD's were driven with a joystick).
+with the file (the CD's were driven with a joystick); the race menus' Replay/Highlights keep
+the session (`0x1add8`), the pause menu's keeps the clocks and races on after Done (`0x5e020`),
+the attract mode plays REPLAY1..3 from its second round (`0x34284`).
 Menus: held keys, letters blended per pixel, an inverse colour table after every fade up
 (NOTES §4.2).
 
