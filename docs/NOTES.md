@@ -3598,6 +3598,81 @@ fast to the last step recorded − 8 and race on (state `0xf6b78` = 1 after).
   faster than 0x320000 0x57; `0x77ef4` a change of places 0x50; `0x7b34c` a police car
   spinning out near a player 0x52.
 
+### 4.23 The joystick and the mouse (2026-10-20; `port/src/joystick.c`, equal)
+
+- **EA's game port reader `0x94fa8`** times port 0x201's four one-shots: `0xf9504` the
+  mask of the axes that answered, `0xf94f0` / `0xf94f4` / `0xf94f8` / `0xf94fc` their
+  counts (bit 0 X, 1 Y, 2 the third, 3 the fourth), `0xf9500` the buttons (inverted).
+  **`0x4e3e8` (the poll)**: `0x12f278` X, `0x12f27c` Y, `0x12f280` the fourth axis (the
+  throttle), `0x12f284` the third (the brake), `0x12f290` the buttons held (1 2 4 8).
+  `joyopt.cfg`'s remapping (`0x4e580`, `0x12f254`), turned-round axes (`0x4e680`,
+  `0x12f224`) and force feedback (`0x4d670`, `0x15d144`) work only with that file, which
+  nothing makes: not ported.
+- **Start-up `0x4d1fc`** (`startup` at `0x4228c`, after the fonts): mask 0 none; 3 a
+  stick; 0xc the throttle and pedals alone; else a stick, a throttle if the fourth count
+  is above 0, pedals if the third is. `0x12f1c0` found, `0x12f1c4` X, `0x12f1c8` Y,
+  `0x12f1cc` throttle, `0x12f1d0` pedals, `0x12f1d8` on (calibrated). Then
+  **`cfg_load_joystick` `0x4d4a0`**: `GAMEDATA/CONFIG/joystick.cfg` (`0x156014`), 0x5c
+  bytes to `0x12f294`, kept if the stick let go is within ±0x4b of both middles and
+  inside the menus' thresholds; a file of another size is removed; otherwise the
+  calibration screen (`0x4c6b0(0)`). Save `0x4d5ec`. The port keeps it in the home
+  folder, the same 0x5c bytes (the original's file and the port's are equal byte for
+  byte).
+- **The calibration, 23 ints at `0x12f294`**: X least, middle, most, the left and right
+  scales, the menus' low and high thresholds; Y the same; the throttle least, middle,
+  most, its two scales and its pedal scale; the brake least, most, scale.
+- **`fe_joystick_calibrate` `0x4c6b0(from_menu)`**: `JOYCHK.QFS` (green) in a race's
+  session (`0x15d126`), else `JOYCAL.QFS` (gold): `bgnd`, `knob`, `pedl`, `sldr`, `!pal`.
+  Every redraw: `pedl` copied at (0x217, 0x60) with a throttle; clip (0x9b..0x1db,
+  0x8c..0x190), `bgnd`, the knob see-through (`0x815c8`) with its top left at (x, y),
+  from (0x10e, 0xdc); the bars clip (0x218..0x229, 0x93 + (100 − bp)·0xba/100 .. 0x14d)
+  and (0x242..0x253, … tp …), `sldr` at (0x218, 0x93) and (0x242, 0x93). **The clip
+  `0x812ec` takes (x0, x1, y0, y1)**, the last push its first. The knob: right
+  v·0x69/(max − mid), left v·0x6c/(min − mid), up and down v·0x4d/(…), snapped to the
+  middle within ±5 across and ±3 up and down. The ends widen as the stick goes. Bars: with
+  pedals bp = 100 − (brake − least)·100/(most − least), tp the same, each 0 under 5;
+  with a throttle only, bp its travel past the middle, tp before it. Button 1 without left
+  Shift (0x2a) and the stick within a quarter of its middle: the middles taken, done.
+  Esc: done and `0x12f1d8` = 0. At the end the thresholds half way between each end and
+  the middle, the ranges at most 0x7ffa, the scales floor(N·65536/(range + 1)) for
+  ranges above 1 (N 0x23, the throttle's right half 0x26, the pedal scales 0x24 only
+  with pedals or a throttle), a fade down, `cfg_save_joystick` (after Esc too).
+- **`0x4e0b8` in a race** (each tick): steering = the scaled X clamped −0x20..0x1f, dead
+  ±3; the pedal from Y ±0x1e; with pedals each = 0x1f − (count·scale >> 16), at least 0,
+  pedal = brake − throttle; with a throttle alone it centred, dead 3 and 4. Into
+  `0x12f260` / `0x12f264`, the buttons `0x12f274`.
+- **`0x48bec`, the control word by kinds** (`0x12d974` steering, `0x12d978` pedals,
+  `0x12d97c` gears, from `0x36a0c`): steering 0 keys, 1 the joystick (mirrored 0x20 − v,
+  0x1f and −0x20 first one more), else the mouse `0x47b78`; pedals 0 keys, 1 the joystick
+  + 0x1e, 3 the buttons (1 → 5, 2 → 0x3c, the brake wins), else the mouse's buttons (1 →
+  5, 2 → 0x3c); gears 0 keys, 3 the buttons (1 up, else 2 down), else the mouse's. The
+  handbrake: its key or button 8; the horn: its key or button 1 when neither pedals nor
+  gears are buttons. `race_keys` `0x47ca2`: button 4 the view key; `hud_keys` `0x2f71d`:
+  button 2 the map (pedals and gears not buttons).
+- **`0x47b78`, the mouse steering** (not in a replay, the player watched, not stopped
+  `0x145c90`): `mouse_limits(0, 0, 256, 64)`, steering x >> 2, mirrored 0x40 − s, 0x1e..0x21
+  → 0x20, above 0x3c → 0x3c, below 0 → 0; else 0x20. race_run sets the limits (0x20,
+  0xb4, 0x120, 0xc8) at 320x200, (0x40, 0x1cc, 0x240, 0x1e0) at 640x480. The port takes
+  the mouse relative in a race (SDL's relative mode), absolute again in the menus.
+- **`0x4dfe0`, the joystick in the menus**: button 1 Space (0x20), 2 Enter (0x0d), Y below
+  its low threshold Up (0x4800), above the high Down, X Left / Right. Read by `fe_read_keys`
+  (Tab not held), the replay bar's held key `0x72f28`, `0x72ac4`, `0x72d94`, the text field
+  `0x701cc` (a button Enter, `0x70426`), `0x6fac0`, the chat `0x195d8`.
+- **Without a joystick** (`cfg_load_config_dat` `0x39c40` at `0x39d08`) kinds 1..3 go back
+  to the keys: steering 0 with Left / Right, gears +0x5f3a 'A' / 'Z', pedals +0x5f38 Up /
+  Down. The controls screen's Calibrate row needs `0x12f1c0`, the joystick kinds
+  `0x12f1d8`; after calibrating (`0x25145`) the screen is faded down, calibrated, the
+  pointer placed if unused, the inverse table reloaded, `0x72600`, the palette, all drawn.
+- **Checked** (DOSBox with a 4-axis timed joystick, `~/dosgames/nfs-joy.conf` /
+  `nfs-joy.map`, the launcher's copy with `NFS_DOS_LAUNCHER`): the calibration screen with
+  the stick let go and held right equal by palette entry, `joystick.cfg` equal byte for
+  byte, the race's control words equal (let go 1952, left 1920, right 1983, throttle 800,
+  brake 3104, button 1 18336, button 2 1952), the controls screen's joystick kinds equal
+  (`build/shots/joy/`). The port: SDL game controllers (left stick, right trigger the
+  throttle, left the brake, A B X Y buttons 1 2 4 8, the d-pad over the stick) or
+  joysticks of two axes or more (a keyboard's "System Control" device has one: refused).
+  Counts 0..511. `RENFS_JOY=1|2` a test stick of 4 or 2 axes driven by `RENFS_INPUT`.
+
 ## 5. The original in DOSBox (2026-10-19)
 
 - The game for DOSBox is a COPY of the installed game in `~/dosgames/nfs` (`NFSSE/` +
@@ -3642,6 +3717,11 @@ fast to the last step recorded − 8 and race on (state `0xf6b78` = 1 after).
   Rusty Springs), `key:Down:1.5` ×2, `key:Return:9`; then `key:a:0.5`, `down:KP_8` and a
   snapshot every 3–4 s. It saves the track in the copy's CONFIG.DAT: put the City one back
   afterwards (`build/snap/CONFIG_cy.DAT`) for the CY1 plans.
+- **A joystick in DOSBox**: `[joystick] joysticktype=4axis, timed=true` and a mapper file
+  of keys for the axes (KP4/KP6 axis 0, KP8/KP2 axis 1, KP7/KP1 axis 2, KP9/KP3 axis 3,
+  KP0 and KP. buttons 1 and 2). **The mapper file must hold every key's binding**: one
+  holding only the joystick's leaves the keyboard unbound. Counts run 48..2706, the
+  middle about 1377.
 - The race in 640x480: the cockpit view, the HUD line on top (best lap? 02:02.2, the race
   time, the gear, the distance 5.2 miles, the lap 2/2), a mirror, the map at the bottom
   right.

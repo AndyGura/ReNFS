@@ -459,9 +459,18 @@ races 320x200 / 320x240; commit locally as the work goes.
    `tools/espdepth.py` lists them. **The credits (`0x25600`): done**, the five pages
    equal by palette entry, with CREDITS.ASF; the timer's free count `0xed0fc` now runs
    in the port (`timer_counter`), so the menu music's choice varies as the original's.
-   Every screen behind the options is now in. Next: a joystick (and the mouse) for
-   driving: the controls screen's other kinds, `controls_read` `0x49248`,
-   `fe_joystick_calibrate` `0x4c6b0` (the MiSTer needs a pad). The dashboard's keys F7 / F8 / M / F9 and Rusty Springs' measurements on the
+   Every screen behind the options is now in. **The joystick and the mouse (NOTES
+   §4.23): done.** A pad or joystick found at start-up (`0x4d1fc`, SDL game controllers
+   or joysticks of two axes or more), its calibration in the home folder's
+   `joystick.cfg` (the original's bytes) or made on the calibration screen (`0x4c6b0`,
+   gold from the menus, green from the race menus), the controls screen's joystick and
+   mouse kinds, the race driven by them (`0x48bec`, `0x4e0b8`, the mouse `0x47b78`
+   relative), the buttons' horn, handbrake, view and map, and the stick in the menus
+   (`0x4dfe0`). Equal to the original in DOSBox with a 4-axis joystick (pictures,
+   `joystick.cfg`, the control words; `build/shots/joy/`). `RENFS_JOY=1|2` a test
+   stick. `tools/checks.sh` runs every check in one command. Next: the cars' showcase
+   (`fe_showcase` `0x17724`) and the track records from Control Central, then the
+   MiSTer core. The dashboard's keys F7 / F8 / M / F9 and Rusty Springs' measurements on the
    status bar: done (NOTES §4.11). Not yet: races at 640x480 (settings +0x7f = 0).
    (`0x136618`, the sections drawn: the settings' +0x85 and F3, NOTES §4.19.)
    Open: the race's sound reaches full scale at the hits and the horn (0.2 to 0.7 % of

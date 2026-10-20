@@ -191,6 +191,10 @@ things, the menu music's choice reads it (`timer_counter` in the port).
 The controls screen `0x22bd0` (NOTES §4.2): +0x5f36.. kinds and keys (menu key codes), conflicts `0x7390c`,
 the key `0x733a0`; the race's scan codes `0x36a0c` (`0x36758` German → US, `key_scancode` `0x91d60`, table `0xf7b74`).
 `tools/fecompare.py`: a port menu picture against DOSBox's, by palette entry.
+The joystick and the mouse (NOTES §4.23): EA's game port `0x94fa8`, the poll `0x4e3e8`, start-up
+`0x4d1fc`, `joystick.cfg` `0x4d4a0`/`0x4d5ec` (`0x12f294`, 23 ints), the calibration `0x4c6b0`, the race
+`0x4e0b8`, the control word by kinds `0x48bec`, the mouse `0x47b78`, the menus `0x4dfe0`.
+`tools/checks.sh`: every check in one command (logs `build/logs/chk`).
 
 ## File formats (details in `docs/NOTES.md`, "Formats")
 
@@ -237,6 +241,8 @@ Data folder: `-data`, else `$RENFS_DATA`, else `./NFSSE`, else `NFSSE` beside th
 (a folder asked for is used or refused). Home: `-home`, `$RENFS_HOME`, `~/.config/renfs`
 (the port's own formats, never the game's files). `RENFS_LANG=de`: the German art;
 `RENFS_NOSOUND=1`: no sound; `RENFS_SNDWAV=f`: what is heard written to a WAV (checking);
+`RENFS_JOY=1|2`: a test joystick of 4 or 2 axes moved by `RENFS_INPUT`'s jl jr ju jd (the stick), jg jk
+(throttle, brake), jb1..jb4, jx/jy/jz/jw<n> (exact counts 0..511);
 `RENFS_INPUT="<retrace>:<key> .."`: keys and mouse given at those retraces (esc enter
 space up down left right tab y n j f1-f9 bksp del ctrl alt lshift rshift end click
 rclick m<x>,<y>, t<text> typed, k<letter> or k<digit> held; `<from>-<to>:<key>` holds a key through those retraces, several at
@@ -259,7 +265,7 @@ queued), the pictures timed by the sound heard, as the original with sound on.
 and `movie.c` (the movies), `fe.c` (front end screens), `mainmenu.c` (Control Central), `options.c` (the options screen, the race menus' Game options), `menu.c` (what the menus share:
 keys, mouse, text styles, the yes/no dialog), `font.c` (FFN, letters blended pixel by
 pixel, `nearest_colour`, the inverse table), `sound.c` (the front end's sound bank and
-music, the race's music `0x63d88` and speech `0x722b4`), `audioopt.c` (the audio screen), `gfxopt.c` (the graphics screen `0x32d08`), `ctrlopt.c` (the controls screen `0x22bd0`: kinds, keys redefined, conflicts; the race's keys from them, `drive_keys_from_config` `0x36a0c`), `credits.c` (the credits `0x25600`: five pages of CREDITS.FSH, 20 s each by the timer's count `0xed0fc`), `loadsave.c` (load and save `0x3c0c8`/`0x3d4c4`, the file list `0x3aacc`: tournaments as `<name>.sav` in the home folder, replays saved, played, deleted; a game on `0x15d134`), `config.c` (CONFIG.DAT; the built-in defaults, equal byte for byte,
+music, the race's music `0x63d88` and speech `0x722b4`), `audioopt.c` (the audio screen), `gfxopt.c` (the graphics screen `0x32d08`), `ctrlopt.c` (the controls screen `0x22bd0`: kinds, keys redefined, conflicts; the race's keys from them, `drive_keys_from_config` `0x36a0c`), `joystick.c` (the joystick: found, calibrated, `joystick.cfg` in the home folder, read in races and menus), `credits.c` (the credits `0x25600`: five pages of CREDITS.FSH, 20 s each by the timer's count `0xed0fc`), `loadsave.c` (load and save `0x3c0c8`/`0x3d4c4`, the file list `0x3aacc`: tournaments as `<name>.sav` in the home folder, replays saved, played, deleted; a game on `0x15d134`), `config.c` (CONFIG.DAT; the built-in defaults, equal byte for byte,
 `tools/config_emu.py`), `main.c`.
 The race so far: `raster.c` (the quad and triangle painters), `poly.c` (projection, quad cutting),
 `road.c` (the frame's points, into the view; the mirror's five sections behind), `roaddraw.c` (the road painted far to near,
