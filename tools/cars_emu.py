@@ -47,8 +47,8 @@ class RaceCar(ctypes.Structure):
     _fields_ = Car._fields_ + [
         ("police", I), ("cfm", P), ("cfm_len", ctypes.c_long), ("colours", P),
         ("pics", P * 2), ("pics_pal", P * 2),
-        ("state", I), ("slot", I), ("draw_node", I), ("mirror_node", I), ("own_turn", I), ("turn", I * 9),
-        ("yaw_drawn", I), ("half_len", I), ("half_wid", I), ("braking", I), ("bits", U8 * 3),
+        ("routine", I), ("state", I), ("slot", I), ("draw_node", I), ("mirror_node", I), ("own_turn", I), ("turn", I * 9),
+        ("yaw_drawn", I), ("half_len", I), ("half_wid", I), ("braking", I), ("bits", U8 * 4),
         ("ground", Vec3), ("seen", Vec3), ("far", I), ("shadow", Vec3), ("along", Vec3), ("across", Vec3),
         ("near_m", Model), ("far_m", Model), ("groups", Group * 4),
         # the rest of race_car (driving, the crash): room for what car_load writes there

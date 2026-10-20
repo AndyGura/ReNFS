@@ -399,8 +399,11 @@ its percent done and weight). Update its steps file after each finished step.
 
 ## Waiting for Danik
 
-- Nothing open. (Decided 2026-10-19: a first start uses the game's built-in defaults,
-  `cfg_defaults`, ported and equal byte for byte.)
+- Races at 640x480: the graphics screen's first row says 640 x 480 by default (the
+  game's built-in setting), the port races at 320x200 anyway. Port 640x480 races for the
+  PC build, or keep 320x200 and show the setting as it is? (Asked 2026-10-20.)
+  (Decided 2026-10-19: a first start uses the game's built-in defaults, `cfg_defaults`,
+  ported and equal byte for byte.)
 
 Decided 2026-10-18: menus 640x480 on the MiSTer (interlaced at 15 kHz),
 races 320x200 / 320x240; commit locally as the work goes.
@@ -422,16 +425,23 @@ races 320x200 / 320x240; commit locally as the work goes.
    drives and crashes (equal step for step), and the status bar's numbers and the race's
    timing, the camera outside and the crash's smoke, the opponent's driving, and cars
    meeting cars, the roadside objects knocked over, the traffic, the police and the
-   sounds, and the race's keys, P's pause and the pause menu (NOTES §4.20; its Replay,
-   Audio and Graphics wait for their screens), Shift+End's giving up, the race's music and its speech (NOTES §4.18's end). , the circuits' sky ring, walls and 3D objects, the race started from Control
+   sounds, and the race's keys, P's pause and the pause menu (NOTES §4.20), Shift+End's giving up, the race's music and its speech (NOTES §4.18's end). , the circuits' sky ring, walls and 3D objects, the race started from Control
    Central, the segments in a row, every standings page, the checkpoint and finish
    menus, a tournament from race to race, the replays. **The race menus' Game options
    (`0x12760`) and the audio screen (`0x105dc`, from the options screen, the race menus
    and the pause menu; F5's silence `0x72638`): done**, equal to the original's pictures
-   (NOTES §4.2). Next: the graphics screen (`0x32d08`; with it races at 640x480, +0x7f),
-   the controls screen (`0x22bd0`, `0x4c6b0` the joystick), load / save (`0x3c0c8`,
+   (NOTES §4.2). **The graphics screen (`0x32d08`, from the same three places): done**,
+   equal by palette entry; the pause menu now hands the race's detail to the settings and
+   back, the frame sets the view up again after a change (`0x5bdaa`), and the dashboard's
+   doubled-pixel copy lists are ported (image quality Medium/Low showed no view before).
+   Its first row, the races' resolution (+0x7f: **0 = 640x480**, 1 = 320x200; the
+   built-in default 0, as the original on a fast PC), is shown but the port still races
+   at 320x200 (Danik's MiSTer choice; 640x480 races are a step of their own: ask him).
+   The camera check had stopped building since the replay (fixed: `tools/replay_stub.c`,
+   the check's copy of the car record brought up to date) and is equal on all 11
+   snapshots again. Next: the controls screen (`0x22bd0`, `0x4c6b0` the joystick), load / save (`0x3c0c8`,
    `0x3d4c4`, `0x3aacc`), the credits (`0x25600`). The dashboard's keys F7 / F8 / M / F9 and Rusty Springs' measurements on the
-   status bar: done (NOTES §4.11). Not yet: races at 640x480 (settings +0x7f).
+   status bar: done (NOTES §4.11). Not yet: races at 640x480 (settings +0x7f = 0).
    (`0x136618`, the sections drawn: the settings' +0x85 and F3, NOTES §4.19.)
    Open: the race's sound reaches full scale at the hits and the horn (0.2 to 0.7 % of
    the samples in `build/snd_port/`): how EA's mixer sums the voices is still to compare. Model polygons of one colour (`0xaa990`) are not ported (none met so far).

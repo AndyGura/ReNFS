@@ -149,6 +149,10 @@ Cars drawn: `cars_at_node` `0x6837c` → `0x66d08` → `0x66880` (NOTES §4.10);
 pictures re-coloured by `0x65020` through a colour map `0xf9520` that keeps what the last
 re-colouring left. Snapshots e1..e5: a 320x200 race, `NFS_DOS_DIR=$PWD/build/dosnfs`.
 The x87 runs at double precision (CW 0x127f): Unicorn must be set so (NOTES §4.6, the crash).
+Graphics screen `0x32d08` (NOTES §4.2): +0x7f 0 races at 640x480, 1 at 320x200; +0x81 window,
++0x83 quality, +0x85 distance, +0x87 car detail, +0x89 horizon; the dashboard's lists double the
+view's pixels by their +0xc rate (`0x8b8f0`); the frame sets the view up again after a change
+(`0x5bdaa`).
 Main menu `0x42c30` (NOTES §4.2): the choices in CONFIG.DAT (+0x6d type, +0x91 opponent,
 +0x95 track, +0x9b car, +0x5f50 unlocks); typed codes SKCART EARALLYE CASINOVILLE
 CONCEPTCAR ROCKYROAD TURBO NITRO EXPLODE (`0x46e94`), End held = no mercy. Options
@@ -247,7 +251,7 @@ queued), the pictures timed by the sound heard, as the original with sound on.
 and `movie.c` (the movies), `fe.c` (front end screens), `mainmenu.c` (Control Central), `options.c` (the options screen, the race menus' Game options), `menu.c` (what the menus share:
 keys, mouse, text styles, the yes/no dialog), `font.c` (FFN, letters blended pixel by
 pixel, `nearest_colour`, the inverse table), `sound.c` (the front end's sound bank and
-music, the race's music `0x63d88` and speech `0x722b4`), `audioopt.c` (the audio screen), `config.c` (CONFIG.DAT; the built-in defaults, equal byte for byte,
+music, the race's music `0x63d88` and speech `0x722b4`), `audioopt.c` (the audio screen), `gfxopt.c` (the graphics screen `0x32d08`), `config.c` (CONFIG.DAT; the built-in defaults, equal byte for byte,
 `tools/config_emu.py`), `main.c`.
 The race so far: `raster.c` (the quad and triangle painters), `poly.c` (projection, quad cutting),
 `road.c` (the frame's points, into the view; the mirror's five sections behind), `roaddraw.c` (the road painted far to near,

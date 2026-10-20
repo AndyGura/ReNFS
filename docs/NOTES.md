@@ -507,8 +507,10 @@ three settings in its entry). The attract mode (`fe_attract_mode` `0x34284`) put
   +0x8f 2, +0x93 0, +0x97 0, +0xb3 1, +0xb1 4, +0x91 7 (Diablo), +0x9b 6 (512TR). Then
   `0x8ee80` (the CPU check: `0xf7924` a 486, `0xf7928` a Pentium) and **the speed test
   `0x74ca0`** sets the detail: below 300 all 0; below 0x1a4 +0x83 1, +0x85 1; below 600
-  +0x83 2, +0x85 2, +0x81 1; from 600 **+0x7f 1 = races at 640x480** (`0x1af78`:
-  `initgraphics(640, 480, 8)`) with +0x85 0, 1, 2 and +0x81 0, 0, 1 below 0x2d0, 900 and
+  +0x83 2, +0x85 2, +0x81 1; from 600 **+0x7f 1 = races at 320x200** (the graphics
+  screen's `640l`/`320l` by +0x7f; `0x1af78` sets 640x480 again after a replay only when
+  +0x7f ≠ 0; an earlier reading here had it the wrong way round) with +0x85 0, 1, 2 and
+  +0x81 0, 0, 1 below 0x2d0, 900 and
   above. +0x87, +0x89 0. The detail words are the graphics screen's (`fe_graphics_options`
   `0x32d08`: `win` `ima` `van` `car` `hor`). The test's number is the frames drawn in a
   given time (more: faster), yet 0 is the most detail in every word: +0x83 → `0x12d9d9`
@@ -835,6 +837,43 @@ libraries `0x80000`..`0x94000` and `0x95000`..`0xb0000`, Watcom's runtime `0x940
     end: if the mode differs from the last one set up (Cancel put the old one back) the
     card is set up again and the menus' music chosen again (`0x63e2c`; the pause menu's
     `pause.asf`); from the pause menu `pause.asf` again anyway; then `0x721ec(+0x77)`.
+- **`fe_graphics_options` `0x32d08(pause)`** (2026-10-20; `port/src/gfxopt.c`, equal to
+  the original by palette entry from the options screen and the pause menu: 0 to 6 pixels
+  of DOSBox's scaling on 21 pictures). `OPTION/GRAPHICS.QFS`, or `CHECK/GRAPHICS.FSH`
+  while `0x15d126` is set (a race session, `race_from_menu`: the race menus and the pause
+  menu). From the options screen and the race menus with 0, the pause menu with 1: the
+  resolution's row greyed (`scrm` and `640m`/`320m`), passed over by the mouse and the
+  keys, the screen starting on row 1. `0x12bd3c` = 1 meanwhile (`fe_read_keys` gives F1-F4).
+  Rows (lit label; value pictures lit / dark from `0x32c10`..): 0 Screen resolution
+  (**+0x7f**, byte ^1: **0 races at 640x480, 1 at 320x200**; `scrl`; `640l 320l`), 1
+  Window size (+0x81 + 1 mod 3; `winl`; `full wmdl smal`), 2 Image quality (+0x83 + 1 mod
+  4, at +0x7f = 1 back to 0 above 1; `imal`; `ihil imdl ilwl intl` (`atml atll` unused)),
+  3 View distance (+0x85 + 1 mod 3; `vanl`; `farl vmdl clsl`), 4 Car detail (+0x87 ^1;
+  `carl`; `chil clwl`), 5 Horizon (+0x89 ^1; `horl`; `honl offl`), 6 Done (`donl`), 7
+  Cancel (`canl`); the dark ones `..d`, the dark labels the background's. Resolution to
+  320x200 also brings the quality above 1 down to 1. The mouse by height: y 0..0x8c,
+  0x91..0xc1, 0xc6..0xf2, 0xf7..0x127, 300..0x15c, 0x161..400, then x ≤ 0x140 Done (y
+  0x1a4..0x1e0), ≥ 0x145 Cancel (..0x1df); keys put it at x 230 (Done 60, Cancel 565), y
+  116 169 220 270 325 377 445 445 (`0x32bf0`, `0x32c00`). Enter, Space or a click steps
+  the row chosen (0x48; the mouse put back on the row when not in use); **F1 window, F2
+  quality, F3 distance, F4 horizon** step their setting from any row and put the mouse on
+  it (the row follows the mouse at the next pass). Up: Cancel as Done, one less, round to
+  Done (and past row 0 in the pause menu); Down: (+1) mod 7, from Cancel to the top;
+  Left/Right swap Done and Cancel only. A change draws the two rows (0x47), then the whole
+  screen at the next pass. Keys act once a quarter second (25 ticks) or once let go. Esc
+  and Cancel put +9..+0xb4 back; Done, 2 minutes, the right button or `0x13c3ca` keep
+  them. The end: `0x12bd3c` = 0, faded down, the art freed. After it the options screen
+  puts the mouse on its row (`0x5458d`), the race menus only when the mouse is not in use
+  (`0x12e1e`).
+- **The pause menu and the detail**: as it opens CONFIG.DAT +9..+0xb4 is put back from
+  the copy kept for the race (`0x565c1`), then the race's detail written in (`0x56b48`:
+  `0x12d9d9` at most 1 at 320x200 (`0x12c308` = 0), +0x83 = `0x12d9d9`, +0x85 =
+  `0x12d9d5`, +0x87 = `0x12d9d7`, +0x89 = `0x12d9d6`, +0x81 = the outside view's layout
+  less its first (`0x144cc`)). At its end the copy is taken again (`0x5809d`), the detail
+  read back (`0x5818d`: `0x12d9d4`, `0x12d9d9`, `0x12d9d5`, `0x12d9d7`, `0x12d9d6`), the
+  copy taken once more, the camera's mode set (`0x14b00`) and the views set up
+  (`0x1440c(+0x81, min(0x12d9d9, 2))`). The road's distance itself (`0xf6b48`) is only
+  asked again by the next Esc or F3.
 - **F5 in the menus** (`0x72638`, from `fe_read_keys` `0x727a0` and `0x72ac4`): +0x75,
   +0x77, +0x79 kept in `0x15d148` / `0x15d14a` / `0x15d14c` and set to 0, every voice's
   volume 0 (`0xf748e` = 1); again: put back and heard (the effects' voices +0x79, speech's
@@ -1379,7 +1418,15 @@ that packs the four pointers and screen points of a child.
   but it runs twice at a race's load (the second time `0x128ec0` is current), so all three
   share it, and the first frame's `view_set_mode` `0x14568` (`0x143e00` set) rebuilds it
   for the view ahead (focal 178): the mirror projects with that table, its own focal (46)
-  only in `0xf7a30`. `view_select` `0x1486c` sets the centre and focal again; for the view
+  only in `0xf7a30`. **Each frame after the view changed** (`race_draw_frame` `0x5bdaa`,
+  after `view_select`): `0x14568(current, 0)` (the layout's 1:1 window whatever the
+  detail; `0x143e04` kept) and the screen round it (`0x3081c`), `0x143e64` = 1; the next
+  frame `0x14568(current, 0x143e04)` with `0x143e00` kept (`0x5bd71`); `0x143e00` is
+  cleared at the frame's end (`0x5c137`: 1 again if it was 999). So whoever's view was set
+  up last (`0x1440c` ends with the outside's), the table is the view ahead's again before
+  anything is projected: measured in DOSBox after the pause menu (focal 178 with the
+  pixels doubled at 640x480). Every `0x14210` marks the view changed. Ported 2026-10-20
+  (race.c; the port's pause menu had left the outside's table). `view_select` `0x1486c` sets the centre and focal again; for the view
   ahead it adds `0x129ec0` / `0x129ec4` (set only by `0x14860`, which nothing calls) and
   shifts by `0xf456c` (never written): both nothing. **The camera's matrices**
   (`camera_matrix` `0x5868c`, after `0x1486c(cam, 0)`): with X, Y, Z the turns by the
@@ -2072,7 +2119,12 @@ The screen's window; **the view through the windows**: `0x8b8f0(view's pixels, l
 0x12b8a4[0x143e04])` (`0x12d9d9` = 3: another list, not read): a BAMF's spans, each from
 its offset in the picture (÷ its width) to bank·65536 + its offset in the window (÷ the
 window's width), going on at column 0 of the next row of both when the window's row ends
-(only 1:1 lists ported; the doubled ones step through `0x94aed` with `0x9471c`/`0xa6240`).
+(the list's +0xc is the rate the picture is read at across: `0x9471c` gives `0x94aed`
+the picture's pixels and the step table `0x15ed1c`, which `0xa6240` fills with (i · rate)
+>> 16 for the longest span; each piece of a span, the first or one after a row's end,
+reads the table from its start; the rows doubled down are the list's own spans; ported
+2026-10-20, before that the doubled lists showed nothing: dash_emu's DETAILS and
+OUT_DETAILS, equal on e1-e4).
 **The mirror** (`0x5b040`, with `0x143e08`): its picture `0xf457c` copied at place 0
 (`0x12b604`). Then the clip `0x5885c(0, 0, 0x102, 200)` (180 when `0xf6b74` ≠ 1) and the
 wheel see-through at its place when the signed turn ≠ `0x12b8d0`: turned left
@@ -2989,7 +3041,8 @@ loop3 loop7 loopx; the circuits' files by track tr1 tr2 tr6 tr3 tr7 tr4, `0x3629
 palette entry: each entry one colour): continue, replay and graphics chosen, 156 pixels of
 307,200 differ in each, the mouse pointer and single pixels of DOSBox's scaling. Continue
 brings the race back where it stood (`build/shots/pause/back.png`), Quit with Yes ends it.
-Replay and Audio since (§4.22, §4.2). Not yet: Graphics (its screen), the network's chat and messages, the
+Replay, Audio and Graphics since (§4.22, §4.2; the detail handed to the settings and back,
+§4.2 "The pause menu and the detail"). Not yet: the network's chat and messages, the
 ticket's picture put back after the menu, the audio settings' per-player volumes
 (`0x12da67`, `0x12da6b`).
 

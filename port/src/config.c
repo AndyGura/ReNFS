@@ -98,9 +98,9 @@ static void config_defaults(void)
         { 0x93, 0 }, { CFG_TRANSMISSION, 0 }, { CFG_RACE_LENGTH, 1 }, { CFG_LAPS, 4 },
         { CFG_OPPONENT, 7 }, { CFG_CAR, 6 },
         /* the detail settings by the speed test (0x74ca0): the port answers below 300,
-           as the snapshots' installed original did: 320x200 (+0x7f = 1 would be 640x480),
-           the most detail (the view's pixels 1:1, the road 28 sections ahead, the
-           outside view at its largest) */
+           a fast machine: races at 640x480 (+0x7f = 1 is 320x200; the port's races are
+           320x200 whatever it says, for now), the most detail (the view's pixels 1:1,
+           the road 28 sections ahead, the outside view at its largest) */
         { 0x7f, 0 }, { 0x83, 0 }, { 0x85, 0 }, { 0x81, 0 }, { 0x89, 0 }, { 0x87, 0 },
         /* the keys (0x15cb4a..), the modem's numbers */
         { 0x5f3c, 0x4b00 }, { 0x5f3e, 0x4d00 }, { 0x5f42, 0x5000 }, { 0x5f36, 0 },

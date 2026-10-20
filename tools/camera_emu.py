@@ -235,7 +235,7 @@ def views(path, L, bad, stats):
                 o.roll_phase, o.pitch_phase = s.raw(a + 0x427, 1)[0], s.raw(a + 0x428, 1)[0]
                 o.roll_shake, o.pitch_shake = ga(0x429), ga(0x42d)
                 o.number, o.player = struct.unpack("<i", s.raw(a + 0x48a, 4))[0], i
-                bits = bytearray(s.raw(a + 0x174, 3))
+                bits = bytearray(s.raw(a + 0x174, 4))
                 if i == 2:
                     bits[1] |= 0x20
                     s.mu.mem_write(a + 0x174, bytes(bits))
