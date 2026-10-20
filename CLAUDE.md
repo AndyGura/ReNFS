@@ -236,7 +236,7 @@ puffs `0x64a74` stretched by EA's `0x96aa8`; exact, `tools/smoke_emu.py`), `poly
 wide line `0x8b195`; exact, `tools/polyfill_emu.py`), `hud.c` (the dashboard over the view:
 `0x30094`, `0x31684`, the needles, the map `0x31cb4`; from outside `0x3081c`, `0x314e4`, the small rev counter `0x31168`;
 pixel-exact, `tools/dash_emu.py`; NOTES §4.11), `track.c`
-(the TRI and its ring of sections), `trackinfo.c`, `trackfam.c`, `racepal.c`, `sky.c` (the sky, the mirror's horizon), `view.c` (windows, lens,
+(the TRI and its ring of sections), `trackinfo.c`, `trackfam.c`, `racepal.c`, `sky.c` (the sky, the circuits' ring `0x4ace8`, the mirror's horizon), `view.c` (windows, lens,
 matrices), `car.c` (cars' files, the grid), `camera.c` (the driver's eyes; outside, modes 2..5 and 8..13, the crash's view
 `0x6324c`; step for step, `tools/camera_emu.py`), `dash.c`
 (the dashboard's file, colours, places and BAMF lists), `drive.c` (the player's car driven: controls, gearbox, engine, tyres, walls, jumps;

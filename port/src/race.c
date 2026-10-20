@@ -453,7 +453,7 @@ int race_test(const char *name)
         /* the view painted off the screen (0xf4578), then the dashboard puts it on the
            screen through its windows (0x31684), or from outside the HUD's lists (0x314e4) */
         raster_window(g_hud_view.pix, g_hud_view.w, win.x, win.y, win.x + win.w, win.y + win.h);
-        sky_draw(cam.yaw, m, &win, g_rkeys.plain_sky);
+        sky_draw(cam.yaw, cam.roll, &cam.pos, m, w, &win, g_rkeys.plain_sky);
         g_car_ticket = g_opp.ticket_up || g_opp.warning_up;
         g_road_steps = g_drive.steps;
         road_objects_start();

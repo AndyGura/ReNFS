@@ -1399,8 +1399,35 @@ that packs the four pointers and screen points of a child.
   → d = (sin << 8, 0, cos << 8) (`0xf8448`) >> `0xf6aa4`, turned by `[0x143df8]`
   (`0x83a54`) and projected (`0x94c80(1, .., 16)`): the screen y of the horizon (>>
   `0xf456c`, 0 in the snapshots). **`0x12ef6c` (the INFO's ring type) = 0** (CL, AL, CY:
-  the open roads) → `0x4a8b4(y)`; else, if the ring has a radius, `0x4ace8(ring, −camera
-  >> 10, &screen point)` (TR1..7; not read yet).
+  the open roads) → `0x4a8b4(y)`; else, if the ring has a height (`0x12ef60` > 0),
+  `0x4ace8(ring, −camera >> 10, &screen point)` (TR1..7, and CL3, AL3 by the INFO).
+- **The circuits' ring** (2026-10-20; ported, `sky.c` `ring_draw`). `sky_ring_setup`
+  `0x4a64c(height far, radius far)`: +0 = height > 0; 32 points (+0x24, 12 bytes each) at
+  angle k·0x1000 (65,536 a turn: 16 a turn, twice over): x = sin·radius, y = vert offset
+  far, z = cos·radius + zoffset far (rounded 16.16 products); the horizon picture "horz"
+  (family entry 2) in eight panels (+0x244, 0x20 each, 16.16 uv: u = (i·w >> 3) << 16 and
+  + ((w/8 − 1) << 16), v 1 and h − 2) and the same eight turned round (+0x344: from
+  ((7 − i)·w >> 3) + w/8 − 1 back). `sky_ring_draw` `0x4ace8`: the first point =
+  ((heading `0x129f10` − 0x320000) / 2^20, toward zero) mod 16 (+16 when negative: 70°
+  left of the heading); the eight points from it (`0x94db8`: each >> `0xece1c` (8) plus
+  −camera >> 10 >> 8), turned (`0x94e10`, the view's matrix) and projected (`0x94c80`,
+  16). scale = window +4 × window +0x10 / screen width `0x143e30`; y = scale × ring y
+  offset, H = scale × ring height (rounded); roll = camera +0x48 (negated on a mirrored
+  track), a = roll >> 8; each panel i of 7 (panel = first + i): corners 0, 1 = points i,
+  i + 1 + (sin a·(H − y) >> 16, −(cos a·(H − y) >> 16)), corners 2, 3 = points i + 1, i −
+  (sin a·(H + y) >> 16, −(cos a·(H + y) >> 16)); left out when both of its top x are right
+  of the screen or both bottom x left of it, when facing away (x0 > x1 or x3 > x2;
+  mirrored: the other way round and the sides swapped) or any x outside ±0x500; painted by
+  `0x34f1c(shape, uv, corners)` (two triangles 0 1 2 and 2 3 0, uv >> 16, as `paint_whole`'s
+  `0x905e0`/`0x8fad0`) with panel & 7's uv, the turned set when panel & 8 and `0x12efc4`.
+  Before the panels (unless F4's plain sky `0x12d9d6`) **`0x4ab18`**: up = (H − y − 1) /
+  cos a − 4, down = (H + y − 1) / cos a − 4 (EA's 16.16 division), right = window x + w −
+  point x, dy = right·tan a·squash; four `fill_rect`s, the sky's colour (the picture's
+  first pixel) and the ground's (its last) left and right of the horizon point, each edge
+  up and down by dy as the roll turns (`ret 8`: the two colours on the stack). With F4:
+  per panel two polygons (`0x8bc71`) from the window's top and from its bottom to the line
+  of the two projected points. **Checked (`tools/sky_emu.py`): equal pixel for pixel on six
+  TR1 snapshots t1..t6 (standing, then up to 116 mph), with F4 too; the city's still equal.**
 - `0x4a8b4(y)`: the shape "horz" of the family's entry 2 (`0x143e50`); the picture's
   column at the middle = ((mirror ? −yaw : yaw) × 5, a rounded 16.16 multiply) >> 16, C
   remainder by its width; unless `0x12d9d6` (then h = cy = 0): top = y − (cy (+0xa) ·
@@ -2880,6 +2907,11 @@ ticket's picture put back after the menu, the audio settings' per-player volumes
   intro, the title), `key:Return:5` ×3 (title, game mode SINGLE PLAYER, the name
   "Player"), `key:Return:7` (into CONTROL CENTRAL), `key:Down:1.5` ×3 (to RACE),
   `key:Return`. The race's clock starts about 2 s later.
+- **Rusty Springs** (snapshots t1..t6, 2026-10-20): after `key:Return:7` into Control
+  Central, `key:Down:1.5` (to the location), `key:Right:2` ×3 (City → Coastal → Alpine →
+  Rusty Springs), `key:Down:1.5` ×2, `key:Return:9`; then `key:a:0.5`, `down:KP_8` and a
+  snapshot every 3–4 s. It saves the track in the copy's CONFIG.DAT: put the City one back
+  afterwards (`build/snap/CONFIG_cy.DAT`) for the CY1 plans.
 - The race in 640x480: the cockpit view, the HUD line on top (best lap? 02:02.2, the race
   time, the gear, the distance 5.2 miles, the lap 2/2), a mirror, the map at the bottom
   right.

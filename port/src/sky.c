@@ -7,6 +7,7 @@
 #include "trackfam.h"
 #include "trackinfo.h"
 #include "view.h"
+#include "polyfill.h"
 
 int g_sky_steps[0x400];   /* 0x12df40: a column's x in the picture, from the middle */
 unsigned char g_sky_rows[480];  /* 0x12dd60: a screen row's row of the picture */
@@ -104,7 +105,172 @@ static void strip(const unsigned char *shape, int off, int x, int top)
     }
 }
 
-void sky_draw(int yaw, const int m[9], const road_window *win, int plain)
+/* the circuits' ring (NOTES §4.7): 32 points round the track, 16 a turn twice over
+   (sky_ring_setup 0x4a64c), and the horizon picture cut in eight panels, the second eight
+   the same turned round */
+static void ring_points(vec3 p[32])
+{
+    int k;
+
+    for (k = 0; k < 32; k++) {
+        int a = k << 12;
+
+        p[k].x = fixmul(ea_sin(a), g_info.radius_far);
+        p[k].y = g_info.vert_far;
+        p[k].z = fixmul(ea_cos(a), g_info.radius_far) + g_info.z_far;
+    }
+}
+
+static void ring_uv(int panel, int w, int h, int uv[8])
+{
+    int d = (int)((unsigned)(w / 8 - 1) << 16), i = panel & 7, u;
+
+    if (panel < 8) {
+        u = (int)((unsigned)(i * w) >> 3 << 16);
+        uv[0] = uv[6] = u;
+        uv[2] = uv[4] = u + d;
+    } else {
+        u = (int)((unsigned)((7 - i) * w) >> 3 << 16) + d;
+        uv[0] = uv[6] = u;
+        uv[2] = uv[4] = u - d;
+    }
+    uv[1] = uv[3] = 0x10000;
+    uv[5] = uv[7] = (h - 2) << 16;
+}
+
+/* 0x4ab18: the sky's colour above the ring and the ground's below it, each in two parts
+   left and right of the horizon's point, their edges moved by the camera's roll */
+static void ring_fill(int roll, const scr2 *pt, int above, int below, const view_window *vw,
+                      const road_window *win, int top, int bottom)
+{
+    int a = roll >> 8, c = ea_cos(a), up, down, right, dy, y_left, y_right, low_left, low_right;
+
+    if (!c)
+        return;
+    up = fixdiv(above - 1, c) - 4;
+    down = fixdiv(below - 1, c) - 4;
+    right = win->x + win->w - pt->x;
+    dy = fixmul(fixmul(right, fixdiv(ea_sin(a), c)), vw->squash);
+    if (dy > 0) {
+        y_left = pt->y - up;
+        y_right = dy + pt->y - up;
+        low_right = pt->y + down;
+        low_left = pt->y + down - dy;
+    } else {
+        dy = -dy;
+        y_left = pt->y + dy - up;
+        y_right = pt->y - up;
+        low_right = pt->y + down - dy;
+        low_left = pt->y + down;
+    }
+    raster_fill(win->x, win->y, right + 4, y_left - win->y, top);
+    raster_fill(win->x, low_left, right + 4, win->y + win->h - low_left, bottom);
+    raster_fill(pt->x, win->y, right, y_right - win->y + 3, top);
+    raster_fill(pt->x, low_right, right, win->y + win->h - low_right, bottom);
+}
+
+/* 0x34f1c: a panel's picture on its quad, as two triangles (0 1 2, 2 3 0) */
+static void ring_panel(const raster_tex *t, const int uv[8], const int q[8])
+{
+    int a[6], b[6], xy[6];
+
+    a[0] = uv[0] >> 16; a[1] = uv[1] >> 16; a[2] = uv[2] >> 16;
+    a[3] = uv[3] >> 16; a[4] = uv[4] >> 16; a[5] = uv[5] >> 16;
+    raster_tri(t, a, q);
+    b[0] = uv[4] >> 16; b[1] = uv[5] >> 16; b[2] = uv[6] >> 16;
+    b[3] = uv[7] >> 16; b[4] = uv[0] >> 16; b[5] = uv[1] >> 16;
+    xy[0] = q[4]; xy[1] = q[5]; xy[2] = q[6]; xy[3] = q[7]; xy[4] = q[0]; xy[5] = q[1];
+    raster_tri(t, b, xy);
+}
+
+/* sky_ring_draw 0x4ace8: the seven panels ahead between eight of the ring's points, from
+   the one 70 degrees left of the heading; the ring's height and its place on the horizon
+   from the INFO (scaled to the view), tilted with the camera's roll */
+static void ring_draw(int yaw, int roll, const vec3 *pos, const int m[9], const scr2 *pt,
+                      const view_window *vw, const road_window *win, int plain)
+{
+    const unsigned char *shape = g_fam.horizon ? shpi_find(g_fam.horizon, "horz") : 0;
+    int start, scale, y_off, height, w, h, top_x, top_y, low_x, low_y, i, screen;
+    vec3 ring[32], p[8], t;
+    scr2 s[8];
+    raster_tex tex;
+
+    if (!shape)
+        return;
+    w = rd16(shape + 4);
+    h = rd16(shape + 6);
+    start = (int)((unsigned)yaw - 0x320000) / 0x100000 % 16;
+    if (start < 0)
+        start += 16;
+    ring_points(ring);
+    t.x = (-pos->x >> 10) >> 8;
+    t.y = (-pos->y >> 10) >> 8;
+    t.z = (-pos->z >> 10) >> 8;
+    for (i = 0; i < 8; i++) {
+        vec3 q;
+
+        q.x = (ring[start + i].x >> 8) + t.x;
+        q.y = (ring[start + i].y >> 8) + t.y;
+        q.z = (ring[start + i].z >> 8) + t.z;
+        rotate(&q, m, &p[i]);
+    }
+    project_points(8, p, s, 16);
+
+    screen = g_view_res ? 640 : 320;       /* 0x143e30, 0x143e38; 0x143e40 the left, 0 */
+    scale = vw->squash * vw->w / screen;
+    y_off = fixmul(scale, g_info.ring_y);
+    height = fixmul(scale, g_info.ring_height);
+    if (g_road_mirror)
+        roll = -roll;
+    {
+        int a = roll >> 8, up = height - y_off, low = height + y_off;
+
+        top_x = ea_sin(a) * up >> 16;
+        top_y = -(ea_cos(a) * up >> 16);
+        low_x = ea_sin(a) * low >> 16;
+        low_y = -(ea_cos(a) * low >> 16);
+        if (!plain)
+            ring_fill(roll, pt, up, low, vw, win, shape[16], shape[16 + w * h - 1]);
+    }
+    shape_tex(shape, &tex);
+    for (i = 0; i < 7; i++) {
+        int panel = start + i, q[8], uv[8];
+
+        q[0] = s[i].x + top_x;      q[1] = s[i].y + top_y;
+        q[2] = s[i + 1].x + top_x;  q[3] = s[i + 1].y + top_y;
+        q[4] = s[i + 1].x - low_x;  q[5] = s[i + 1].y - low_y;
+        q[6] = s[i].x - low_x;      q[7] = s[i].y - low_y;
+        /* off the screen to one side, facing away, or too far out */
+        if (!g_road_mirror) {
+            if ((q[0] > screen && q[2] > screen) || (q[4] < 0 && q[6] < 0)
+                || q[0] > q[2] || q[6] > q[4])
+                continue;
+        } else if ((q[4] > screen && q[6] > screen) || (q[0] < 0 && q[2] < 0)
+                   || q[0] < q[2] || q[6] < q[4])
+            continue;
+        if (q[0] <= -0x500 || q[2] <= -0x500 || q[4] <= -0x500 || q[6] <= -0x500
+            || q[0] >= 0x500 || q[2] >= 0x500 || q[4] >= 0x500 || q[6] >= 0x500)
+            continue;
+        if (!plain) {
+            ring_uv(g_info.last_used && (panel >> 3 & 1) ? 8 + (panel & 7) : panel & 7, w, h, uv);
+            ring_panel(&tex, uv, q);
+        } else {
+            /* the F4 sky: above the ring's line the sky's colour, below it the ground's */
+            int xy[8];
+
+            xy[0] = s[i].x;     xy[1] = win->y;
+            xy[2] = s[i + 1].x; xy[3] = win->y;
+            xy[4] = s[i + 1].x; xy[5] = s[i + 1].y;
+            xy[6] = s[i].x;     xy[7] = s[i].y;
+            poly_fill(4, xy, poly_solid_rows, shape[16]);
+            xy[1] = xy[3] = win->y + win->h;
+            poly_fill(4, xy, poly_solid_rows, shape[16 + w * h - 1]);
+        }
+    }
+}
+
+void sky_draw(int yaw, int roll, const vec3 *pos, const int m[9], const view_window *vw,
+              const road_window *win, int plain)
 {
     const unsigned char *shape;
     int a = yaw >> 14, w, h, cy, top, bottom, off;
@@ -118,6 +284,12 @@ void sky_draw(int yaw, const int m[9], const road_window *win, int plain)
     rotate(&d, m, &v);
     project_points(1, &v, &s, 16);
 
+    /* the circuits (and CL3, AL3): the ring, if it has a height (0x4a9d0) */
+    if (g_info.ring_type) {
+        if (g_info.height_far > 0)
+            ring_draw(yaw, roll, pos, m, &s, vw, win, plain);
+        return;
+    }
     shape = g_fam.horizon ? shpi_find(g_fam.horizon, "horz") : 0;
     if (!shape)
         return;

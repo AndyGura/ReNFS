@@ -64,10 +64,14 @@ def sky_setup(s, L):
 
 
 def sky(s, L, win):
+    """the port's sky from the snapshot's camera (yaw +0x44, roll +0x48, place +0x10) and
+    its view's window ([0x143dfc] +0x1c, 40 bytes)"""
     cam = s.u32(0x143df4)
-    yaw = struct.unpack("<i", s.raw(cam + 0x44, 4))[0]
+    yaw, roll = struct.unpack("<ii", s.raw(cam + 0x44, 8))
+    pos = (ctypes.c_int * 3)(*struct.unpack("<3i", s.raw(cam + 0x10, 12)))
     m = (ctypes.c_int * 9)(*struct.unpack("<9i", s.raw(s.u32(0x143df8), 36)))
-    L.sky_draw(yaw, m, ctypes.byref(win), s.read(0x12d9d6, 1)[0])
+    vw = (ctypes.c_int * 10)(*struct.unpack("<10i", s.raw(struct.unpack("<I", s.raw(s.u32(0x143dfc) + 0x1c, 4))[0], 40)))
+    L.sky_draw(yaw, roll, pos, m, vw, ctypes.byref(win), s.read(0x12d9d6, 1)[0])
 
 
 def port(s, name, L, n, node):
