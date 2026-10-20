@@ -184,12 +184,32 @@ int race_test(const char *name)
     config_load();             /* the player's settings, the records the status bar shows */
     memset(&g_drive, 0, sizeof g_drive);
     g_drive.state = 1;
-    g_drive.kind = 0;          /* City 1 (0x12da12), its first segment */
+    {
+        /* the track (0x12da12, CONFIG.DAT +0x95) and segment (0x12da0e, +0x93) by the name
+           asked for (the circuits' files by track, 0x3629c) */
+        static const char *const tracks[9] = { "cy", "cl", "al", "tr1", "tr2", "tr6", "tr3",
+                                               "tr7", "tr4" };
+        for (i = 8; i >= 0; i--)
+            if (!strncasecmp(name, tracks[i], strlen(tracks[i])))
+                break;
+        g_drive.kind = i < 0 ? 0 : i;
+        g_drive.segment = i >= 0 && i < 3 && name[2] >= '1' && name[2] <= '3' ? name[2] - '1' : 0;
+    }
     g_drive.catch_up = 1;      /* (0x12dd10, race_setup_record) */
-    /* (a test: RENFS_LAPS=n laps on a circuit) */
-    g_drive.laps = getenv("RENFS_LAPS") ? atoi(getenv("RENFS_LAPS")) : 1;
-    if (g_drive.laps < 1 || g_drive.laps > DRIVE_LAPS)
-        g_drive.laps = 1;
+    /* the laps: an open road's one; a circuit's by the race length (+0xb3) as Control
+       Central sets them (0x437fc): 4, 8 or 16, or 2, 6 or 12 on tracks 4..7 (or
+       RENFS_LAPS for a test) */
+    g_drive.laps = 1;
+    if (g_track.loop) {
+        static const int laps[2][3] = { { 4, 8, 16 }, { 2, 6, 12 } };
+        int len = config_word(0xb3);
+
+        g_drive.laps = laps[g_drive.kind >= 4 && g_drive.kind <= 7][len < 0 || len > 2 ? 2 : len];
+        if (getenv("RENFS_LAPS"))
+            g_drive.laps = atoi(getenv("RENFS_LAPS"));
+        if (g_drive.laps < 1 || g_drive.laps > DRIVE_LAPS)
+            g_drive.laps = 1;
+    }
     /* where the race ends (race_main before 0x506dc): a circuit's laps, an open road's
        last section less 45 nodes */
     g_drive.last_node = g_track.loop ? g_track.length * 4
@@ -271,17 +291,8 @@ int race_test(const char *name)
     view_setup(&g_view_mirror, g_view_mirror.mode);
     view_setup(&g_view_ahead, g_view_ahead.mode);
     memset(&g_pause, 0, sizeof g_pause);
-    {
-        /* the pause menu's map: the track (CONFIG.DAT +0x95) and segment (+0x93) by the
-           name asked for (the circuits' files by track, 0x3629c) */
-        static const char *const tracks[9] = { "cy", "cl", "al", "tr1", "tr2", "tr6", "tr3",
-                                               "tr7", "tr4" };
-        for (i = 8; i >= 0; i--)
-            if (!strncasecmp(name, tracks[i], strlen(tracks[i])))
-                break;
-        g_pause.track = i < 0 ? 0 : i;
-        g_pause.segment = i >= 0 && i < 3 && name[2] >= '1' && name[2] <= '3' ? name[2] - '1' : 0;
-    }
+    g_pause.track = g_drive.kind;      /* (the pause menu's map) */
+    g_pause.segment = g_drive.segment;
     race_keys_start();         /* (the settings' detail, 0x5ba1c's 0x1440c) */
     /* (the opponent keeps the grid's node until its first step: the road's axes it
        drives by are worked out as that step moves it to the nearest, drive_opponent) */
@@ -310,9 +321,9 @@ int race_test(const char *name)
     for (i = 0; i < RACE_CARS; i++)
         cars[i].part = 7;      /* (+0x51a: driven, their finish checked, meeting the others) */
     /* the race's timing (race_start 0x506dc): the settings' laps (CONFIG.DAT +0xb1,
-       0x12dd14), the race length's times (0x12dd24) */
-    g_timing.lap_limit = config_word(0xb1);
-    g_timing.table = 1;
+       0x12dd14, as Control Central left them), the race length's times (+0xb3, 0x12dd24) */
+    g_timing.lap_limit = g_drive.laps;
+    g_timing.table = config_word(0xb3) < 0 || config_word(0xb3) > 2 ? 1 : config_word(0xb3);
     timing_cars();
     timing_start();
     /* the computer's driving (load_traffic_cfg 0x7de84): the drivers by the grid places,
@@ -345,8 +356,8 @@ int race_test(const char *name)
     /* the dashboard as the race starts: the status bar still black (its first 360
        steps), standing with the engine idling (+0x3c1 700 at the start) */
     memset(&g_hud, 0, sizeof g_hud);
-    g_hud.track = 0;           /* City 1 (0x12da12), its first segment */
-    g_hud.table = 1;
+    g_hud.track = g_drive.kind;
+    g_hud.table = g_timing.table;
     g_hud.shown = 1;
     g_hud.race_type = g_race_type;
     g_hud.running = 1;

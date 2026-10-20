@@ -33,7 +33,7 @@ static const char usage[] =
     "  RENFS_SEED=n     a test: the race's random numbers from n (else the clock)\n"
     "  RENFS_PLACE=s:a,c,v  a test: at race step s the opponent put a m ahead of the\n"
     "                   car and c m to the side, at v m/s\n"
-    "  RENFS_LAPS=n     a test: n laps of a circuit (tr1 ..; else 1)\n"
+    "  RENFS_LAPS=n     n laps of a circuit (tr1 ..; else the race length's, 8 by default)\n"
     "  RENFS_VIEW=n     a test: the race watched from camera n (2..5, 8..12 outside)\n"
     "\n"
     "Keys: Space, Enter or Esc pass a movie or the title.\n";

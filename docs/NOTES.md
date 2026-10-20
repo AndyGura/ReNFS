@@ -2692,6 +2692,17 @@ the menus' F5 has it off, `0xf748e`) and the word queued (`0x9901f`); `0x72438` 
 queue (`0x990a6`). The race's F5 does not silence it. An `.EAS` in IMA has no block header:
 its decoder starts at 0 (`eacs_sound`, equal to `tools/eacs.py` on the three words).
 **Ported** (`sound.c` `speech_say`, `drive.c`; heard on TR1 with `RENFS_LAPS`).
+The place words `first.eas` .. `eighth.eas` (a table of pointers at `0x503f0`) are read by
+nothing (no relocation record points into the table): the original never says the places.
+So a one-lap race says nothing, and a race of more laps says `finallap` only as the last
+lap starts, or `besttime` when a lap beats the track's lap record (Rusty Springs 38.2 s
+built in).
+**The laps** (`0x437fc`, Control Central, each time round its loop): +0xb3 the race length
+0/1/2 → +0xb1 4/8/16 laps, 2/6/12 on tracks 4..7; the built-in defaults hold +0xb3 1 and
++0xb1 4, so a race from the menu has 8 laps on Rusty Springs. `--race` takes them so
+(`RENFS_LAPS` for fewer) and the track's number and segment (`0x12da12`, `0x12da0e`) from
+the name asked for: before 2026-10-20 it kept City 1's (0) on every track, so a circuit
+compared its laps with City's record and spoke "best time" every lap.
 
 ### 4.19 The race keys (2026-10-20)
 

@@ -213,7 +213,7 @@ once; for `--shot` tests);
 `RENFS_THROW=s:x,y,z`: the car given a speed at race step s (to see a crash);
 `RENFS_PLACE=s:a,c,v`: the opponent put a m ahead and c m beside at v m/s at race step s;
 `RENFS_VIEW=n`: the race watched from camera n (outside: 2..5, 8..12);
-`RENFS_LAPS=n`: n laps of a circuit in `--race` (else 1);
+`RENFS_LAPS=n`: n laps of a circuit in `--race` (else the settings' race length, as Control Central `0x437fc`: 8 on TR1 by default);
 `RENFS_CONFIG=f`: a CONFIG.DAT for the test (the original's, `nfsdos.py mem:156c14:5f52:f`).
 `RENFS_SEED=n`: the race's random numbers seeded with n (else the time, as the original).
 Sound: SDL's device at 44.1 kHz 16-bit stereo, each stream converted by an
