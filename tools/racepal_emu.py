@@ -30,6 +30,7 @@ SMOKE_ADD = 16 + 48
 
 def race_track(s, name, L):
     """the track's info and family, before the cars (the info sets the tint they get)"""
+    ctypes.c_int.in_dll(L, "g_view_res").value = s.i32(0x12c308)
     if not L.trackinfo_load(name.encode(), s.i32(0x12c340), s.i32(0x143e2c)):
         sys.exit("no track info")
     if not L.trackfam_load(name.encode(), s.i32(0x12c340), s.i32(0x12da12)):

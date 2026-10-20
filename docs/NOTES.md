@@ -2457,7 +2457,7 @@ again, the new one by the smoothed line `0x8b195` (widths 1, the needles' record
 `0x12b5f4`); then the map at (0x103, 0x7e) and `0x5c5d0`. Mode 0 again (`0x143e68` = 0):
 the whole dashboard (`0x2d284`). **Equal pixel for pixel on all 11 snapshots in 7 frames
 each (the crash's view, the revs from 300 to 9999; `tools/dash_emu.py`).** Not ported:
-the tickets, `0xeaaa8` (the background drawn again), detail 3, the replay's buttons, 640x480.
+the tickets, `0xeaaa8` (the background drawn again), detail 3, the replay's buttons, 640x480. (Since: 640x480, detail 3 and the replay bar at both, §4.24.)
 
 ### 4.12 The race's timing (2026-10-19)
 
@@ -3684,6 +3684,67 @@ fast to the last step recorded − 8 and race on (state `0xf6b78` = 1 after).
   in the menus; the original's joystick has no Esc. The analogue steering and pedals
   (`car_steer_2` `0x4853c`, `car_pedals_2` `0x48a80`) come only with the Joystick kinds,
   as in the original: the keys' kinds' routines know full or nothing.
+
+### 4.24 Races at 640x480 (2026-10-21; the port's default, as the original's)
+
+Settings +0x7f = 0 (the built-in default) races at 640x480: `0x12c308` = 1 (the hires flag,
+0 at 320x200), `0x143e2c` the view's resolution (the window table `0xe85c0` + 680 · it).
+`0x36e09` drops to 320x200 only on a slow machine; the port never does. The port: `g_view_res`
+and `H(lo, hi)` (`view.h`); `RENFS_RES=320|640` overrides the settings for tests.
+
+- **Files**: `MASKHI.FSH` / `MASKHIG`, `MASKHI.MMB`, `MASKHI.B00..` (`0x5f7c8`), the dash
+  `<car>DH.FSH`, the tickets `TICKETxH` / `WARNxH`. Pictures 640x480, the view picture
+  `0x143e30` too.
+- **The status bar** (`0x30d8c`): digits at y 6, step 0x13; the accelerations at 0x14f /
+  0x1cc / 0x234; the start lights a 640x32 band, lights 0x82 apart at y 1 (their beeps
+  `0x5257c` not ported at either resolution).
+- **The map `0x31cb4`**: corner (2, 2) (320: (1, 1)); node shift 19 (20); the road's centre
+  (+0x38, +0x45) (320: +0x1c, +0x1c), the dots' (+0x38, +0x46) (+0x1c, +0x19); the frame
+  drawn twice, (ox−1..ox+0x70, oy−1..oy+0x8a) then (ox−2..ox+0x71, oy−2..oy+0x8b); clip
+  (2, 0x72, 2, 0x8c); dots inside |x| < 0x38, |y| < 0x3d, the police |y| < 0x44; the
+  arrows at x = race type 1 ? ox+0x5b : ox+0x60 − 0xd·k, their triangles 4 wide (2), `aro1`
+  at oy+0x83, `aru1` at oy. A dot (`map_dot`): clip (2, 0x72, 9, 0x85), fill (x−3, y−3, 7, 5),
+  lines (x−1..x+1) at y−4 and y+2, `pos1` at (x−4, y−5), the clip put back. The map's
+  background taken at (0x208, 0x132), 0x71x0x8c; from outside the map at (0x206, 0x130)
+  (320: (0x103, 0x7e)).
+- **From outside**: the tiles from row 0x20 (320: 0xd) (`0x3081c`); the outside box from
+  `0xe8b10` + 0x16c (the 640x480 set) + 52 · layout + 0x24.
+- **Detail 3, F2's fourth state, only at 640x480** (`0x12d9d9` = 3): the view drawn at
+  detail 2 (`0x143e04` = min(it, 2)) and copied with list [3], every other line. The
+  "clear" flag `0x12d9da` is set at the race's start with detail 3 (`0x5bc0f`), F1 at
+  detail 3 (`0x4801c`), F2 reaching 3 (`0x480bd`), the map turned off (`0x2f7a3`) and after
+  a view change (`0x5bfef`); while set the frame fills the view picture with the marker
+  colour `0x13d5c8`, copies it with list [2] (dash `0x12b8ac`/`0x12b8b0`; outside
+  `0x145a28`/`0x145a58` + layout · 16 + 8 / + 0xc) and clears it. In the frame after a view
+  change from outside, the window's odd rows are blacked in the view picture (`0x5c053`).
+  At 320x200 F2 goes 0, 1 (`0x4808e`'s other test is Ctrl, which no F key passes). Values
+  4 and 5 (the detail by speed, `race_update_cars` `0x51b95`) need settings above 3:
+  never.
+- **The replay bar**: clip (0, 0x280, 0x1c0, 0x1e0); the time `0x2d6b4(count, 0x41, 0x1c5,
+  0xd, 7)`; the line at (0x41, 0x1d8), 0xf1 long, 6 high; Done without the +10 offset, its
+  plain look always blitted when not lit; the mouse kept to (0, 0x1c2, 0x280, 0x1e0)
+  (`0x5e4f7`; 320: (0, 0xb4, 0x140, 0xc8)). The port's mouse is in 640x480 space, scaled.
+- **The pause menu** keeps the mode (`0x56ce7`, `0x580a9`: 320x200 switches to 640x480 and
+  back). The mouse limits of `0x55a00` and `race_run` don't matter: `0x47b78` sets its own
+  (0, 0, 0x100, 0x40) at both resolutions.
+- **Checked** on the snapshots h1 (the driver's view), h6, h7 (outside), with the
+  original's code in Unicorn (`Snap.vesa()` follows EA's bank switch `0x9d7f8`,
+  `vesa_screen()` reads the 640x480 screen): the dashboard, map, outside frames
+  (`dash_emu`), the road, walls and 3D objects (`roadpic_emu --walls --models`), the cars
+  (`cars_emu`), 0 pixels off, and the 320x200 ones still equal (`tools/checks.sh`).
+- **Not ported at either resolution** (found on the way; h7 shows the first: 1,201 pixels
+  of the player's own car from outside):
+  - the player's wheels: tyre pictures by speed `0x66148` (+0x425/+0x426, `0x977f3`,
+    +0x602/+0x60a) and the front wheels turned by the steering (+0x18 >> 5, `0x6634c` →
+    `0x662e0`, `0x97eb8`);
+  - the tyres' dust and smoke `0x664bc` → `0x663e0` → `0x64714`/`0x64768` (`smo1..4`,
+    `dir1..4`, `0x1464bc`/`0x1460ac`; half the scale at 320x200; EA's random `0x52580`);
+  - the skid marks `0x679ec`/`0x67950` (125 records `0x149574` + 0xa0·i, ring `0xf6e2c`,
+    width 0x2580/z up to 15, halved at 320x200 and by detail; on `0x12d9d7`);
+  - the bar while racing but watching another car, stopped or in a replay from the race
+    `0x7ef14` → `0x7f1d8`/`0x7f310`/`0x7f998`, `0x7f010`/`0x7f470` (`0x5c636`: running and
+    (`0x15d13a` or the car watched not the player's or stopped `0x145c90`));
+  - the start lights' beeps `0x5257c`.
 
 ## 5. The original in DOSBox (2026-10-19)
 

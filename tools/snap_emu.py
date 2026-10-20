@@ -89,6 +89,38 @@ class Snap:
         mu.emu_start(game(at), DONE, count=limit)
         return mu.reg_read(UC_X86_REG_EAX)
 
+    def vesa(self):
+        """the 640x480 screen in the card's memory, seen 64 KB at a time at 0xa0000 through
+        the bank EA's 0x9d7f8 sets (VESA 4F05; the bank last set kept at 0xf9910): each
+        change swaps the window out to self.screen and the new bank's part in, and the
+        interrupt is stepped over. self.vesa_screen() the whole picture afterwards"""
+        mu = self.mu
+        self.screen = bytearray(640 * 480 + 0x10000)
+        self.bank = mu.mem_read(game(0xf9910), 1)[0]
+
+        def on_bank(mu, addr, size, _):
+            al = mu.reg_read(UC_X86_REG_EAX) & 0xff
+            if al != self.bank and al < 5:
+                b = self.bank
+                if b < 5:
+                    self.screen[b << 16:(b + 1) << 16] = mu.mem_read(0xa0000, 0x10000)
+                mu.mem_write(0xa0000, bytes(self.screen[al << 16:(al + 1) << 16]))
+                self.bank = al
+                mu.mem_write(game(0xf9910), bytes([al]))
+            sp = mu.reg_read(UC_X86_REG_ESP)
+            mu.reg_write(UC_X86_REG_EIP, struct.unpack("<I", mu.mem_read(sp, 4))[0])
+            mu.reg_write(UC_X86_REG_ESP, sp + 4)
+        mu.hook_add(UC_HOOK_CODE, on_bank, None, begin=game(0x9d7f8), end=game(0x9d7f8))
+        # the window holds the bank last set
+        if self.bank < 5:
+            self.screen[self.bank << 16:(self.bank + 1) << 16] = mu.mem_read(0xa0000, 0x10000)
+
+    def vesa_screen(self):
+        b = self.bank
+        if b < 5:
+            self.screen[b << 16:(b + 1) << 16] = self.mu.mem_read(0xa0000, 0x10000)
+        return bytes(self.screen[:640 * 480])
+
     def read(self, flat_addr, n):
         return bytes(self.mu.mem_read(game(flat_addr), n))
 

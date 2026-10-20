@@ -153,6 +153,21 @@ def number_port(L, st, car, k, v):
 L_cars = []
 
 W, H, VGA = 320, 200, 0xa0000
+HIRES = 0                  # a 640x480 race (0x12c308): the screen in banks (Snap.vesa)
+
+
+def scr_start(s):
+    """the screen filled with FILL (at 640x480 all of the card's memory)"""
+    if HIRES:
+        s.vesa()
+        s.screen[:] = bytes([FILL]) * len(s.screen)
+        s.mu.mem_write(VGA, bytes([FILL]) * 0x10000)
+    else:
+        s.mu.mem_write(VGA, bytes([FILL]) * (W * H))
+
+
+def scr_read(s):
+    return s.vesa_screen() if HIRES else bytes(s.mu.mem_read(VGA, W * H))
 
 
 def picture(s, at):
@@ -184,10 +199,10 @@ def left_out(s):
 
 def original(s):
     """the screen after the redraw, from a screen of FILL"""
-    s.mu.mem_write(VGA, bytes([FILL]) * (W * H))
+    scr_start(s)
     s.write(0x12b8d4, struct.pack("<I", 1))
     s.call(0x30094)
-    return bytes(s.mu.mem_read(VGA, W * H))
+    return scr_read(s)
 
 
 def original_frames(path):
@@ -196,7 +211,7 @@ def original_frames(path):
     s = Snap(path)
     left_out(s)
     car = player(s)
-    s.mu.mem_write(VGA, bytes([FILL]) * (W * H))
+    scr_start(s)
     s.write(0x12b8d4, struct.pack("<I", 1))
     got = []
     for k in range(len(STEERS)):
@@ -208,12 +223,12 @@ def original_frames(path):
             if v is not None:
                 s.write(at, struct.pack("<i", v))
         s.call(0x31684, eax=car)
-        got.append(bytes(s.mu.mem_read(VGA, W * H)))
+        got.append(scr_read(s))
     for change in NUMBERS:
         for k, v in change.items():
             number_change(s, car, k, v)
         s.call(0x31684, eax=car)
-        got.append(bytes(s.mu.mem_read(VGA, W * H)))
+        got.append(scr_read(s))
     return got
 
 
@@ -377,9 +392,12 @@ OUT_DETAILS = [0, 0, 1, 2, 1, 0, 2]
 LAYOUT = 1
 
 
+VIEW_TOP, VIEW_ROWS = 17, 160     # (640x480: from row 33, 384 rows)
+
+
 def pattern(k):
     """the view's 3D window (320 x 160 from row 17) as frame k paints it"""
-    return bytes((x * 7 + y * 3 + k * 11) % 200 + 20 for y in range(160) for x in range(320))
+    return bytes((x * 7 + y * 3 + k * 11) % 200 + 20 for y in range(VIEW_ROWS) for x in range(W))
 
 
 def original_outside(path):
@@ -392,15 +410,17 @@ def original_outside(path):
     s.call(0x8118c, view)
     s.call(0x14568, eax=LAYOUT, edx=0)
     s.call(0x3081c)
+    s.write(0x12b94c, struct.pack("<i", 1))    # the status bar's strip to be blacked, as
+                                               # the port's after hud_load
     base = struct.unpack("<I", s.raw(view + 0x2c, 4))[0] + 0x10
-    s.mu.mem_write(VGA, bytes([FILL]) * (W * H))
+    scr_start(s)
     got = []
     for k, rpm in enumerate(OUT_RPMS):
-        s.mu.mem_write(base + 17 * W, pattern(k))
+        s.mu.mem_write(base + VIEW_TOP * W, pattern(k))
         s.mu.mem_write(car + 0x3c1, struct.pack("<i", rpm))
         s.write(0x143e04, struct.pack("<i", OUT_DETAILS[k]))
         s.call(0x314e4, eax=car, edx=int(k == 0))
-        got.append(bytes(s.mu.mem_read(VGA, W * H)))
+        got.append(scr_read(s))
     return got
 
 
@@ -421,14 +441,14 @@ def port_outside(s, L):
     car = HudCar(g(a, 0x18), g(a, 0x48a), g(a, 0x3c1), g(g(a, 0x479), 0xac), g(a, 0x68),
                  viewed, int(viewed < s.i32(0x12da30)), g(a, 0x15c), g(a, 0x3ed), g(a, 0x47d),
                  g(a, 0x50), g(a, 0x48))
-    box = (I * 4)(*[struct.unpack("<i", s.read(0xe8b10 + 52 * LAYOUT + 0x24 + 4 * i, 4))[0]
+    box = (I * 4)(*[struct.unpack("<i", s.read(0xe8b10 + 0x16c * HIRES + 52 * LAYOUT + 0x24 + 4 * i, 4))[0]
                     for i in range(4)])
     L.hud_outside_screen(box)
     scr = Picture.in_dll(L, "g_hud_screen")
     ctypes.memset(scr.pix, FILL, W * H)
     got = []
     for k, rpm in enumerate(OUT_RPMS):
-        ctypes.memmove(view.pix + 17 * W, pattern(k), 160 * W)
+        ctypes.memmove(view.pix + VIEW_TOP * W, pattern(k), VIEW_ROWS * W)
         car.rpm = rpm
         st.detail = OUT_DETAILS[k]
         L.hud_outside_frame(ctypes.byref(car), int(k == 0), LAYOUT)
@@ -448,9 +468,13 @@ def main():
     L.files_init(b"NFSSE", None)
     if not L.exe_load():
         sys.exit("no NFS_DOS.EXE")
+    global W, H, HIRES, VIEW_TOP, VIEW_ROWS
     for path in args:
         s = Snap(path)
         s.path = path
+        HIRES = s.i32(0x12c308)
+        W, H = (640, 480) if HIRES else (320, 200)
+        VIEW_TOP, VIEW_ROWS = (33, 384) if HIRES else (17, 160)
         tag = os.path.splitext(os.path.basename(path))[0]
         pal = palette(s)
         frames = original_frames(path)
@@ -458,18 +482,18 @@ def main():
         maps = original_map(path, MAP_NODES)
         outs = original_outside(path)
         got, got_back, got_frames, got_maps, got_outs = port(s, name, L)
-        R.png("build/shots/dash_%s_orig.png" % tag, want, pal)
-        R.png("build/shots/dash_%s_port.png" % tag, got, pal)
+        R.png("build/shots/dash_%s_orig.png" % tag, want, pal, W, H)
+        R.png("build/shots/dash_%s_port.png" % tag, got, pal, W, H)
         diff = [255 if a != b else 0 for a, b in zip(want, got)]
-        R.png("build/shots/dash_%s_diff.png" % tag, diff, [(0, 0, 0)] * 255 + [(255, 255, 255)])
+        R.png("build/shots/dash_%s_diff.png" % tag, diff, [(0, 0, 0)] * 255 + [(255, 255, 255)], W, H)
         d = [i for i, x in enumerate(diff) if x]
         db = sum(1 for a, b in zip(want_back, got_back) if a != b)
         print("%s: %d pixels differ%s; the map's background: %d differ" % (
             tag, len(d), " (first %d, %d)" % (d[0] % W, d[0] // W) if d else "", db))
         for k, (a, b) in enumerate(zip(frames, got_frames)):
             d = [i for i in range(W * H) if a[i] != b[i]]
-            R.png("build/shots/dash_%s_frame%d_orig.png" % (tag, k), a, pal)
-            R.png("build/shots/dash_%s_frame%d_port.png" % (tag, k), b, pal)
+            R.png("build/shots/dash_%s_frame%d_orig.png" % (tag, k), a, pal, W, H)
+            R.png("build/shots/dash_%s_frame%d_port.png" % (tag, k), b, pal, W, H)
             what = ("wheel %s, rpm %s, speed %s, step %s, radar %s" % (
                 STEERS[k], RPMS[k], SPEEDS[k], STEPS[k], RADARS[k]) if k < len(STEERS)
                 else ", ".join("%s %s" % kv for kv in NUMBERS[k - len(STEERS)].items()))
@@ -478,8 +502,8 @@ def main():
 
         for k, (a, b) in enumerate(zip(outs, got_outs)):
             d = [i for i in range(W * H) if a[i] != b[i]]
-            R.png("build/shots/dash_%s_out%d_orig.png" % (tag, k), a, pal)
-            R.png("build/shots/dash_%s_out%d_port.png" % (tag, k), b, pal)
+            R.png("build/shots/dash_%s_out%d_orig.png" % (tag, k), a, pal, W, H)
+            R.png("build/shots/dash_%s_out%d_port.png" % (tag, k), b, pal, W, H)
             print("  outside %d (rpm %d): %d pixels differ%s" % (
                 k, OUT_RPMS[k], len(d), " (first %d, %d)" % (d[0] % W, d[0] // W) if d else ""))
         w, h, _ = picture(s, 0xf4584)

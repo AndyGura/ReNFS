@@ -29,8 +29,8 @@ typedef struct {
 
 extern dash_state g_dash;
 
-/* the car's dashboard (car its name, "F512TR", number +0x48a); 0 if missing. At 640x480
-   only its colours so far */
+/* the car's dashboard (car its name, "F512TR", number +0x48a), at 640x480 (hires) the
+   DH files; 0 if missing */
 int dash_load(const char *car, int number, int hires);
 void dash_free(void);
 /* its first 48 colours as a piece of the race's palette (0x2e8bc), and the cockpit's 13

@@ -17,14 +17,17 @@ from snap_emu import Snap, game
 from road_emu import Road, ROAD_SECTIONS
 from poly_emu import Vec3
 
+# (as tools/cars_emu.py's: video.c and the cars' files reach the rest)
 SOURCES = ["roaddraw.c", "sky.c", "trackinfo.c", "road.c", "poly.c", "raster.c", "track.c", "files.c", "exe.c",
-           "trackfam.c", "model.c", "racepal.c", "font.c", "video.c", "fsh.c", "unpack.c", "view.c", "config.c", "polyfill.c"]
+           "trackfam.c", "model.c", "racepal.c", "font.c", "video.c", "fsh.c", "unpack.c", "view.c", "config.c", "polyfill.c",
+           "cardraw.c", "camera.c", "car.c", "dash.c", "hud.c", "crash.c", "smoke.c", "drive.c", "timing.c", "opponent.c",
+           "sndlib.c", "racesnd.c", "audio.c", "sound.c", "eacs.c"]
 
 
 def lib():
     out = "build/roaddraw_test.so"
     subprocess.check_call(["cc", "-O1", "-g", "-shared", "-fPIC", "-o", out] +
-                          ["port/src/" + f for f in SOURCES] + ["-Iport/src"] +
+                          ["port/src/" + f for f in SOURCES] + ["tools/timing_test.c", "tools/collide_test.c", "tools/replay_stub.c", "-Iport/src"] +
                           subprocess.check_output(["sdl2-config", "--cflags", "--libs"]).decode().split())
     return ctypes.CDLL(os.path.abspath(out))
 

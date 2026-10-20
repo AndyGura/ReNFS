@@ -333,6 +333,11 @@ int race_run(void)
     memset(&g_drive, 0, sizeof g_drive);
     g_drive.state = 1;
     replay_setup_record();
+    /* (race_run 0x3724f) at 640x480 when the graphics screen's first row says so (+0x7f
+       0; 0x12c308, 0x143e2c by 0x5b984), else 320x200; RENFS_RES=320 or 640 for a test */
+    g_view_res = config_word(0x7f) == 0;
+    if (getenv("RENFS_RES"))
+        g_view_res = atoi(getenv("RENFS_RES")) == 640;
     /* (0x5e4b8, 0x5e4c4) a race, or a replay (CONFIG.DAT +0xaf: 1 the whole of
        REPLAY.RPL, 2 its highlights, 3 the attract mode's): the race record from the file
        (0x5c340), the rest of it read at the first step */
@@ -466,12 +471,13 @@ int race_run(void)
     redline = S32(cars[0].spec, 0xac);      /* the engine's red line */
     cars_queue_colours(list, ncars, marks);
     car = (const char *)exe_at((unsigned)exe_i32(0xf6b10 + 4 * (200 + player)), 1);
-    if (!dash_load(car, cars[0].number, 0))
+    if (!dash_load(car, cars[0].number, g_view_res))
         return 0;
     dash_queue_colours();
     if (!hud_load())
         return 0;
-    video_mode(320, 200);
+    /* (0x5ba1c: at 640x480 the menus' mode kept) */
+    video_mode(H(320, 640), H(200, 480));
     pal_apply_pieces();
     race_colours(marks, ncars, type);
     needle_colours(cars[0].number);     /* (0x8a390, in race_colours) */
@@ -488,7 +494,7 @@ int race_run(void)
 
     /* the views and the camera in the driver's seat; the racers on the grid, the player
        in slot 7 (0x12dca0) */
-    view_init(0, cars[0].number, horizon);
+    view_init(g_view_res, cars[0].number, horizon);
     camera_init(eye);
     view_setup(&g_view_ahead, g_view_ahead.mode);
     view_setup(&g_view_mirror, g_view_mirror.mode);
@@ -653,7 +659,7 @@ int race_run(void)
         /* (race_draw_frame 0x5bcf5: the road drawn as far as F3 asked, gathered again) */
         if (race_keys_frame())
             road_refresh();
-        g_hud.detail = g_view_detail;
+        g_hud.detail = g_rkeys.window == 3 ? 3 : g_view_detail;
         track_keep_sections(quarter(cam.node));
         if (g_track.last_node < 0 || quarter(g_track.last_node) != quarter(cam.node))
             road_gather(cam.node, quarter(cam.node), g_rkeys.drawn);
@@ -725,6 +731,16 @@ int race_run(void)
         /* (the seat this frame is drawn from: F9 inside the dashboard's frame changes it
            for the next) */
         seat = cam.mode == 0 && !g_hud.no_dash;
+        /* detail 3, every other line: the screen's view blacked again after a change
+           (0x5bfef); from outside, this frame's 1:1 view gets its odd lines black in the
+           view's window (0x5c053) as the lists leave them out later */
+        if (redraw && g_hud.detail == 3) {
+            g_hud.clear = 1;
+            if (!seat)
+                for (i = win.y | 1; i < win.y + win.h; i += 2)
+                    memset(g_hud_view.pix + (long)i * g_hud_view.w + win.x, g_marker_line,
+                           (size_t)win.w);
+        }
         if (k == 1)
             ;                  /* the police's ticket or warning instead */
         else if (seat) {

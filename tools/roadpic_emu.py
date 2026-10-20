@@ -41,7 +41,19 @@ def png(path, pix, pal, W=W, H=H):
 
 CLIP = (0, 0, 320, 127)          # the 3D view above the dashboard (some snapshots were taken
                                  # while the game drew into a smaller picture)
-SCREEN, ROWS = 0x3800000, 0x3840000
+SCREEN, ROWS = 0x3800000, 0x3860000     # (the rows past a 640x480 screen)
+
+
+def screen_for(s):
+    """a 640x480 race (0x12c308): its screen, and the 3D view's window ([0x143dfc] +0x1c:
+    x, y, w, h at +0x18)"""
+    global W, H, CLIP
+    if s.i32(0x12c308):
+        W, H = 640, 480
+        x, y, w, h = struct.unpack("<4i", s.raw(struct.unpack("<I", s.raw(s.u32(0x143dfc) + 0x1c, 4))[0] + 0x18, 16))
+        CLIP = (x, y, x + w, y + h)
+    else:
+        W, H, CLIP = 320, 200, (0, 0, 320, 127)
 
 
 def original(s, n, node):
@@ -137,6 +149,7 @@ def main():
     os.makedirs("build/shots", exist_ok=True)
     for p in snaps:
         s = Snap(p)
+        screen_for(s)
         if s.u32(0x143dfc) != struct.unpack("<I", s.raw(s.u32(0x143df4) + 0x88, 4))[0]:
             print("%s: skipped (taken while the mirror's view was current)" % os.path.basename(p))
             continue
@@ -160,10 +173,10 @@ def main():
         L.video_get_palette(raw, 0, 256)
         pal = [tuple(raw[3 * i:3 * i + 3]) for i in range(256)]
         tag = os.path.splitext(os.path.basename(p))[0]
-        png("build/shots/road_%s_orig.png" % tag, want, pal)
-        png("build/shots/road_%s_port.png" % tag, got, pal)
+        png("build/shots/road_%s_orig.png" % tag, want, pal, W, H)
+        png("build/shots/road_%s_port.png" % tag, got, pal, W, H)
         diff = [255 if a != b else 0 for a, b in zip(want, got)]
-        png("build/shots/road_%s_diff.png" % tag, diff, [(0, 0, 0)] * 255 + [(255, 255, 255)])
+        png("build/shots/road_%s_diff.png" % tag, diff, [(0, 0, 0)] * 255 + [(255, 255, 255)], W, H)
         d = sum(1 for x in diff if x)
         painted = sum(1 for x in want if x)
         print("%s: %d pixels painted by the original, %d differ%s" % (

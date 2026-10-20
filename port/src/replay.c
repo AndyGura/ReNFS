@@ -1266,8 +1266,8 @@ static void speed_set(int action, int repeats)
 static void bar_mouse(int *x, int *y)
 {
     mouse_read(x, y);
-    *x = *x * 320 / 640;
-    *y = *y * 200 / 480;
+    *x = *x * H(320, 640) / 640;
+    *y = *y * H(200, 480) / 480;
 }
 
 static int bar_in(int k, int x, int y)
@@ -1298,6 +1298,8 @@ static void bar_input(void)
 {
     int over = 0, arrows = 0, x, y, k, key;
 
+    /* the mouse kept on the bar's rows (0x5e4f7: from 180 of 200, 450 of 480) */
+    mouse_limits(0, H(0xb4 * 480 / 200, 0x1c2), 640, 480);
     /* (the buttons read once the mouse has been used, 0x156604) */
     fe_mouse_moved();
     if (g_mouse_active)
@@ -1345,8 +1347,8 @@ static void bar_input(void)
             /* the mouse to the middle of the lit picture */
             const int *r = g_bar.rect[g_bar.lit];
 
-            mouse_place((g_bar.lit_size[g_bar.lit][0] / 2 + r[0]) * 640 / 320,
-                        (g_bar.lit_size[g_bar.lit][1] / 2 + r[1]) * 480 / 200);
+            mouse_place((g_bar.lit_size[g_bar.lit][0] / 2 + r[0]) * 640 / H(320, 640),
+                        (g_bar.lit_size[g_bar.lit][1] / 2 + r[1]) * 480 / H(200, 480));
         }
         if (key == 0x20 || key == 0x0d) {
             g_bar.pressed = g_bar.lit;

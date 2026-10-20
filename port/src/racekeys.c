@@ -6,6 +6,7 @@
 #include "config.h"
 #include "drive.h"
 #include "exe.h"
+#include "hud.h"
 #include "racesnd.h"
 #include "timing.h"
 #include "video.h"
@@ -39,6 +40,7 @@ void race_keys_start(void)
     views_start(config_word(0x81) & 0xff);
     g_rkeys.drawn = 0x1c;
     g_rkeys.drawn_next = g_rkeys.road < 3 ? drawn[g_rkeys.road] : -1;
+    g_hud.clear = g_rkeys.window == 3;     /* (0x5bc0f) */
 }
 
 /* the car watched (Alt+Ctrl and a number), the camera behind it (mode 4) */
@@ -113,14 +115,19 @@ void race_keys(race_camera *cam)
             n = exe_i32(0xe8b10 + 0x16c * g_view_res + 52 * cam->ahead->current);
             if (n >= 0)
                 view_layout(cam->ahead, n);
+            if (g_rkeys.window == 3)
+                g_hud.clear = 1;
             g_view_redraw = 1;
         }
     } else if (key_down(K_F2)) {
         if (g_rkeys.fkey_up) {
+            /* (at 320x200 0, 1: 0x4808e would allow 3 with Ctrl held, never here) */
             g_rkeys.window = (g_rkeys.window + 1) % 4;
             if (!g_view_res && g_rkeys.window > 1)
                 g_rkeys.window = 0;
             detail(cam, g_rkeys.window);
+            if (g_rkeys.window == 3)
+                g_hud.clear = 1;
         }
     } else if (key_down(K_F3)) {
         if (g_rkeys.fkey_up) {

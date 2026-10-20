@@ -220,6 +220,7 @@ def load_cars(s, name, L):
 
 def check(path, name, L):
     s = Snap(path)
+    R.screen_for(s)
     tag = os.path.splitext(os.path.basename(path))[0]
     if s.u32(0x143dfc) != struct.unpack("<I", s.raw(s.u32(0x143df4) + 0x88, 4))[0]:
         print("%s: skipped (taken while the mirror's view was current)" % tag)
@@ -258,10 +259,10 @@ def check(path, name, L):
     raw = (U8 * 768)()
     L.video_get_palette(raw, 0, 256)
     pal = [tuple(raw[3 * i:3 * i + 3]) for i in range(256)]
-    R.png("build/shots/cars_%s_orig.png" % tag, want, pal)
-    R.png("build/shots/cars_%s_port.png" % tag, got, pal)
+    R.png("build/shots/cars_%s_orig.png" % tag, want, pal, R.W, R.H)
+    R.png("build/shots/cars_%s_port.png" % tag, got, pal, R.W, R.H)
     diff = [255 if a != b else 0 for a, b in zip(want, got)]
-    R.png("build/shots/cars_%s_diff.png" % tag, diff, [(0, 0, 0)] * 255 + [(255, 255, 255)])
+    R.png("build/shots/cars_%s_diff.png" % tag, diff, [(0, 0, 0)] * 255 + [(255, 255, 255)], R.W, R.H)
     d = sum(1 for x in diff if x)
     print("%s: %d pixels differ; %s" % (tag, d, "; ".join(bad) if bad else "the cars' places equal"))
     for c in cars:

@@ -174,7 +174,7 @@ static const unsigned char *named(const fsh_file *f, const char *name)
    rows at the bottom) while playing back */
 static void redraw_clip(void)
 {
-    clip_set(0, g_win.w, 0, g_hud.running ? g_win.h : 0xb4);
+    clip_set(0, g_win.w, 0, g_hud.running ? g_win.h : H(0xb4, 0x1c0));
 }
 
 static const unsigned char *table_named(unsigned table, int i)
@@ -185,14 +185,17 @@ static const unsigned char *table_named(unsigned table, int i)
 int hud_load(void)
 {
     shape s;
+    char path[64];
     int i;
 
     hud_free();
     /* (0x2e8d4 as the player's car is loaded: the acceleration test's figures none) */
     memset(g_accel, 0, sizeof g_accel);
     memset(g_accel_shown, 0, sizeof g_accel_shown);
-    if (!fsh_load(&g_mask, g_german ? "SIMDATA/MISC/MASKLOG.FSH" : "SIMDATA/MISC/MASKLO.FSH")) {
-        fprintf(stderr, "renfs: SIMDATA/MISC/MASKLO.FSH is missing\n");
+    /* (load_cockpit_mask 0x5f7c8: MASKHI at 640x480, MASKHIG / MASKLOG the German) */
+    snprintf(path, sizeof path, "SIMDATA/MISC/MASK%s%s.FSH", H("LO", "HI"), g_german ? "G" : "");
+    if (!fsh_load(&g_mask, path)) {
+        fprintf(stderr, "renfs: %s is missing\n", path);
         return 0;
     }
     if (!fsh_find(&g_mask, "!pal", &s)) {
@@ -205,21 +208,23 @@ int hud_load(void)
             g_mask_pal[i] >>= 2;
     pal_queue_remap(g_mask.d, g_mask_pal);
     cockpit_queue_colours();
-    g_hud_screen.w = 320;
-    g_hud_screen.h = 200;
+    g_hud_screen.w = H(320, 640);
+    g_hud_screen.h = H(200, 480);
     g_hud_screen.pix = g_fb;
-    g_hud_map_back.w = 0x39;
-    g_hud_map_back.h = 0x34;
-    g_hud_map_back.pix = calloc(0x39 * 0x34, 1);
-    g_hud_view.w = 320;                    /* 0x143e30, 0x143e34 */
-    g_hud_view.h = 200;
-    g_hud_view.pix = calloc(320 * 200, 1);
+    /* (race_load_track 0x5ba1c's windows: the map's background 0xf4580, the map 0xf4584,
+       the view 0xf4578) */
+    g_hud_map_back.w = H(0x39, 0x71);
+    g_hud_map_back.h = H(0x34, 0x8c);
+    g_hud_map_back.pix = calloc((size_t)(g_hud_map_back.w * g_hud_map_back.h), 1);
+    g_hud_view.w = H(320, 640);            /* 0x143e30, 0x143e34 */
+    g_hud_view.h = H(200, 480);
+    g_hud_view.pix = calloc((size_t)(g_hud_view.w * g_hud_view.h), 1);
     g_hud_mirror.w = g_dash.place[1][0] - g_dash.place[0][0] + 1;
     g_hud_mirror.h = g_dash.place[1][1] - g_dash.place[0][1] + 1;
     g_hud_mirror.pix = calloc((size_t)(g_hud_mirror.w * g_hud_mirror.h), 1);
-    g_hud_map.w = 0x3a;
-    g_hud_map.h = 0x36;
-    g_hud_map.pix = calloc(0x3a * 0x36, 1);
+    g_hud_map.w = H(0x3a, 0x74);
+    g_hud_map.h = H(0x36, 0x8e);
+    g_hud_map.pix = calloc((size_t)(g_hud_map.w * g_hud_map.h), 1);
     g_redraw = 1;
     g_bar_black = 1;
     g_map_back_taken = 0;
@@ -236,8 +241,8 @@ int hud_load(void)
         hh = s16(t + 6) / 2;
         g_tach_c[0] = hw + s16(t + 0xc);
         g_tach_c[1] = hh + s16(t + 0xe);
-        g_tach_r[0] = hw - hw / 4 - hw / 16;
-        g_tach_r[1] = hh - hh / 4 - hh / 16;
+        g_tach_r[0] = hw - hw / 4 - H(hw / 16, 0);
+        g_tach_r[1] = hh - hh / 4 - H(hh / 16, 0);
         for (k = 0; k < 4; k++)
             g_hud_small_needle[k] = exe_i32(0xeaa98 + 4 * k);
         /* the replay's bar: the names from the program's tables (0xf6bc0 dond .., 0xf6c08
@@ -275,16 +280,15 @@ int hud_load(void)
         g_bar.speed = 0;
         g_bar.redraw = 0;
         g_bar.speeds = 1;
-        g_mmb = file_load("SIMDATA/MISC/MASKLO.MMB", &len);
+        snprintf(path, sizeof path, "SIMDATA/MISC/MASK%s.MMB", H("LO", "HI"));
+        g_mmb = file_load(path, &len);
         if (ww_count(g_mmb) < 12) {
-            fprintf(stderr, "renfs: SIMDATA/MISC/MASKLO.MMB is missing\n");
+            fprintf(stderr, "renfs: %s is missing\n", path);
             return 0;
         }
         for (k = 0; k < 12; k++) {
-            char path[64];
-
             g_lists[0][k] = ww_entry(g_mmb, k);
-            snprintf(path, sizeof path, "SIMDATA/MISC/MASKLO.B%d%d", k / 4, k % 4);
+            snprintf(path, sizeof path, "SIMDATA/MISC/MASK%s.B%d%d", H("LO", "HI"), k / 4, k % 4);
             if (!(g_mask_b[k] = file_load(path, &len))) {
                 fprintf(stderr, "renfs: %s is missing\n", path);
                 return 0;
@@ -404,39 +408,40 @@ static void yellow_digits(int v, int x, int y, int step, int n)
         }
 }
 
-/* steps as seconds and tenths (0x2d7f0: more than 1,200 shown as none) */
+/* steps as seconds and tenths (0x2d7f0: more than 1,200 shown as none); at 640x480 the
+   places its registers give, else those pushed */
 static void accel_time(int v, int x)
 {
-    int sec;
+    int sec, y = H(1, 6), step = H(8, 0x13);
 
     if (v > 0x4b0)
         v = 0;
     sec = v / 60;
-    yellow_digits(sec, x, 1, 8, 2);
-    yellow_digits((v - sec * 60) / 6, x + 2 * 8 + 2, 1, 8, 1);
+    yellow_digits(sec, x, y, step, 2);
+    yellow_digits((v - sec * 60) / 6, x + 2 * step + H(2, 8), y, step, 1);
 }
 
 /* the acceleration test's figures on the status bar, each when it changes (0x2d8c0) */
 static void accel_figures(void)
 {
-    static const int time_x[3] = { 0x14, 0x45, 0x76 };
-    int i;
+    static const int time_x[2][3] = { { 0x14, 0x45, 0x76 }, { 0x25, 0x8d, 0xf5 } };
+    int i, y = H(1, 6), step = H(8, 0x13);
 
     for (i = 0; i < 3; i++)
         if (g_accel_shown[i] != g_accel[i]) {
-            accel_time(g_accel[i], time_x[i]);
+            accel_time(g_accel[i], time_x[g_view_res][i]);
             g_accel_shown[i] = g_accel[i];
         }
     if (g_accel_shown[3] != g_accel[3]) {
-        yellow_digits(g_accel[3], 0xaa, 1, 8, 3);
+        yellow_digits(g_accel[3], H(0xaa, 0x14f), y, step, 3);
         g_accel_shown[3] = g_accel[3];
     }
     if (g_accel_shown[5] != g_accel[5]) {
-        yellow_digits(g_accel[5], 0x11f, 1, 8, 3);
+        yellow_digits(g_accel[5], H(0x11f, 0x234), y, step, 3);
         g_accel_shown[5] = g_accel[5];
     }
     if (g_accel_shown[4] != g_accel[4]) {
-        yellow_digits(g_accel[4], 0xee, 1, 8, 3);
+        yellow_digits(g_accel[4], H(0xee, 0x1cc), y, step, 3);
         g_accel_shown[4] = g_accel[4];
     }
 }
@@ -474,14 +479,14 @@ void hud_braking(int from60, int from80)
 static void status_bar(void)
 {
     if (!g_hud.shown || g_hud.steps < 360) {
-        raster_fill(0, 0, 320, 16, g_marker_line);
+        raster_fill(0, 0, H(320, 640), H(16, 32), g_marker_line);
         return;
     }
     blit_own(named(&g_mask, "stat"), COPY);
     if (g_hud.mode == 1) {
         blit_own(named(&g_mask, "rtet"), COPY);
         time_draw(record_time(g_hud.track, 6 + (g_hud.circuit ? 10 * g_hud.table : 0)) + 300,
-                  0x11, 3, 6, 2);
+                  H(0x11, 0x1f), H(3, 8), H(6, 0xd), H(2, 7));
         blit_own(named(&g_mask, "splt"), COPY);
         blit_own(table_named(YELLOW, g_hud.ahead >= 0 ? YELLOW_PLUS : YELLOW_MINUS), COPY);
     } else if (g_hud.mode == 0) {
@@ -492,7 +497,7 @@ static void status_bar(void)
         } else
             blit_own(named(&g_mask, g_hud.circuit ? "lap#" : "mile"), COPY);
         time_draw((g_hud.circuit ? g_hud.best_lap : record_time(g_hud.track, g_hud.segment)) + 300,
-                  0x11, 3, 6, 2);
+                  H(0x11, 0x1f), H(3, 8), H(6, 0xd), H(2, 7));
     }
     else {
         blit_own(named(&g_mask, "acct"), COPY);
@@ -505,7 +510,8 @@ static void status_bar(void)
 
 void hud_redraw(void)
 {
-    static const int corners[8] = { 0, 0, 0x38, 0, 0x38, 0x3b, 0, 0x3b };
+    static const int corners[2][8] = { { 0, 0, 0x38, 0, 0x38, 0x3b, 0, 0x3b },
+                                       { 0, 0, 0x70, 0, 0x70, 0x8b, 0, 0x8b } };
     shape dash;
 
     window_set(&g_hud_screen);
@@ -513,10 +519,11 @@ void hud_redraw(void)
     if (fsh_find(&g_dash.file, "dash", &dash))
         blit(dash.head, 0, 0, SEE_THROUGH);
     /* the map's box: the dashboard under it, taken and darkened twice (0x84248) */
-    blit_pixels(g_hud_map_back.pix, g_hud_map_back.w, g_hud_map_back.h, 0x104, 0x7f, TAKE);
+    blit_pixels(g_hud_map_back.pix, g_hud_map_back.w, g_hud_map_back.h, H(0x104, 0x208),
+                H(0x7f, 0x132), TAKE);
     window_set(&g_hud_map_back);
-    poly_fill(4, corners, poly_shade_rows, 0);
-    poly_fill(4, corners, poly_shade_rows, 0);
+    poly_fill(4, corners[g_view_res], poly_shade_rows, 0);
+    poly_fill(4, corners[g_view_res], poly_shade_rows, 0);
     g_map_back_taken = 1;
     window_set(&g_hud_screen);
     status_bar();
@@ -565,10 +572,10 @@ int hud_ticket(int ticket, int warning, int over)
         char path[48];
 
         /* 0x30424: SIMDATA/MISC's TICKET or WARN (TICKEG, GWARN in kilometres), D
-           racing or R the replay, L the low detail's 320x200 */
+           racing or R the replay, L 320x200 or H 640x480 */
         snprintf(path, sizeof path, "SIMDATA/MISC/%s%c%c.QFS",
                  ticket ? (g_hud.kmh ? "TICKEG" : "TICKET") : (g_hud.kmh ? "GWARN" : "WARN"),
-                 g_hud.running ? 'D' : 'R', 'L');
+                 g_hud.running ? 'D' : 'R', H('L', 'H'));
         if (!fsh_load(&g_ticket, path)) {
             fprintf(stderr, "renfs: %s is missing\n", path);
             return 0;
@@ -643,11 +650,14 @@ static void bamf_copy(const hud_picture *from, const unsigned char *list)
     }
 }
 
-/* how far the wheel is turned, 0 .. 6 (5 limits at 320x200, 3 never) */
+/* how far the wheel is turned, 0 .. 6 (5 limits at 320x200, 3 never; at 640x480 0 .. 5) */
 static int wheel_turn(int steer)
 {
     int a = steer < 0 ? -steer : steer;
 
+    if (g_view_res)
+        return a < 0x21999 ? 0 : a < 0x70000 ? 1 : a < 0xc8000 ? 2 : a < 0x133333 ? 3
+            : a < 0x1b0000 ? 4 : 5;
     if (a < 0x74ccc)
         return a < 0x26666 ? 0 : a < 0x66666 ? 1 : 2;
     return a < 0x154ccc ? 4 : a < 0x1c6666 ? 5 : 6;
@@ -655,7 +665,7 @@ static int wheel_turn(int steer)
 
 /* a gauge's needle: from its centre (the last point) to t/n of the way from one point
    to the next, n 1024 or 10 (20 for km/h), the needle EA's smoothed line in the car's
-   colour (0x8b195) a pixel wide (0xea71c, 0xea720 less one at 320x200) */
+   colour (0x8b195) as wide as the car's (0xea71c, 0xea720; less one at 320x200) */
 static void needle(int (*pt)[2], int count, int i, int t, int n, int number)
 {
     int cx = pt[count - 1][0], cy = pt[count - 1][1], ex, ey;
@@ -669,15 +679,16 @@ static void needle(int (*pt)[2], int count, int i, int t, int n, int number)
     }
     poly_wide_line(cx << 16, cy << 16, ex << 16, ey << 16, g_needle_colour,
                    (const unsigned char (*)[256])g_needle_blend,
-                   exe_i32(0xea71c + 20 * number) - 0x10000,
-                   exe_i32(0xea720 + 20 * number) - 0x10000, g_hud_view.w, g_hud_view.h);
+                   exe_i32(0xea71c + 20 * number) - H(0x10000, 0),
+                   exe_i32(0xea720 + 20 * number) - H(0x10000, 0), g_hud_view.w, g_hud_view.h);
 }
 
 /* the speed in three digits, the leading noughts blank (cars 3 and 11) */
 static void speed_digits(int v, int number)
 {
-    int d[3], i, x = number == 3 ? 0x99 : 0x58, y = number == 3 ? 0x98 : 0x62;
-    int step = number == 3 ? 4 : 7, leading = 1;
+    int d[3], i, x = number == 3 ? H(0x99, 0x131) : H(0x58, 0xb0);
+    int y = number == 3 ? H(0x98, 0x16d) : H(0x62, 0xeb);
+    int step = number == 3 ? H(4, 9) : H(7, 0xe), leading = 1;
 
     for (i = 0; i < 3; i++) {
         d[i] = v >= 10 ? v % 10 : v;
@@ -747,7 +758,7 @@ static void start_lights(void)
     int k = g_hud.steps / 60, i;
 
     if (g_bar_black) {
-        raster_fill(0, 0, 320, 16, g_marker_line);
+        raster_fill(0, 0, H(320, 640), H(16, 32), g_marker_line);
         g_bar_black = 0;
     }
     for (i = 0; i < 5; i++) {
@@ -755,7 +766,7 @@ static void start_lights(void)
                          : i < 3 ? (i > k ? "srdd" : "srdl") : (i > k ? "syld" : "syll");
 
         /* (each light's sound as it comes on, 0x5257c: not yet) */
-        blit(named(&g_mask, name), 0x41 * i, 0, COPY);
+        blit(named(&g_mask, name), H(0x41, 0x82) * i, H(0, 1), COPY);   /* (0x2dc13) */
     }
     g_bar_at = g_hud.steps + 10;
 }
@@ -970,22 +981,25 @@ static void bar_numbers(const hud_car *c)
             start_lights();
         return;
     }
+    /* (the same routines in other places at 640x480) */
+    int y = H(1, 5), step = H(8, 0x13), gap = H(3, 8);
+
     if (g_hud.mode < 2) {
-        speed_number(c, 0x7a, 1, 0xe);
-        gear_number(c, 0xba, 1);
-        place_number(c, 0x121, 1, 7);
+        speed_number(c, H(0x7a, 0x106), H(1, 2), H(0xe, 0x1b));
+        gear_number(c, H(0xba, 0x17a), y);
+        place_number(c, H(0x121, 0x244), y, H(7, 0x13));
     }
     if (g_hud.mode == 1) {
-        time_number(t, 0x48, 1, 8, 3);
-        split_number(0xe0, 1, 8, 3);
+        time_number(t, H(0x48, 0x90), y, step, gap);
+        split_number(H(0xe0, 0x1c0), y, step, gap);
     } else if (g_hud.mode == 0) {
-        time_number(t, 0x48, 1, 8, 3);
+        time_number(t, H(0x48, 0x90), y, step, gap);
         if (g_hud.splits > 0)
-            split_number(0xe0, 1, 8, 3);
+            split_number(H(0xe0, 0x1c0), y, step, gap);
         else if (g_hud.circuit)
-            laps_number(c, 0xde, 1, 8, 0xf5, 1);
+            laps_number(c, H(0xde, 0x1c0), y, step, H(0xf5, 0x1f2), y);
         else
-            miles_number(c, 0xd9, 1, 8, 2);
+            miles_number(c, H(0xd9, 0x1b8), y, step, H(2, 7));
     }
     if (g_hud.mode == 2)
         accel_figures();
@@ -996,25 +1010,25 @@ static void bar_numbers(const hud_car *c)
 /* 0x5fa54: the bar's strip, the button pressed (its pressed look) or lit (its lit look,
    the mouse on it but for Done), the camera's label and the speed's (lit while the mouse
    is on their buttons, pressed a pixel down and right), Done's normal look unless it is
-   lit. On the English bar Done's pictures 10 to the right */
+   lit. On the English bar at 320x200 Done's pictures 10 to the right */
 static void bar_buttons(void)
 {
     int mx, my, k = g_bar.lit, over;
     const unsigned char *p;
 
     mouse_read(&mx, &my);
-    mx = mx * 320 / 640;
-    my = my * 200 / 480;
+    mx = mx * H(320, 640) / 640;
+    my = my * H(200, 480) / 480;
     blit_own(g_bar_strip, COPY);
     if (g_bar.pressed) {
         p = g_bar_button[2][g_bar.pressed];
-        if (g_bar.pressed == BAR_DONE && !g_hud.kmh)
+        if (g_bar.pressed == BAR_DONE && !g_hud.kmh && !g_view_res)
             blit(p, s16(p + 0xc) + 10, s16(p + 0xe) + 1, COPY);
         else
             blit_own(p, COPY);
     } else if (k == BAR_DONE) {
         p = g_bar_button[1][k];
-        if (!g_hud.kmh)
+        if (!g_hud.kmh && !g_view_res)
             blit(p, s16(p + 0xc) + 10, s16(p + 0xe), COPY);
         else
             blit_own(p, COPY);
@@ -1040,7 +1054,9 @@ static void bar_buttons(void)
         blit(p, s16(p + 0xc) + 1, s16(p + 0xe) + 1, COPY);
     else
         blit_own(p, COPY);
-    if (g_bar.lit != BAR_DONE && !g_hud.kmh) {
+    if (g_bar.lit != BAR_DONE && g_view_res)
+        blit_own(g_bar_button[0][BAR_DONE], COPY);
+    else if (g_bar.lit != BAR_DONE && !g_hud.kmh) {
         p = g_bar_button[0][BAR_DONE];
         blit(p, s16(p + 0xc) + 10, s16(p + 0xe) + 1, COPY);
     }
@@ -1068,17 +1084,30 @@ static void bar_draw(void)
     window_set(&g_hud_screen);
     if (!g_bar.redraw && g_bar.count_shown == g_drive.steps)
         goto pointer;
-    clip_set(0, 0x140, 0xb4, 0xc8);
+    clip_set(0, H(0x140, 0x280), H(0xb4, 0x1c0), H(0xc8, 0x1e0));
     if (g_bar.redraw)
         bar_buttons();
     g_bar.count_shown = g_drive.steps;
     g_bar.redraw = 0;
-    time_draw(g_drive.steps, 0x2d, 0xba, 6, 2);
-    w = g_drive.steps * 0x7a / (g_replay.last + 1);
-    raster_fill(0x2d, 0xc3, w, 3, g_hud_colour[3]);
-    raster_fill(0x2d + w, 0xc3, 0x7a - w, 3, g_hud_colour[HUD_BLACK]);
+    time_draw(g_drive.steps, H(0x2d, 0x41), H(0xba, 0x1c5), H(6, 0xd), H(2, 7));
+    w = g_drive.steps * H(0x7a, 0xf1) / (g_replay.last + 1);
+    raster_fill(H(0x2d, 0x41), H(0xc3, 0x1d8), w, H(3, 6), g_hud_colour[3]);
+    raster_fill(H(0x2d, 0x41) + w, H(0xc3, 0x1d8), H(0x7a, 0xf1) - w, H(3, 6),
+                g_hud_colour[HUD_BLACK]);
 pointer:
     fe_mouse_look(g_bar.pressed > 0);
+}
+
+/* detail 3, every other line (0x31832, 0x30bff): the first time, the view's picture
+   blacked and put on the screen whole through the list of the pixels doubled, so that
+   the lines left out are black */
+static void lines_clear(const unsigned char *list)
+{
+    if (!g_hud.clear)
+        return;
+    memset(g_hud_view.pix, g_marker_line, (size_t)(g_hud_view.w * g_hud_view.h));
+    bamf_copy(&g_hud_view, list);
+    g_hud.clear = 0;
 }
 
 void hud_frame(const hud_car *c)
@@ -1091,11 +1120,13 @@ void hud_frame(const hud_car *c)
     if (g_redraw)
         hud_redraw();
     window_set(&g_hud_screen);
+    if (g_hud.detail == 3)
+        lines_clear(g_dash.list[2]);
     bamf_copy(&g_hud_view, g_dash.list[g_hud.detail & 3]);
     if (g_hud.mirror && g_hud_mirror.pix)          /* 0x5b040 */
         blit_pixels(g_hud_mirror.pix, g_hud_mirror.w, g_hud_mirror.h,
                     g_dash.place[0][0], g_dash.place[0][1], COPY);
-    clip_set(0, 0x102, 0, g_hud.running ? 0xc8 : 0xb4);
+    clip_set(0, H(0x102, 0x206), 0, g_hud.running ? H(0xc8, 0x1e0) : H(0xb4, 0x1c0));
     if (shown != g_wheel_shown)
         blit_own(g_dash.wheel[!left][turn], SEE_THROUGH);
     g_wheel_shown = shown;
@@ -1121,7 +1152,8 @@ void hud_frame(const hud_car *c)
     hud_keys();
     bar_numbers(c);
     if (g_hud.map && g_hud_map.pix)
-        blit_pixels(g_hud_map.pix, g_hud_map.w, g_hud_map.h, 0x103, 0x7e, COPY);
+        blit_pixels(g_hud_map.pix, g_hud_map.w, g_hud_map.h, H(0x103, 0x206), H(0x7e, 0x130),
+                    COPY);
     bar_draw();                /* 0x5c5d0 */
 }
 
@@ -1160,8 +1192,9 @@ static void hud_keys(void)
                 g_redraw = 1;
                 if (g_hud.cam_mode != 0 || g_hud.no_dash)
                     g_view_redraw = 1;
+                if (g_hud.detail == 3)     /* (0x2f7a3) */
+                    g_hud.clear = 1;
             }
-            /* (0x12d9d9 = 3, the detail with every other line: 0x12d9da, not yet) */
             g_keys_up = 0;
         }
     } else if (key_down(0x43) && !g_hud.stopped && g_hud.cam_mode <= 1) {
@@ -1189,11 +1222,12 @@ void hud_outside_screen(const int box[4])
     int x0 = box[0], y0 = box[1], x1 = box[2] + x0 - 1, y1 = y0 + box[3] - 1, i, j, x, y;
 
     window_set(&g_hud_view);
-    /* the tiles, two across in turn, from row 13 (their names 0xeaa20: 0000 .. 0003) */
+    /* the tiles, two across in turn, from row 13 (640x480: 32) under the status bar
+       (their names 0xeaa20: 0000 .. 0003) */
     for (i = 0; i < g_hud_view.w / w; i++)
         for (j = 0; j < g_hud_view.h / h; j++)
             blit(named(&g_mask, (const char *)exe_at((unsigned)exe_i32(0xeaa20 + 4 * ((i & 1) + 2 * j)), 4)),
-                 i * w, 0xd + j * h, COPY);
+                 i * w, H(0xd, 0x20) + j * h, COPY);
     status_bar();
     /* the border: its top and bottom, its sides, the sides' last pieces, the corners */
     for (x = x0; x < x1; x += tw) {
@@ -1237,9 +1271,15 @@ static void small_tach(const hud_car *c)
              (my < o[3] ? my : o[3]) - 2, (my > o[3] ? my : o[3]) + 2);
     blit_own(dial, SEE_THROUGH);
     clip_set(0, g_win.w, 0, g_win.h);
-    poly_wide_line(sx << 16, sy << 16, ex << 16, ey << 16, g_needle_colour,
-                   (const unsigned char (*)[256])g_needle_blend, 0x10000, 0x10000,
-                   g_hud_screen.w, g_hud_screen.h);
+    if (g_view_res) {
+        /* at 640x480 three of EA's lines a pixel apart in the HUD's first colour */
+        poly_line(ex, ey, sx, sy, g_hud_colour[0]);
+        poly_line(ex + 1, ey, sx + 1, sy, g_hud_colour[0]);
+        poly_line(ex, ey + 1, sx, sy + 1, g_hud_colour[0]);
+    } else
+        poly_wide_line(sx << 16, sy << 16, ex << 16, ey << 16, g_needle_colour,
+                       (const unsigned char (*)[256])g_needle_blend, 0x10000, 0x10000,
+                       g_hud_screen.w, g_hud_screen.h);
     o[0] = ex;
     o[1] = ey;
     o[2] = sx;
@@ -1258,25 +1298,30 @@ void hud_outside_frame(const hud_car *c, int redraw, int layout)
         redraw_clip();
         blit_pixels(g_hud_view.pix, g_hud_view.w, g_hud_view.h, 0, 0, COPY);
     } else {
-        /* (0x12d9d9 = 3, the detail with every other line: another way, not yet) */
+        const unsigned char **lists = g_lists[g_hud.map != 0] + (layout > 1 ? layout - 1 : 0) * 4;
+
         window_set(&g_hud_screen);
-        bamf_copy(&g_hud_view, g_lists[g_hud.map != 0][(layout > 1 ? layout - 1 : 0) * 4
-                                                        + (g_hud.detail & 3)]);
+        if (g_hud.detail == 3)
+            lines_clear(lists[2]);
+        bamf_copy(&g_hud_view, lists[g_hud.detail & 3]);
     }
     hud_keys();
     bar_numbers(c);
     small_tach(c);
     if (g_hud.map && g_hud_map.pix)
-        blit_pixels(g_hud_map.pix, g_hud_map.w, g_hud_map.h, 0x103, 0x7e, COPY);
+        blit_pixels(g_hud_map.pix, g_hud_map.w, g_hud_map.h, H(0x103, 0x206), H(0x7e, 0x130), COPY);
     bar_draw();                /* 0x5c5d0 */
 }
 
 /* the map (0x31cb4), 58 x 54 at 320x200: positions in 1/2^20 of the world's units round
    the viewed car's node, turned by its heading, x the other way on a mirrored track */
-#define MAP_SHIFT 20
-#define MAP_X 0x1d                     /* its centre: 1 + 0x1c */
-#define MAP_Y 0x1d                     /* the road's; the dots' 1 + 0x19 */
-#define MAP_DOT_Y 0x1a
+/* the map's corner (1, 1; 640x480: 2, 2), its scale (a node's place >> 20; 19) and its
+   centre: the road's (+0x1c, +0x1c; +0x38, +0x45), the dots' (+0x1c, +0x19; +0x38, +0x46) */
+#define MAP_O H(1, 2)
+#define MAP_SHIFT H(20, 19)
+#define MAP_X (MAP_O + H(0x1c, 0x38))
+#define MAP_Y (MAP_O + H(0x1c, 0x45))
+#define MAP_DOT_Y (MAP_O + H(0x19, 0x46))
 
 static int rd32(const unsigned char *p)
 {
@@ -1302,9 +1347,18 @@ static void map_point(const map_view *v, int node, int *x, int *y)
 }
 
 /* a racer's dot (0x32ac0): a square of 4 in its colour under the "pos1" ring, kept off
-   the map's top and bottom rows */
+   the map's top and bottom rows; 640x480: 7 by 5 and a line above and below, a round dot */
 static void map_dot(int x, int y, int colour)
 {
+    if (g_view_res) {
+        clip_set(2, 0x72, 9, 0x85);
+        raster_fill(x - 3, y - 3, 7, 5, colour);
+        poly_line(x - 1, y - 4, x + 1, y - 4, colour);
+        poly_line(x - 1, y + 2, x + 1, y + 2, colour);
+        blit(named(&g_mask, "pos1"), x - 4, y - 5, SEE_THROUGH);
+        clip_set(2, 0x72, 2, 0x8c);
+        return;
+    }
     clip_set(1, 0x39, 6, 0x30);
     raster_fill(x - 2, y + 1, 4, 4, colour);
     blit(named(&g_mask, "pos1"), x - 3, y, SEE_THROUGH);
@@ -1317,6 +1371,15 @@ static int map_apart(int d)
     int a = abs(d), b = abs(d + g_track.nodes_len), c = abs(g_track.nodes_len - d);
 
     return a < b && a < c ? a : b < c ? b : c;
+}
+
+/* the map's frame (0x8a0f0): a rectangle's outline from (o, o) to (x1, y1) */
+static void map_frame(int o, int x1, int y1)
+{
+    raster_fill(o, o, x1 - o + 1, 1, g_map_frame);
+    raster_fill(x1, o + 1, 1, y1 - o - 1, g_map_frame);
+    raster_fill(o, o + 1, 1, y1 - o - 1, g_map_frame);
+    raster_fill(o, y1, x1 - o + 1, 1, g_map_frame);
 }
 
 void hud_map(const hud_map_state *m)
@@ -1342,15 +1405,14 @@ void hud_map(const hud_map_state *m)
     window_set(&g_hud_map);
     if (m->driver) {
         if (g_map_back_taken)
-            blit_pixels(g_hud_map_back.pix, g_hud_map_back.w, g_hud_map_back.h, 1, 1, COPY);
+            blit_pixels(g_hud_map_back.pix, g_hud_map_back.w, g_hud_map_back.h, MAP_O, MAP_O, COPY);
     } else
-        blit(named(&g_mask, "mpbd"), 1, 1, SEE_THROUGH);
-    /* the frame (0x8a0f0) */
-    raster_fill(0, 0, 0x3a, 1, g_map_frame);
-    raster_fill(0x39, 1, 1, 0x34, g_map_frame);
-    raster_fill(0, 1, 1, 0x34, g_map_frame);
-    raster_fill(0, 0x35, 0x3a, 1, g_map_frame);
-    clip_set(1, 0x39, 1, 0x35);
+        blit(named(&g_mask, "mpbd"), MAP_O, MAP_O, SEE_THROUGH);
+    /* the frame (0x8a0f0); 640x480 twice, the second one pixel further out */
+    map_frame(MAP_O - 1, MAP_O + H(0x38, 0x70), MAP_O + H(0x34, 0x8a));
+    if (g_view_res)
+        map_frame(MAP_O - 2, MAP_O + 0x71, MAP_O + 0x8b);
+    clip_set(MAP_O, MAP_O + H(0x38, 0x70), MAP_O, MAP_O + H(0x34, 0x8a));
 
     /* the road: from `range` nodes behind, then 16 apart (City-like circuit: 13.5),
        open roads kept to their first node and 60 past the segment's end */
@@ -1381,8 +1443,8 @@ void hud_map(const hud_map_state *m)
     c4 = mulr(4, -fix_cos(a));
     s4 = mulr(4, fix_sin(a));
     t = s4 - (s4 >> 2) + (s4 >> 4);
-    poly_line(x0 + 1 + (c4 >> 1) + 0x1c, MAP_Y - (y0 + (t >> 1)),
-              x0 + 1 - (c4 - (c4 >> 1)) + 0x1c, MAP_Y - (y0 - (t - (t >> 1))),
+    poly_line(x0 + MAP_X + (c4 >> 1), MAP_Y - (y0 + (t >> 1)),
+              x0 + MAP_X - (c4 - (c4 >> 1)), MAP_Y - (y0 - (t - (t >> 1))),
               g_hud_colour[HUD_RED]);
 
     /* the racers, the last first: a dot on the map, else an arrow at its edge, above
@@ -1393,21 +1455,23 @@ void hud_map(const hud_map_state *m)
 
         if (apart <= range) {
             map_point(&v, m->nodes[k], &x, &y);
-            if ((x < 0 ? -x : x) < 0x1c && (y < 0 ? -y : y) < 0x17) {
+            if ((x < 0 ? -x : x) < H(0x1c, 0x38) && (y < 0 ? -y : y) < H(0x17, 0x3d)) {
                 map_dot(MAP_X + x, MAP_DOT_Y - y, colour);
                 continue;
             }
         }
-        bx = g_hud.race_type == 1 ? 1 + 0x2e : 1 + 0x31 - 7 * k;
+        bx = g_hud.race_type == 1 ? MAP_O + H(0x2e, 0x5b) : MAP_O + H(0x31 - 7 * k, 0x60 - 0xd * k);
         ahead = g_hud.race_type == 1 ? m->place == 1 : m->places[k] > m->place;
         if (ahead) {
-            int tri[6] = { bx + 1, 0x31, bx + 5, 0x31, bx + 3, 0x33 };
+            int y0 = MAP_O + H(0x2f, 0x83), w = H(2, 4);
+            int tri[6] = { bx + 1, y0 + 1, bx + 1 + 2 * w, y0 + 1, bx + 1 + w, y0 + 1 + w };
             poly_fill(3, tri, poly_solid_rows, colour);
-            blit(named(&g_mask, "aro1"), bx, 0x30, SEE_THROUGH);
+            blit(named(&g_mask, "aro1"), bx, y0, SEE_THROUGH);
         } else {
-            int tri[6] = { bx + 1, 4, bx + 5, 4, bx + 3, 2 };
+            int y0 = MAP_O + H(3, 5), w = H(2, 4);
+            int tri[6] = { bx + 1, y0, bx + 1 + 2 * w, y0, bx + 1 + w, y0 - w };
             poly_fill(3, tri, poly_solid_rows, colour);
-            blit(named(&g_mask, "aru1"), bx, 0, SEE_THROUGH);
+            blit(named(&g_mask, "aru1"), bx, MAP_O - H(1, 0), SEE_THROUGH);
         }
     }
 
@@ -1418,7 +1482,7 @@ void hud_map(const hud_map_state *m)
         apart = (short)(apart < 0 ? -apart : apart);
         if (apart < 0x140) {
             map_point(&v, m->cop_node, &x, &y);
-            if ((x < 0 ? -x : x) < 0x1c && (y < 0 ? -y : y) < 0x1d) {
+            if ((x < 0 ? -x : x) < H(0x1c, 0x38) && (y < 0 ? -y : y) < H(0x1d, 0x44)) {
                 if (++g_hud.cop_flash > 10)
                     g_hud.cop_flash = 0;
                 map_dot(MAP_X + x, MAP_DOT_Y - y, g_marker_colour[g_hud.cop_flash > 5 ? 0 : 6]);

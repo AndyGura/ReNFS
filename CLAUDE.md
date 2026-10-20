@@ -191,6 +191,9 @@ things, the menu music's choice reads it (`timer_counter` in the port).
 The controls screen `0x22bd0` (NOTES §4.2): +0x5f36.. kinds and keys (menu key codes), conflicts `0x7390c`,
 the key `0x733a0`; the race's scan codes `0x36a0c` (`0x36758` German → US, `key_scancode` `0x91d60`, table `0xf7b74`).
 `tools/fecompare.py`: a port menu picture against DOSBox's, by palette entry.
+Races at 640x480 (NOTES §4.24): the default (+0x7f 0, `0x12c308` 1), `H(lo, hi)` in the port; detail 3
+every other line (`0x12d9da` the clear); not yet at either size: the player's wheels `0x66148`/`0x6634c`,
+tyre dust `0x664bc`, skid marks `0x679ec`, the watching bar `0x7ef14`, the start beeps `0x5257c`.
 The joystick and the mouse (NOTES §4.23): EA's game port `0x94fa8`, the poll `0x4e3e8`, start-up
 `0x4d1fc`, `joystick.cfg` `0x4d4a0`/`0x4d5ec` (`0x12f294`, 23 ints), the calibration `0x4c6b0`, the race
 `0x4e0b8`, the control word by kinds `0x48bec`, the mouse `0x47b78`, the menus `0x4dfe0`.
@@ -254,6 +257,7 @@ once; for `--shot` tests);
 `RENFS_THROW=s:x,y,z`: the car given a speed at race step s (to see a crash);
 `RENFS_PLACE=s:a,c,v`: the opponent put a m ahead and c m beside at v m/s at race step s;
 `RENFS_VIEW=n`: the race watched from camera n (outside: 2..5, 8..12);
+`RENFS_RES=320|640`: races at that size whatever the settings say;
 `RENFS_LAPS=n`: n laps of a circuit in `--race` (else the settings' race length, as Control Central `0x437fc`: 8 on TR1 by default);
 `RENFS_CONFIG=f`: a CONFIG.DAT for the test (the original's, `nfsdos.py mem:156c14:5f52:f`).
 `RENFS_SEED=n`: the race's random numbers seeded with n (else the time, as the original).

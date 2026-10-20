@@ -20,6 +20,7 @@
 #include "sound.h"
 #include "timing.h"
 #include "video.h"
+#include "view.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -154,14 +155,15 @@ static void menu(void)
 
     /* the settings as before the race (0x565c1), with the detail as the keys left it
        (0x56b48); the race's palette kept, its sounds stopped, the screen faded down and
-       640x480 */
+       640x480 (a 640x480 race keeps its mode, 0x56ce7) */
     mouse_relative(0);                     /* (a mouse steering: the pointer back) */
     memcpy(g_config + 9, g_session.kept, sizeof g_session.kept);
     race_keys_to_config();
     video_get_palette(race_pal, 0, 256);
     rsnd_stop_all();
     pal_fade_down(0, 256);
-    video_mode(640, 480);
+    if (!g_view_res)
+        video_mode(640, 480);
     place(CONTINUE);
     fe_font_load();
     fe_mouse_load();
@@ -317,7 +319,8 @@ static void menu(void)
     music_fade_out();
     fe_sound_bank_free();
     music_wait_end();
-    video_mode(320, 200);
+    if (!g_view_res)                       /* (0x580a9) */
+        video_mode(320, 200);
     video_palette(race_pal, 0, 256);
     memcpy(g_session.kept, g_config + 9, sizeof g_session.kept);   /* (0x5809d) */
     fe_sound_unmute();                     /* (0x58107: F5's silence ends here) */

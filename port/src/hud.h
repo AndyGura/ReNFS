@@ -1,4 +1,4 @@
-/* The race's dashboard and HUD at 320x200 (NOTES §4.11): the dashboard's picture, the
+/* The race's dashboard and HUD at 320x200 and 640x480 (NOTES §4.11): the dashboard's picture, the
    status bar on top, the map's box, and what changes each frame over them. */
 #ifndef RENFS_HUD_H
 #define RENFS_HUD_H
@@ -25,7 +25,8 @@ typedef struct {
     int splits;                /* 0x14ea70: splits shown */
     int best_lap;              /* 0x13c20c */
     int race_type;             /* 0x12da20 */
-    int detail;                /* 0x143e04: which of the dashboard's lists (0: 1:1) */
+    int detail;                /* 0x143e04: which of the dashboard's lists (0: 1:1); 3 (F2's
+                                  fourth at 640x480, 0x12d9d9): every other line */
     int mirror;                /* 0x143e08: the mirror shown */
     int map;                   /* 0x12b988: the map shown */
     int mirrored;              /* 0x12dd28: the track the other way round (the wheel too) */
@@ -43,6 +44,8 @@ typedef struct {
     int view_changed;          /* F9 pressed: the camera's mode to be taken up again */
     int cam_mode;              /* 0x129ecc: the camera's mode */
     int stopped;               /* 0x145c90: the player finished and stopped */
+    int clear;                 /* 0x12d9da: at detail 3 the view's place on the screen
+                                  blacked first, once */
 } hud_status;
 
 /* what the map shows (0x31cb4) */

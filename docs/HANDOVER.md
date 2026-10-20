@@ -399,9 +399,8 @@ its percent done and weight). Update its steps file after each finished step.
 
 ## Waiting for Danik
 
-- Races at 640x480: the graphics screen's first row says 640 x 480 by default (the
-  game's built-in setting), the port races at 320x200 anyway. Port 640x480 races for the
-  PC build, or keep 320x200 and show the setting as it is? (Asked 2026-10-20.)
+- Nothing open. (Decided 2026-10-20: 640x480 races for the PC, then a 60 fps mode, then
+  the rest of the PC game, then the MiSTer: memory `order-of-work`.)
   (Decided 2026-10-19: a first start uses the game's built-in defaults, `cfg_defaults`,
   ported and equal byte for byte.)
 
@@ -474,7 +473,16 @@ races 320x200 / 320x240; commit locally as the work goes.
    so, no automatic switch; documented in `README.md` and `--help`). `tools/checks.sh` runs every check in one command. Next: the cars' showcase
    (`fe_showcase` `0x17724`) and the track records from Control Central, then the
    MiSTer core. The dashboard's keys F7 / F8 / M / F9 and Rusty Springs' measurements on the
-   status bar: done (NOTES §4.11). Not yet: races at 640x480 (settings +0x7f = 0).
+   status bar: done (NOTES §4.11). **Races at 640x480 (2026-10-21, NOTES §4.24): done**,
+   the default as in the original (settings +0x7f = 0; Options → Graphics gives 320x200):
+   the dashboard, the map, the outside view, the road, the cars, detail 3 (every other
+   line), the replay bar and the pause menu, equal pixel for pixel on the 640x480
+   snapshots h1 h6 h7 (`tools/checks.sh` runs them too). Found on the way, not ported at
+   either resolution: the player's wheels turning and its tyre pictures, the tyres' dust,
+   the skid marks, the bar while watching after the finish, the start lights' beeps
+   (NOTES §4.24's end). **Next: the 60 fps mode** (Danik: the engine stepping faster, or
+   the motion interpolated, whichever is cheaper), then those gaps, the showcase and the
+   records, then the MiSTer.
    (`0x136618`, the sections drawn: the settings' +0x85 and F3, NOTES §4.19.)
    Open: the race's sound reaches full scale at the hits and the horn (0.2 to 0.7 % of
    the samples in `build/snd_port/`): how EA's mixer sums the voices is still to compare. Model polygons of one colour (`0xaa990`) are not ported (none met so far).

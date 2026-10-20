@@ -54,6 +54,8 @@ typedef struct {
 
 extern view_window g_windows[2][VIEW_WINDOWS];  /* 0xe85c0: 320x200, 640x480 */
 extern int g_view_res;                          /* 0x143e2c: 0 320x200, 1 640x480 */
+/* a number by the race's resolution: lo at 320x200, hi at 640x480 (0x12c308) */
+#define H(lo, hi) (g_view_res ? (hi) : (lo))
 extern view_rec g_view_ahead, g_view_mirror;    /* 0xe8de8, 0xe8e28 */
 extern view_rec g_view_outside;                 /* 0xe8e08: the cameras outside the car */
 extern int g_view_redraw;      /* 0x143e00: the view changed, the screen round it drawn
