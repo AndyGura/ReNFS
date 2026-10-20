@@ -32,6 +32,8 @@ typedef struct {
     int pedal_kind[DRIVE_PLAYERS];     /* 0x12d978: 1 the joystick's pedals */
     int nitro;                 /* 0x12cca0: the NITRO code typed */
     int revving[DRIVE_PLAYERS];/* 0x12ccac: held at full revs (the start) */
+    int gave_up[DRIVE_PLAYERS];/* 0x12a150: Shift+End: no more racing, the controls
+                                  straight on with the handbrake (0x48bec) */
     int explode;               /* 0xf74f8 = 4: EXPLODE typed */
     int nitro_keys;            /* N held with a shift or B (0xf7af9, 0xf7af2/0xf7afe/0xf7af8) */
     int clock;                 /* 0xed100: the 100 Hz clock */

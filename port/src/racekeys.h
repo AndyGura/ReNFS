@@ -1,7 +1,8 @@
 /* The keys of a race beside the driving (race_keys 0x47c88, once a race step before the
    cars, NOTES §4.19): the view key (C) changes the camera, Alt+Ctrl with 1 .. 8 watches
    another car, F1 the outside view's size, F2 its pixels doubled, F3 how far the road is
-   drawn, F4 the sky's picture, F5 the sounds, F6 the racers' markers. */
+   drawn, F4 the sky's picture, F5 the sounds, F6 the racers' markers; Shift+End gives the race
+   up. */
 #ifndef RENFS_RACEKEYS_H
 #define RENFS_RACEKEYS_H
 
@@ -17,6 +18,7 @@ typedef struct {
     int muted;                 /* 0xec528: F5 */
     int drawn;                 /* 0x136618: the road's sections drawn ahead */
     int drawn_next;            /* 0xf6b48: .. from the next frame on (-1 none) */
+    int race_clock;            /* 0xed0f8: the race clock's steps (set by race.c) */
 } race_keys_state;
 
 extern race_keys_state g_rkeys;

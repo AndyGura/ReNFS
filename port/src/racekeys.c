@@ -6,12 +6,13 @@
 #include "drive.h"
 #include "exe.h"
 #include "racesnd.h"
+#include "timing.h"
 #include "video.h"
 
 race_keys_state g_rkeys;
 
 /* the scan codes */
-enum { K_1 = 2, K_CTRL = 0x1d, K_ALT = 0x38, K_RSHIFT = 0x36, K_F1 = 0x3b, K_F2, K_F3, K_F4,
+enum { K_1 = 2, K_CTRL = 0x1d, K_LSHIFT = 0x2a, K_ALT = 0x38, K_RSHIFT = 0x36, K_END = 0x4f, K_F1 = 0x3b, K_F2, K_F3, K_F4,
        K_F5, K_F6 };
 
 void race_keys_start(void)
@@ -42,6 +43,18 @@ static void watch(race_camera *cam, int n)
     g_drive.viewed = n;
     camera_set_car(cam, g_cars[n], 4);
     rsnd_engine_on();
+}
+
+/* 0x1f0b4: player p gives up (not in a time trial, nor once in or given up already):
+   driven no more (0x48bec), its finish time 999,999 (with 0x12dd5c, 1 in a race on one
+   machine; the network's message 10 too), so the race ends once the car has stopped,
+   the player not placed */
+static void give_up(int p)
+{
+    if (!g_race_type || g_timing.finish[p] || g_drive.gave_up[p])
+        return;
+    g_drive.gave_up[p] = 1;
+    g_timing.finish[p] = 999999;
 }
 
 /* F2 (0x14370): the view's pixels, at most twice as wide and high */
@@ -80,8 +93,12 @@ void race_keys(race_camera *cam)
             camera_next(cam);
         g_rkeys.view_up = 0;
     }
-    /* (Shift+End: the player gives the race up, 0x1f0b4; Alt+M: the camera's node and
-       mode printed, a developer's display (0xf4568); 0x12da04, the replay's keys: not yet) */
+    /* Shift+End, after 100 steps of the race clock (400 in a network race; not in a
+       replay) */
+    if (key_down(K_END) && (key_down(K_LSHIFT) || key_down(K_RSHIFT)) && g_rkeys.race_clock > 100)
+        give_up(g_player);
+    /* (Alt+M: the camera's node and mode printed, a developer's display (0xf4568);
+       0x12da04, the replay's keys: not yet) */
     if (key_down(K_CTRL))
         return;
     if (key_down(K_F1)) {

@@ -117,7 +117,8 @@ static void race_place(const race_car *player, int st)
 static void race_step(race_car *player, race_camera *cam, int done)
 {
     int st = g_drive.steps, i;
-    unsigned w = drive_keyboard(g_road_mirror);
+    /* (0x48bec) given up: straight on, no pedals, the handbrake */
+    unsigned w = g_drive.gave_up[g_player] ? 0x87a0 : drive_keyboard(g_road_mirror);
 
     g_drive.flags = (st & 1 ? 0 : 1) | (st & 3 ? 0 : 4) | (st & 7 ? 0 : 0x10);
     g_drive.revving[g_player] = (w & 0x3000) == 0x3000;
@@ -373,7 +374,8 @@ int race_test(const char *name)
 
         /* the race's steps: one each three ticks of the clock (the race clock's
            three-cycle, race_timer_tick 0x4c454), the player's car driven */
-        while (done < (clock_ticks() - start - g_pause.held_ticks) / 3) {
+        g_rkeys.race_clock = (int)((clock_ticks() - start - g_pause.held_ticks) / 3);
+        while (done < (unsigned)g_rkeys.race_clock) {
             race_step(&cars[0], &cam, done);
             done++;
         }

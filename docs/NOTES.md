@@ -2695,7 +2695,13 @@ for it), the speech, the race keys' calls (`0x47c88`: the camera's changes, the 
   numbers and the map follow the car watched (`0x31e87`).
 - **Shift+End** (no replay; past 100 steps of the race clock `0xed0f8`, 400 in a network
   race): `0x1f0b4(player)`, the player gives up: unless a time trial (+0x6d = 0), `0x12a150[car]`
-  = 1, `0x12a14e` = 10, with `0x12dd5c` the finish time 999,999. **Alt+M**
+  = 1, `0x12a14e` = 10 (the network's message), with `0x12dd5c` (1 in a race on one
+  machine, measured) the finish time 999,999; not once the player is in or has given up.
+  From then `keys_control_word` `0x48bec` gives the player 0x87a0: straight on, no pedals,
+  the handbrake (bit 15); the race ends as any other once the car stops (`0x13c178` = 1),
+  the results showing DNF and N/A (measured in DOSBox, `build/dos/giveup/`: from 56 mph
+  over in under 8 s). **Ported** (`racekeys.c`, `race.c`): from 52 mph stopped and over
+  in about 6 s (`build/shots/pause/giveup*.png`). **Alt+M**
   (`0xf4568` ^= 1): the frame prints the camera's node and mode letter (`0x5bfa9`, a
   developer's display).
 - **Ctrl held: no F key.** Each F key once a press (`0xec5cc`):
