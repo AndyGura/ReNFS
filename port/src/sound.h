@@ -21,6 +21,11 @@ void music_volume(int v);
 /* 0x722b4 + 0x72438: a spoken word from FRONTEND/SPEECH (GSPEECH in German), when the
    settings' +0x7b allows it, at the sounds' volume and a half */
 void speech_say(const char *name);
+/* (0x72454, 0x72490) the word stopped and let go */
+void speech_stop(void);
+/* 0x63e2c: the menus' music again after a race or one of its screens: by the setting
+   CFG_MENU_MUSIC, any of the twelve, a rock or a techno one, from EA's random numbers */
+void music_random(void);
 /* 0x720d8: faded out over a second; 0x72150: waited for, then stopped */
 void music_fade_out(void);
 void music_wait_end(void);

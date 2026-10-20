@@ -161,6 +161,9 @@ The race from Control Central (NOTES §4.21): `race_from_menu` `0x3770c`, `race_
 `race_setup_record` `0x36c5c` (racers 1/2/8 by type; police and 6 traffic head to head on
 open roads), the cars `0x653a4` (menu car → game car `0x36250`), the grid `0x370bc`, the
 loading picture `0x64d28` (SIMDATA/SLIDES), EA's random numbers re-seeded from the clock.
+After a race (NOTES §4.21): the session `0x15cb68` (`fe_new_session` `0x7469c`), `0x68ab0`/`0x68dcc`
+the results and ranks, `fe_standings_segment` `0x6a9d0`, `race_menu_checkpoint` `0x1a5d8`, the films
+`0x37ff0`/`0x3823c`; still to port the finish menu `0x1b6a0` and the other standings.
 Menus: held keys, letters blended per pixel, an inverse colour table after every fade up
 (NOTES §4.2).
 
@@ -255,6 +258,8 @@ frame, a step every 3 ticks (TURBO 2 2 3); `race_from_menu`, `--race`),
 pitch and sides; NOTES §4.18) and `racesnd.c` (the race's 16 channels: engine, road, tyres,
 horns, siren and radar, the two nearest cars, the hits; equal step for step,
 `tools/opponent_emu.py --full --sound`), the samples mixed by `audio.c`'s voices,
+`session.c` (what a race leaves: results, totals, ranks, records taken), `standings.c` (the
+segment's standings), `racemenu.c` (the checkpoint menu, the winner's and the police's films),
 `pause.c` (P's hold `0x63110`, the check `0x63304`, the pause menu `0x56474` with its map; NOTES §4.20), `racekeys.c` (`race_keys` `0x47c88`: C the camera `camera_next` `0x1494c`, Alt+Ctrl+1..8
 the car watched, F1..F6 view size, pixels, road distance, sky, sound, markers, Shift+End giving up `0x1f0b4`; the view
 key equal, `tools/camera_emu.py`; NOTES §4.19),

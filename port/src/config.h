@@ -16,6 +16,14 @@ void config_save(void);
 /* a word of it (the menus' choices are 16-bit, at odd places) */
 int config_word(int at);
 void config_set_word(int at, int v);
+/* a 32-bit number of it (the records' times and speeds) */
+int config_long(int at);
+void config_set_long(int at, int v);
+
+/* the records (NOTES §3.16): from +0xb5, 0xa6b bytes a track, 0x27 a record */
+#define CFG_RECORDS 0xb5
+#define CFG_TRACK_RECORDS 0xa6b
+#define CFG_RECORD 0x27
 
 #define CFG_MENU_MUSIC 0x73    /* 0 none, 1 all twelve in turn, 2 and 4-9 rock, 3 and 10-15 techno */
 #define CFG_SPEECH 0x7b        /* the race's spoken words on (0x722b4) */

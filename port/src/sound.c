@@ -202,6 +202,23 @@ void race_music_start(void)
     music_start(names[pick]);
 }
 
+void music_random(void)
+{
+    static const char *const names[12] = {
+        "ROCK1.AS4", "ROCK2.AS4", "ROCK3.AS4", "ROCK4.AS4", "ROCK5.AS4", "ROCK6.AS4",
+        "TECHNO1.AS4", "TECHNO2.AS4", "TECHNO3.AS4", "TECHNO4.AS4", "TECHNO5.AS4", "TECHNO6.AS4",
+    };
+    int mode = config_word(CFG_MENU_MUSIC);
+
+    /* (0xf749a cleared: the race's music not chosen yet) */
+    if (mode == 1)
+        music_start(names[random_below(12)]);
+    else if (mode == 2 || (mode >= 4 && mode <= 9))
+        music_start(names[random_below(6)]);
+    else if (mode == 3 || (mode >= 10 && mode <= 15))
+        music_start(names[6 + random_below(6)]);
+}
+
 void music_volume(int v)
 {
     if (!config_word(CFG_MENU_MUSIC))
@@ -244,6 +261,12 @@ void speech_say(const char *name)
         }
     }
     free(d);
+}
+
+void speech_stop(void)
+{
+    audio_stream_close(g_speech);
+    g_speech = -1;
 }
 
 void music_fade_out(void)

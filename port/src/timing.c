@@ -93,6 +93,11 @@ void timing_start(void)
         g_timing.tickets[p] = g_timing.warnings[p] = 0;
         g_timing.place[p] = 0;
         g_drive.top_speed[p] = 0;
+        g_drive.distance[p] = 0;
+        g_drive.stats[p][0] = g_drive.stats[p][1] = 99999;
+        g_drive.stats[p][2] = g_drive.stats[p][3] = 999;
+        g_drive.stats[p][4] = 0;
+        g_drive.stats[p][5] = 99999;
         for (k = 0; k < DRIVE_LAPS; k++)
             g_drive.lap_times[p][k] = 0;
     }

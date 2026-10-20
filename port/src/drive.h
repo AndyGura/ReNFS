@@ -10,7 +10,7 @@
 
 #define DRIVE_PLAYERS 8
 #define DRIVE_RESULTS 9       /* the race's results (0x14ea80: 9 of 0x1d2 bytes), one a car */
-#define DRIVE_LAPS 16
+#define DRIVE_LAPS 17       /* the times as each lap was finished: 0x14ea80 + 4k */
 
 /* what of the race the driving reads and keeps (the original's globals; the cars, the
    player and the humans are cardraw.h's g_cars, g_player, g_humans) */
@@ -43,6 +43,12 @@ typedef struct {
     int first_move;            /* 0x13c170 */
     int top_speed[DRIVE_RESULTS];      /* 0x14ea80 + 0x1d2 a car, +0x1c4: the race's
                                           fastest |speed| (the traffic's too) */
+    int distance[DRIVE_RESULTS];       /* +0x1c0 (0x14ec40): the race's length at its
+                                          end, the finish node · 4.8 (0x68ab0) */
+    int stats[DRIVE_PLAYERS][6];       /* +0x198 .. (0x14ec18, 1c, 20, 24, 28, 2c): 99,999
+                                          99,999 999 999 0 99,999 as the race starts (a
+                                          circuit's statistics; what writes them during
+                                          the race is not found yet) */
     int options;               /* 0x12da28 (the settings' word 0x15d12a): 0x20 lands
                                   softer after a long jump, but on tr6 */
     char track[8];             /* 0x12da16: the track's name */

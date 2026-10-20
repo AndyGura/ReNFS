@@ -352,6 +352,13 @@ Ghidra project and `build/decomp`, one command). The git history was started aga
   path from the title, Esc/Quit and giving up; single races and tournaments of eight on
   CY1 and TR1 driven 85 s. `--race` now uses the saved choices too.
 
+- **After a race, first part** (NOTES §4.21, `session.c`, `standings.c`, `racemenu.c`):
+  each racer's results kept between segments (times added up, ranks, the rival), the
+  segment's records taken, the segment standings screen, the checkpoint menu between an
+  open road's segments (Continue, Standings, Quit), the three segments in a row, the
+  winner's and the police's films, the menu music after a race. **Equal** by palette
+  entry to the original's standings and checkpoint screens (`build/after/`).
+
 **Progress page for Danik**: https://claude.ai/artifact/VZdxTpYC3oLXYeBVJpoDoM (every step,
 its percent done and weight). Update its steps file after each finished step.
 
@@ -382,10 +389,11 @@ races 320x200 / 320x240; commit locally as the work goes.
    meeting cars, the roadside objects knocked over, the traffic, the police and the
    sounds, and the race's keys, P's pause and the pause menu (NOTES §4.20; its Replay,
    Audio and Graphics wait for their screens), Shift+End's giving up, the race's music and its speech (NOTES §4.18's end). , the circuits' sky ring, walls and 3D objects, the race started from Control
-   Central. Next: what `race_from_menu` `0x3770c` does after a race (NOTES §4.21): an open
-   road's three segments in a row with the checkpoint menu between (`0x1a5d8`), the
-   standings screens (`fe_standings_*`), the finish menu (`0x1b6a0`), the records written
-   back, the winner's and the police's films.
+   Central, the segments in a row with the segment standings and the checkpoint menu.
+   Next (NOTES §4.21 "Not yet"): the finish menu `0x1b6a0`, the track standings
+   `0x6b938` (top ten), a circuit's lap standings (`0x6cb24`, `0x6e1ac`, `0x69f8c`,
+   `0x69438`), the final standings `0x6f070`, the tournament's end; then the
+   checkpoint's Options and Replay.
    (`0x136618`, the sections drawn: the settings' +0x85 and F3, NOTES §4.19.)
    Open: the race's sound reaches full scale at the hits and the horn (0.2 to 0.7 % of
    the samples in `build/snd_port/`): how EA's mixer sums the voices is still to compare. Model polygons of one colour (`0xaa990`) are not ported (none met so far).

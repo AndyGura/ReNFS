@@ -166,6 +166,17 @@ void config_set_word(int at, int v)
     g_config[at + 1] = (unsigned char)(v >> 8);
 }
 
+int config_long(int at)
+{
+    return (int)((unsigned)g_config[at] | (unsigned)g_config[at + 1] << 8
+                 | (unsigned)g_config[at + 2] << 16 | (unsigned)g_config[at + 3] << 24);
+}
+
+void config_set_long(int at, int v)
+{
+    put32(at, v);
+}
+
 void config_save(void)
 {
     char path[1024], tmp[1040];

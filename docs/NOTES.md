@@ -2983,6 +2983,92 @@ field on CY1 and TR1 for 85 s each; time trial; TURBO's clock (2 2 3). Not yet: 
 the network's records, the detail settings back after a race (the original puts them
 back from its copy anyway).
 
+**After a race** (2026-10-20). **The session `0x15cb68`** (0x5b6 bytes, a saved game's
+first part): 8 racers' records of 0x95 bytes: +0 the name, +9 a circuit's 20 lap times,
++0x59 the race's time, +0x5d its distance, +0x61 its top speed, +0x65 the total (times
+added up over the segments, 0 once one is missed), +0x69 the total distance, +0x6d the
+best top speed, +0x71 tickets, +0x75 warnings, +0x79 (only cleared), +0x7d..+0x91 the
+race record's statistics `0x14ec18`, `1c`, `24`, `20`, `2c`, `28`. Then `0x15d010` the
+kept settings, `0x15d0bc` the kept keys, `0x15d0d8` the tournament's points[8],
+`0x15d0e8` won[9], `0x15d0fa` raced[9], `0x15d10c` given up[8], `0x15d11c` the race type,
+`0x15d120` the films (2), `0x15d122` the result, `0x15d136` network, `0x15d140` German.
+**`fe_new_session` `0x7469c`** (in `fe_outer_loop` before the menu and at
+`race_from_menu`'s end): the keys kept, `tourn_clear_records` `0x745f4` (all but the
+names; +0x93 the segment = 0), the points, won and raced cleared; `0x74748` the names:
+CONFIG.DAT +0 the player's, then 8 bytes each from `0xe43e0` (Drifter Burnout Psycho
+Phreak Hacker Razor "Mr. Ice").
+
+**`0x68ab0`** (race_run, after `0x15d122` = `0x13c178`; a quit from the pause menu sets
+only `0x13c17c` = 2, so the result stays 0): given up |= `0x12a150`; the humans' distance
+`0x14ec40` = last node · 0x30 / 10; a computer's racer not in: finish = (last node · laps
+· steps − 300) / ((lap − 1) · last node + node + 1); the order `0x13c194` bubble-sorted
+(swapped when a's time ≤ 0 or b's < a's); the segment's time; the splits to `0x14eac4`
+(read by nothing); with +0xaf = 0 (a race played, not a replay) **`0x68dcc`**: finished
+(1): each racer's time, top speed, total (0 when the time < 1), best top; else these four
+cleared for all 8. `0x14fae2` the player's place, `0x14faea` its rank by totals (how
+many less), the rival `0x14fae8` (from player == 0, the other racer of the least total),
+`0x14fae6` its rank, `0x14faec` its car (`0x36c3c`, the words `0x36270`), `0x14fae4` its
+place; `0x12c278` the order (the next segment's grid); a circuit's player laps from
+`0x14ea84` (differences, < 0x3c → 0); the tickets, warnings, distance and statistics.
+race_run's end also writes the detail settings back (+0x81..+0x89) into CONFIG.DAT and
+the kept copy.
+
+**`race_from_menu`'s loop**: the settings kept, race_run, black, 640x480; kept +0x93 + 1;
+the player's total and top after each segment (`0x12c324`, `0x12c318`), total distance
+(open road added, circuit laps · distance), best top; the settings put back. Result 4: the
+police's film (`0x3823c`: COP/GCOP 1..3). Result 1: after a third segment or on a circuit,
++0x93 = 0 and the winner's film (`0x37ff0`); the sound bank, the menu's music
+(`0x63e2c`: EA's random number `0x52580`; mode 1 any of 12, rock or techno by the music
+setting); an open road before its third: `fe_standings_segment(1)` (and
+`fe_standings_final(1)` in a single race or tournament), then the checkpoint: 0 → +0x93 =
+0, done. Otherwise the standings for the kind of race (segment, track `0x6b938`, loop1
+`0x6cb24`, final `0x6f070`, `0x689f8`), then `race_menu_finish` `0x1b6a0`, done. Not
+finished (given up, quit, arrested): the music, the bank, the standings, the finish menu,
++0x93 = 0. Done: the tournament's end (`0x689b0`, `0x42a84`, `0xec460`), then
+`fe_new_session`. (The record splits `0x12c0e8` copied out and back: no change.)
+
+**The winner's film `0x37ff0`**: won when the total ≥ 1, not given up, and no other racer's
+total is less (a missed segment's 0 counts as less); raced[track] = 1. A tournament:
+won[track] = 1; nine won with Lost Vegas (`0xec460`) or eight without → WIN#7, else by
+track 0→WIN#2, 1→4, 2→6, 3→1, 4/5→3, else 5. A time trial: none. Head to head, single
+race: n = 0 or 1 (`0x74aec`: Watcom's srand from the clock, the first rand / 0x2aaa, 3 →
+0; 2 drawn again), the player's car < 3 → n + 1, < 6 → n + 3, else n + 5. `0x341a4`
+plays a film: black, the keys flushed, 320x240, back to 640x480.
+
+**`fe_standings_segment` `0x6a9d0`** (STATS/STANDSEG.QFS): the segment = +0x93 − 1 (0 →
+the third); `records_segment` `0x69608` first if asked: the record +0xb5 + track · 0xa6b
++ i · 0x27 (+0 name, +0xf car, +0x13 gearbox, +0x17 set, +0x1b time, +0x1f speed, +0x23
+race type, from the kept settings), the time i (0 < t < record) = bit 1, the speed i + 3
+(record < top) = bit 2; never with the Warrior (car 11). The page: the player's column at
+x 0x131, the rival's (a time trial: the record so far, +0x5a3 / +0x658) at 0x1d6; rows y
+0x5a name, 0x6e car, 0x89 standing, 0x9b time, 0xad total, 0xcb average, 0xdd top speed;
+"SEGMENT %d"/"ETAPPE %d" at (8, 0x5a); the records at y 0x136 and 0x17c (x 7, 0x131,
+0x1d6, 0x23f the race kind), white when just taken; the commentary con4_B16 (both),
+con1_A16 (speed), con2_A16 (time). Done x 0..0x82, y 0x1b3..0x1e0 (donl/dond), the mouse
+put at (40, 450); 12,000 hundredths, Enter, Space, Esc or the right button. Formats: time
+`0x74914` "%d:%02d.%d" / "%d.%d" / "N/A" (≤ 0, 99999, 999999); speed `0x74854` ("N/A" ≤
+0x9fff6; mph i · 224 / 100 + 1, km/h i · 360 / 100 + 1, the tenth the m/s value's);
+average `0x74a14` d · 1344 / t (2160 German); names cut by `0x717d0`; car names `0xf7454`.
+
+**`race_menu_checkpoint` `0x1a5d8`** (CHECK/CHKMENU.QFS): rows conl repl higl gmol gmsl
+chal quil (dark `*d`), the mouse's rows y 0..0x91, 0x9c..0xbe, 0xcb..0xec, 0xf7..0x11b,
+0x125..0x149, (chat 0x153..0x177, a network race only), 0x180..0x1e0; the keys put the
+mouse at x 320, y 128 173 219 266 312 358 404, up and down past the chat; Esc = Continue.
+Replay and Highlights run race_run again in replay mode (+0xaf 1 / 2), Options `0x12760`,
+Standings the segment's (0) and the final, Quit "End game ?" → 0. (The flag that fades
+the music is the stack's, set only by Quit: Continue fades it.)
+
+**Ported** (`session.c`, `standings.c`, `racemenu.c`, `race.c`): the session, `0x68ab0`
+and `0x68dcc`, the records taken, the segment standings, the checkpoint menu (Replay,
+Highlights, Options not yet), an open road's three segments in a row, the police's and the
+winner's films, the menu's music after a race. **Equal** to the original's screens by
+palette entry: the standings after giving up (the only differences the typed name and the
+opponent's times) and the checkpoint menu (0 pixels). Seen: City's three segments in a row
+(6:30.2 + 7:47.1 = 14:17.4), Quit from the checkpoint back to Control Central. **Not
+yet**: `race_menu_finish` `0x1b6a0` (CHECK/FINMENU.QFS), the track standings `0x6b938`
+(the top ten, STANDTRK), a circuit's `0x6cb24`/`0x6e1ac`/`0x69f8c`/`records_best_lap`
+`0x69438`, the final standings `0x6f070`, the tournament's end.
+
 ## 5. The original in DOSBox (2026-10-19)
 
 - The game for DOSBox is a COPY of the installed game in `~/dosgames/nfs` (`NFSSE/` +

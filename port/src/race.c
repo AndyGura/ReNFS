@@ -15,6 +15,7 @@
 #include "fe.h"
 #include "files.h"
 #include "fsh.h"
+#include "racemenu.h"
 #include "racepal.h"
 #include "smoke.h"
 #include "menu.h"
@@ -25,7 +26,9 @@
 #include "sndlib.h"
 #include "road.h"
 #include "roaddraw.h"
+#include "session.h"
 #include "sky.h"
+#include "standings.h"
 #include "timing.h"
 #include "track.h"
 #include "trackfam.h"
@@ -330,7 +333,7 @@ int race_run(void)
         g_drive.laps = config_word(CFG_LAPS);
         if (getenv("RENFS_LAPS"))
             g_drive.laps = atoi(getenv("RENFS_LAPS"));
-        if (g_drive.laps < 1 || g_drive.laps > DRIVE_LAPS)
+        if (g_drive.laps < 1 || g_drive.laps > DRIVE_LAPS - 1)
             g_drive.laps = 1;
     }
     /* where the race ends (race_main before 0x506dc): a circuit's laps, an open road's
@@ -609,7 +612,28 @@ int race_run(void)
     }
 
     rsnd_free();               /* (0x52a70) */
-    music_fade_out();          /* (race_run 0x37228: 0x720d8, 0x72150) */
+    /* race_run 0x37228 after race_main: the detail settings as the keys left them back
+       into the settings and their copy (0x144cc: the outside view's size; on 320x200
+       the view's pixels at most doubled across), how the race ended, the results
+       (0x68ab0), the music faded out */
+    {
+        int d[5], at;
+
+        d[0] = g_view_outside.current - g_view_outside.layout;
+        d[1] = g_rkeys.window > 1 && !g_view_res ? 1 : g_rkeys.window;
+        d[2] = g_rkeys.road;
+        d[3] = config_word(0x87);
+        d[4] = g_rkeys.plain_sky;
+        for (i = 0, at = 0x81; i < 5; i++, at += 2) {
+            config_set_word(at, d[i]);
+            g_session.kept[at - 9] = (unsigned char)d[i];
+            g_session.kept[at - 8] = (unsigned char)(d[i] >> 8);
+        }
+    }
+    /* (left from the pause menu, 0x13c17c = 2, the result 0x13c178 stays 0) */
+    g_session.result = g_timing.result;
+    session_race_end();
+    music_fade_out();
     music_wait_end();
     g_road_paint.cars = g_road_paint.cars_behind = 0;
     g_ncars = 0;
@@ -623,15 +647,101 @@ int race_run(void)
     return g_pause.quit ? 2 : g_timing.result;
 }
 
+/* the settings +9 .. +0xb4 and the keys kept while a race runs, and put back */
+static void keep_settings(void)
+{
+    memcpy(g_session.kept, g_config + 9, sizeof g_session.kept);
+    memcpy(g_session.kept_keys, g_config + 0x5f36, sizeof g_session.kept_keys);
+}
+
+static void put_settings_back(void)
+{
+    memcpy(g_config + 9, g_session.kept, sizeof g_session.kept);
+    memcpy(g_config + 0x5f36, g_session.kept_keys, sizeof g_session.kept_keys);
+}
+
 void race_from_menu(void)
 {
     static const unsigned char black[768];
+    int over = 0, seg, track;
+    session_racer *me;
 
-    /* (0x3770c: an open road's three segments one after the other, the standings and the
-       checkpoint's menu between, the records after: still to come) */
-    race_run();
-    video_palette(black, 0, 256);
-    video_mode(640, 480);
+    g_session.race_type = config_word(CFG_RACE_TYPE);
+    memset(g_session.seg_total, 0, sizeof g_session.seg_total);
+    memset(g_session.seg_top, 0, sizeof g_session.seg_top);
+    while (!over && !g_quit) {
+        /* (the track's record splits copied out to 0x12c0e8 and back unchanged: read by
+           nothing in between) */
+        keep_settings();
+        race_run();
+        video_palette(black, 0, 256);
+        video_mode(640, 480);
+        video_palette(black, 0, 256);
+        if (g_quit)
+            break;
+        /* one segment on in the copy; the player's total and top speed for it; the
+           distance driven added up (a circuit's: the laps'); the best top speed */
+        seg = (short)(g_session.kept[CFG_SEGMENT - 9] | g_session.kept[CFG_SEGMENT - 8] << 8) + 1;
+        g_session.kept[CFG_SEGMENT - 9] = (unsigned char)seg;
+        g_session.kept[CFG_SEGMENT - 8] = (unsigned char)(seg >> 8);
+        me = &g_session.racer[g_player];
+        if (seg >= 1 && seg <= 3) {
+            g_session.seg_total[seg - 1] = me->total;
+            g_session.seg_top[seg - 1] = me->top;
+        }
+        track = config_word(CFG_TRACK);
+        if (me->distance < 1)
+            me->total_distance = 0;
+        else if (track < 3)
+            me->total_distance += me->distance;
+        else
+            me->total_distance = config_word(CFG_LAPS) * me->distance;
+        if (me->best_top < me->top)
+            me->best_top = me->top;
+        put_settings_back();
+        if (g_session.result == 4)                 /* arrested: the police's film */
+            race_film_police();
+        if (g_session.result == 1) {
+            if (track > 2 || seg > 2) {
+                /* (the record splits back when the race's total beat the best: the same
+                   words) the next race from the first segment; the winner's film */
+                config_set_word(CFG_SEGMENT, 0);
+                race_film_winner();
+            }
+            fe_sound_bank_load();
+            music_random();
+            if (track < 3 && seg < 3) {
+                /* between the segments: the standings, then the checkpoint's menu (a
+                   race's and a tournament's standings so far, 0x6f070: not yet) */
+                standings_segment(1);
+                if (!race_menu_checkpoint()) {
+                    config_set_word(CFG_SEGMENT, 0);
+                    over = 1;
+                }
+            } else {
+                /* the last segment or a circuit: the standings (the track's ten best,
+                   a circuit's laps, a race's and a tournament's: 0x6b938, 0x6cb24,
+                   0x6f070, not yet), then the finish menu (0x1b6a0, not yet) */
+                if (track < 3)
+                    standings_segment(1);
+                fe_sound_bank_free();
+                over = 1;
+            }
+        } else {
+            /* given up, left or turned back: the standings, the finish menu, and the
+               next race from the first segment */
+            music_random();
+            fe_sound_bank_load();
+            if (track < 3)
+                standings_segment(1);
+            fe_sound_bank_free();
+            config_set_word(CFG_SEGMENT, 0);
+            over = 1;
+        }
+    }
+    /* (a tournament's end: its winner, the unlocked tracks; 0x689b0, 0x42a84) then a
+       new session */
+    session_new();
 }
 
 int race_test(const char *name)
@@ -641,6 +751,7 @@ int race_test(const char *name)
     if (!exe_load())
         return -1;
     config_load();             /* the player's settings, the records the status bar shows */
+    session_new();
     /* the track (+0x95) and segment (+0x93) by the name asked for, tr5 Rusty Springs'
        rally; a circuit's laps by the race length (+0xb3) as Control Central sets them
        (0x437fc): 4, 8 or 16, or 2, 6 or 12 on tracks 4..7 */
