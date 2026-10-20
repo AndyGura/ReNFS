@@ -3255,6 +3255,25 @@ fast to the last step recorded − 8 and race on (state `0xf6b78` = 1 after).
   `0x5decc(button, held)`: |< to `0x143edc` − 27,900, >| to − 300, << and >> by held / 16
   · 4 (4 at first), state 4; `0x5e308` the speeds: 6 full (`0xf6b7c` 4), 7 (3, wait 2),
   8 (2, 4), 9 (1, 8), 5 pause.
+- **The bar drawn** (`0x5c5d0` at the end of both HUD frames, `0x5fcf0`; ported
+  2026-10-20): MASKLO.FSH's `repl` strip at (0, 183), clip (0, 320, 180, 200); the
+  buttons from the name tables `0xf6bc0` (pressed, `…d`), `0xf6be4` (lit, `…i`; their
+  boxes are the buttons' rectangles), `0xf6c08` (normal, `…l`), the camera's labels
+  `0xf6c2c`/`0xf6c4c` by the camera's mode 0..7 (13 shows 3), the speed's `0xf6c6c`/
+  `0xf6c78`; pressed labels at +1, +1, Done's English pictures +10 across. The time by
+  `0x2d6b4`(count, 0x2d, 0xba, 6, 2) and the line at (0x2d, 0xc3), count · 0x7a / (last
+  + 1) long, 3 high, in the HUD's dark green over black; only when the counter moved or
+  `0x1456ac` asks for all. All blits COPY. The pointer (`0x52394`, MOUSE.FSH ptr0, ptr1
+  while a button is held) shown while not racing. **`0x2d314`**, the clip of every whole
+  redraw of the dashboard: (0, w, 0, 0xb4) while not racing, so the bar's rows are kept;
+  while racing the whole screen with the ticket's flag `0x12b8d4` (`0x2d284`), the bottom
+  band (0xb4..h) with `0x12b8d8` (`0x2d278`). The ticket's end (`0x306e8`) asks for the
+  whole bar again in a replay. Slower speeds: race_main runs one step per wait + 1 due
+  (`0x145ca8`). Compared with the original only at 640x480 (DOSBox's machine is fast:
+  races there are 640x480 though +0x7f is 0; `0x36e09` changes it only on slow
+  machines, so another place decides): the same buttons, the arrow keys' light, the
+  camera's and the speed's turns (FULL → 1/2 → 1/4), the pause menu's replay starting
+  again at its first count after its last.
 - **Cameras** (`0x5dac4`, highlights): the event decides: two racers near → 6 or 7 (the
   opponent's views), events 0xd6..0xf7 with a random 10 ≥ 8 → 2, 0xdb..0xe3 → random 5,
   else random 4 + 1.

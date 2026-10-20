@@ -91,6 +91,35 @@ typedef struct {
 
 extern replay_state g_replay;
 
+/* the replay's bar (0x5e4ec, 0x5fcf0): eight buttons along the bottom, 1 Done, 2 |< to the
+   start, 3 << back, 4 >> on, 5 >| to the end, 6 play (full speed, then a half and a
+   quarter), 7 pause, 8 the camera; the time and how far through the recording */
+enum { BAR_DONE = 1, BAR_START, BAR_BACK, BAR_ON, BAR_END, BAR_PLAY, BAR_PAUSE, BAR_CAMERA };
+typedef struct {
+    int pressed;               /* 0x14569c: the button held down, 0 none */
+    int lit;                   /* 0x1456a0: the button lit by the mouse or the arrow keys */
+    int cam;                   /* 0x1456a4: the camera's label (the camera's mode 0..7) */
+    int speed;                 /* 0x1456a8: the speed's label: 0 full, 1 a half, 2 a quarter */
+    int redraw;                /* 0x1456ac: the whole bar drawn again */
+    int speeds;                /* 0x1456b0: play's turn through the speeds, 1..3 */
+    int count_shown;           /* 0x145bc0: the counter the time was drawn for */
+    int action;                /* 0x145550: what a button asks this step: 1 |<, 2 >|, 3
+                                  <<, 4 >>, 5 pause, 6 7 8 the speeds, 10 the camera */
+    int last_action;           /* 0xf6bb4 */
+    int repeats;               /* 0xf6bb8: steps the same action has been asked */
+    int last_pressed;          /* 0xf6bb0 */
+    int shown;                 /* 0x145544: what is playing: 3 on, 4 back, 5 paused, 6 full
+                                  speed, 8 9 10 slower (the camera button off while 5) */
+    int last_key;              /* 0xf6ba8 */
+    int mouse_was[2];          /* 0x145600, 0x1455fc */
+    int rect[9][4];            /* 0x14560c ..: each button's box, x0 y0 x1 y1 (its pressed
+                                  picture's) */
+    int lit_size[9][2];        /* each lit picture's width and height */
+    int wait_left;             /* 0x145ca8: steps due before the next played slower */
+} replay_bar;
+
+extern replay_bar g_bar;
+
 /* race_setup_record 0x36c5c: the record from CONFIG.DAT's settings */
 void replay_setup_record(void);
 /* replay_settings 0x5c340: the record from REPLAY.RPL (the name in CONFIG.DAT +0x3b,

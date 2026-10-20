@@ -579,6 +579,18 @@ int race_run(void)
            three-cycle, race_timer_tick 0x4c454), the player's car driven */
         g_rkeys.race_clock = race_clock(clock_ticks() - start - g_pause.held_ticks);
         while (done < (unsigned)g_rkeys.race_clock && !g_replay.end) {
+            /* (race_main 0x6356c) a replay played slower: a step each wait + 1 due */
+            if (g_drive.state == 2 && g_replay.speed > 0 && g_replay.speed < 4) {
+                if (g_bar.wait_left < 1) {
+                    g_bar.wait_left = g_replay.wait;
+                    race_step(&cars[0], &cam, done);
+                }
+                g_bar.wait_left--;
+                done++;
+                continue;
+            }
+            if (g_drive.state == 2)
+                g_bar.wait_left = 0;
             race_step(&cars[0], &cam, done);
             done++;
             /* running fast to a point of the replay: no frames between */
@@ -659,6 +671,7 @@ int race_run(void)
         memcpy(map.places, g_timing.places, sizeof map.places);
         map.driver = cam.mode == 0 && !g_hud.no_dash;
         g_hud.cam_mode = cam.mode;
+        g_hud.running = g_drive.state == 1;
         g_hud.stopped = g_timing.stopped;
         hud_map(&map);
         k = hud_ticket(g_opp.ticket_up, g_opp.warning_up, g_timing.result);

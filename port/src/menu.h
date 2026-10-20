@@ -25,6 +25,8 @@ void fe_mouse_read(void);          /* 0x522e8: the buttons, into g_mouse_buttons
 void fe_mouse_save(void);          /* mouse_save 0x52348: its place, to see it move */
 void fe_mouse_moved(void);         /* 0x71b24: g_mouse_active once it moves or is pressed */
 void fe_mouse_press(void);         /* 0x52304: the pointer pressed a fifth of a second */
+/* 0x52394: the pointer shown, pressed or not (the replay's bar) */
+void fe_mouse_look(int pressed);
 void fe_mouse_hide(void);          /* 0x71afc: a key used, the pointer hidden until the
                                       screen is drawn again */
 

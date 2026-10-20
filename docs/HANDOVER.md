@@ -381,8 +381,11 @@ Ghidra project and `build/decomp`, one command). The git history was started aga
   back byte for byte like the files' own snapshots to their ends (`RENFS_REPLAYCHECK=1`);
   the original's attract mode in DOSBox reaches the same road node (`nfsdos.py follow:`).
   The CD's were driven with a joystick: the steering and pedal kinds now come from the
-  race record. Not yet: the replay bar and its buttons, slow motion, the pause menu's
-  replay, the race menus' Replay / Highlights buttons, the attract mode's replays.
+  race record. **The replay bar** (second part): Done, |<, <<, >>, >|, play at full, a
+  half and a quarter speed, pause, the camera, the time and the line along the bottom,
+  by mouse (the pointer) or arrows and Space/Enter, Esc for Done; the highlights keep it
+  across their jumps. Not yet: the pause menu's replay with racing on after it, the race
+  menus' Replay / Highlights buttons, the attract mode's replays.
   Open (older, found 2026-10-20): `tools/timing_emu.py` puts the second racer's finish
   time one lap slot earlier than the original in 7 of its 13 runs (the game code writes
   `0x14ea7c` + racer · 0x1d2 + lap · 4 on both sides: look at the check's set-up of the

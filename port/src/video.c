@@ -234,9 +234,9 @@ static void write_shot(void)
     }
     fprintf(f, "P6\n%d %d\n255\n", g_fb_w, g_fb_h);
     for (int i = 0; i < g_fb_w * g_fb_h; i++) {
-        int x = i % g_fb_w - g_mouse_x, y = i / g_fb_w - g_mouse_y;
+        int x = i % g_fb_w - g_mouse_x * g_fb_w / 640, y = i / g_fb_w - g_mouse_y * g_fb_h / 480;
         unsigned char v = g_fb[i];
-        if (g_cursor && g_cursor_on && g_fb_w == 640 && x >= 0 && y >= 0 && x < g_cursor_w &&
+        if (g_cursor && g_cursor_on && x >= 0 && y >= 0 && x < g_cursor_w &&
             y < g_cursor_h && g_cursor[y * g_cursor_w + x] != 255)
             v = g_cursor[y * g_cursor_w + x];  /* the pointer, as on the screen */
         unsigned c = g_rgb[v];
@@ -317,12 +317,14 @@ void video_retrace(void)
                 row[x] = g_rgb[src[x]];
         }
         /* the pointer (0x81600: its top left corner at the mouse; 255 is see-through) */
-        if (g_cursor && g_cursor_on && g_fb_w == 640) {
-            for (int y = 0; y < g_cursor_h && g_mouse_y + y < g_fb_h; y++)
-                for (int x = 0; x < g_cursor_w && g_mouse_x + x < g_fb_w; x++) {
+        /* (the mouse is kept in 640x480's pixels: at 320x200 in the race's) */
+        if (g_cursor && g_cursor_on) {
+            int mx = g_mouse_x * g_fb_w / 640, my = g_mouse_y * g_fb_h / 480;
+            for (int y = 0; y < g_cursor_h && my + y < g_fb_h; y++)
+                for (int x = 0; x < g_cursor_w && mx + x < g_fb_w; x++) {
                     unsigned char c = g_cursor[y * g_cursor_w + x];
                     if (c != 255)
-                        ((unsigned *)((char *)pixels + (g_mouse_y + y) * pitch))[g_mouse_x + x] = g_rgb[c];
+                        ((unsigned *)((char *)pixels + (my + y) * pitch))[mx + x] = g_rgb[c];
                 }
         }
         SDL_UnlockTexture(g_tex);

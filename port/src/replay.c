@@ -15,12 +15,15 @@
 #include "files.h"
 #include "menu.h"
 #include "opponent.h"
+#include "racekeys.h"
 #include "racesnd.h"
 #include "timing.h"
 #include "track.h"
+#include "video.h"
 
 unsigned char g_rec[REC_SIZE];
 replay_state g_replay;
+replay_bar g_bar;
 
 /* the file's blocks (§3.15): the race record, then 0x9a4 bytes from 0x144ba8 (the
    highlights), the recording (UsrCtrlBuff 0xf6b98), 0xcc8 bytes from 0x143ed8 (the
@@ -322,6 +325,12 @@ void replay_start(void)
     g_replay.auto_camera = 0;
     g_replay.attract = 0;
     g_replay.end = 0;
+    g_replay.plays = 1;
+    /* (the bar: play pressed, full speed, drawn again) */
+    g_bar.redraw = 1;
+    g_bar.speed = 0;
+    g_bar.shown = 6;
+    g_bar.pressed = BAR_PLAY;
 }
 
 void replay_race_begins(void)
@@ -1026,12 +1035,20 @@ static void begin(int mode)
             jump(g_replay.hl[0][0], g_replay.hl[0][1]);
             g_replay.speed = 4;
             g_replay.wait = 0;
+            g_bar.shown = 6;
+            g_bar.pressed = BAR_PLAY;
+            g_bar.redraw = 1;
+            g_bar.speed = 0;
         }
         return;
     }
     g_replay.highlight = -2;
     g_replay.speed = 4;
     g_replay.wait = 0;
+    g_bar.shown = 6;
+    g_bar.pressed = BAR_PLAY;
+    g_bar.speed = 0;
+    g_bar.redraw = 1;
     from = g_replay.last - (mode == 3 ? 27000 : 600);
     if (from < 0)
         from = 0;
@@ -1054,8 +1071,12 @@ static void back_to_race(void)
         to = 0;
     jump(to - to % 4, g_replay.last);
     g_replay.speed = 4;
+    g_bar.shown = 6;
     g_replay.resume = 1;
     g_replay.wait = 0;
+    g_bar.pressed = 0;
+    g_bar.speed = 0;
+    g_bar.redraw = 1;
     g_replay.cam->wanted = g_replay.camera_kept;
     g_replay.highlight = -2;
     rsnd_mute(0);
@@ -1070,7 +1091,11 @@ static void next_highlight(void)
 
     g_replay.speed = 4;
     g_replay.wait = 0;
+    g_bar.shown = 6;
+    g_bar.pressed = BAR_PLAY;
+    g_bar.speed = 0;
     g_replay.highlight++;
+    g_bar.redraw = 1;
     if (g_replay.highlight >= g_replay.nhighlights) {
         if (!g_replay.attract) {
             g_replay.highlight = 0;
@@ -1103,6 +1128,10 @@ static void next_highlight(void)
         /* a big one played at half speed */
         g_replay.speed = 3;
         g_replay.wait = 2;
+        g_bar.shown = 8;
+        g_bar.pressed = BAR_PLAY;
+        g_bar.speed = 1;
+        g_bar.redraw = 1;
         g_replay.slowed = 1;
     }
     jump(g_replay.hl[g_replay.highlight][0], g_replay.hl[g_replay.highlight][1]);
@@ -1139,6 +1168,270 @@ static void playing(void)
         next_highlight();
 }
 
+/* 0x5decc: |<, >|, << and >> (held: by more the longer, a sixteenth of the steps held,
+   in fours): the counter moved, nothing played (state 4) until a speed is chosen; at
+   most 27,900 counts back from the end, at least 300 before it */
+static void seek(int button, int repeats)
+{
+    int by = repeats ? repeats / 16 * 4 : 4, first = g_replay.last - 27900;
+    int end = g_replay.last - 300, *t = &g_drive.steps;
+
+    if (*t > end)
+        *t = end;
+    switch (button) {
+    case 1:
+        *t = first < 0 ? 0 : first;
+        g_bar.shown = 4;
+        break;
+    case 2:
+        *t = end < first ? first : end;
+        if (*t < 0)
+            *t = 0;
+        g_bar.shown = 3;
+        break;
+    case 3:
+        if (by < *t)
+            *t -= by;
+        if (*t < first)
+            *t = first;
+        g_bar.shown = 4;
+        break;
+    case 4:
+        if (*t < end - by)
+            *t += by;
+        if (*t < 0)
+            *t = 0;
+        g_bar.shown = 3;
+        break;
+    }
+    g_replay.auto_camera = 0;
+    *t -= *t % 4;
+    if (g_drive.state == 1)
+        objects_keep();
+    g_drive.state = 4;
+    g_replay.highlight = -2;
+    g_replay.speed = 4;
+    g_replay.wait = 0;
+    rsnd_mute(1);
+}
+
+/* 0x5e308: play at a speed (6 full, 7 a half, 8 a quarter, 9 an eighth), or pause (5,
+   once a press: two more steps shown, then held); after seeking, played from there */
+static void speed_set(int action, int repeats)
+{
+    static const int speed[4] = { 4, 3, 2, 1 }, wait[4] = { 0, 2, 4, 8 };
+
+    if (g_drive.state == 1)
+        return;
+    if (action >= 6 && action <= 9) {
+        int k = action - 6;
+
+        g_replay.speed = speed[k];
+        g_replay.wait = wait[k];
+        g_bar.speed = k;
+        g_bar.shown = k ? 7 + k : 6;
+        g_bar.pressed = BAR_PLAY;
+        g_bar.redraw = 1;
+        if (action != 9)
+            rsnd_mute(0);
+    } else if (action == 5) {
+        if (repeats)
+            return;
+        if (g_drive.state != 3 && g_replay.hold == 0) {
+            rsnd_mute(1);
+            g_replay.speed = 0;
+            g_replay.hold = 2;
+            g_bar.shown = 5;
+        }
+    } else
+        return;
+    if (g_drive.state == 4) {
+        g_replay.resume = 4;
+        g_replay.mark_start = 1;
+        jump(g_drive.steps - g_drive.steps % 4, g_replay.last);
+        g_replay.auto_camera = 0;
+    }
+}
+
+/* the mouse in the race's picture (the port keeps it in 640x480's) */
+static void bar_mouse(int *x, int *y)
+{
+    mouse_read(x, y);
+    *x = *x * 320 / 640;
+    *y = *y * 200 / 480;
+}
+
+static int bar_in(int k, int x, int y)
+{
+    const int *r = g_bar.rect[k];
+
+    return r[0] <= x && x <= r[2] && r[1] <= y && y <= r[3];
+}
+
+/* 0x72f28: the key held, in this order: Space, Enter, Esc, Tab, up, down, left, right */
+static int held_key(void)
+{
+    static const int scan[8] = { 0x39, 0x1c, 0x01, 0x0f, 0x48, 0x50, 0x4b, 0x4d };
+    static const int code[8] = { 0x20, 0x0d, 0x1b, 0x09, 0x4800, 0x5000, 0x4b00, 0x4d00 };
+    int i;
+
+    for (i = 0; i < 8; i++)
+        if (key_down(scan[i]))
+            return code[i];
+    return 0;
+}
+
+/* 0x5e4ec: the buttons by the mouse (moved or pressed; the play button's look kept up
+   to date) or the arrow keys (the mouse put on the lit one), Space or Enter pressing
+   the lit one, Esc pressing Done; let go, the pressed one stays lit. Then what the
+   pressed button asks */
+static void bar_input(void)
+{
+    int over = 0, arrows = 0, x, y, k, key;
+
+    /* (the buttons read once the mouse has been used, 0x156604) */
+    fe_mouse_moved();
+    if (g_mouse_active)
+        fe_mouse_read();
+    bar_mouse(&x, &y);
+    if (x != g_bar.mouse_was[0] || y != g_bar.mouse_was[1] || g_mouse_buttons
+        || g_bar.lit == BAR_PLAY)
+        for (k = 1; k <= 8; k++) {
+            if ((k == BAR_CAMERA && g_bar.shown == 5) || !bar_in(k, x, y))
+                continue;
+            if (!g_mouse_buttons) {
+                if (k != g_bar.lit) {
+                    g_bar.pressed = 0;
+                    g_bar.redraw = 1;
+                    g_bar.lit = k;
+                }
+            } else if (k != g_bar.pressed) {
+                g_bar.lit = 0;
+                g_bar.redraw = 1;
+                g_bar.pressed = k;
+            }
+            over = 1;
+        }
+    g_bar.mouse_was[0] = x;
+    g_bar.mouse_was[1] = y;
+    key = held_key();
+    if (key) {
+        if (key != g_bar.last_key && key == 0x4b00) {
+            if (--g_bar.lit < 1)
+                g_bar.lit = 8;
+            if (g_bar.shown == 5 && g_bar.lit == BAR_CAMERA)
+                g_bar.lit = 7;
+            g_bar.redraw = 1;
+            over = arrows = 1;
+        }
+        if (key != g_bar.last_key && key == 0x4d00) {
+            if (++g_bar.lit > 8)
+                g_bar.lit = 1;
+            if (g_bar.shown == 5 && g_bar.lit == BAR_CAMERA)
+                g_bar.lit = 1;
+            g_bar.redraw = 1;
+            over = arrows = 1;
+        }
+        if (arrows) {
+            /* the mouse to the middle of the lit picture */
+            const int *r = g_bar.rect[g_bar.lit];
+
+            mouse_place((g_bar.lit_size[g_bar.lit][0] / 2 + r[0]) * 640 / 320,
+                        (g_bar.lit_size[g_bar.lit][1] / 2 + r[1]) * 480 / 200);
+        }
+        if (key == 0x20 || key == 0x0d) {
+            g_bar.pressed = g_bar.lit;
+            g_bar.redraw = 1;
+            over = 1;
+        }
+    }
+    if (key_down(0x01) && g_rkeys.race_clock > 15) {
+        g_bar.pressed = BAR_DONE;
+        over = 1;
+        g_bar.redraw = 1;
+    }
+    g_bar.last_key = key;
+    if (!over && g_bar.pressed) {
+        g_bar.lit = g_bar.pressed;
+        g_bar.redraw = 1;
+        g_bar.pressed = 0;
+    }
+    switch (g_bar.pressed) {
+    case 0:
+        break;
+    case BAR_DONE:
+        g_replay.mode = 7;
+        g_bar.speeds = 0;
+        break;
+    case BAR_START:
+        g_bar.action = 1;
+        g_bar.speeds = 0;
+        break;
+    case BAR_BACK:
+        g_bar.action = 3;
+        g_bar.speeds = 0;
+        break;
+    case BAR_ON:
+        g_bar.action = 4;
+        g_bar.speeds = 0;
+        break;
+    case BAR_END:
+        g_bar.action = 2;
+        g_bar.speeds = 0;
+        break;
+    case BAR_PLAY:
+        /* the speeds in turn: full, a half, a quarter (while playing) */
+        if (g_bar.last_pressed != BAR_PLAY) {
+            if (g_drive.state == 2 && ++g_bar.speeds > 3)
+                g_bar.speeds = 1;
+            g_bar.action = exe_i32(0xf6b58 + 4 * g_bar.speeds);
+        }
+        break;
+    case BAR_PAUSE:
+        if (g_bar.last_pressed != BAR_PAUSE) {
+            g_bar.action = 5;
+            g_bar.speeds = 0;
+        }
+        break;
+    case BAR_CAMERA:
+        if (g_bar.last_pressed != BAR_CAMERA)
+            g_bar.action = 10;
+        break;
+    }
+    g_bar.last_pressed = g_bar.pressed;
+}
+
+/* 0x5e948's second half: the bar read, its action done (a new one: the bar drawn again,
+   its look let go) */
+static void bar_step(void)
+{
+    g_bar.action = 0;
+    bar_input();
+    if (!g_bar.action) {
+        g_bar.last_action = g_bar.repeats = 0;
+        return;
+    }
+    if (g_bar.action == g_bar.last_action)
+        g_bar.repeats++;
+    else {
+        g_bar.redraw = 1;
+        g_bar.repeats = 0;
+        g_bar.pressed = 0;
+    }
+    if (g_bar.action >= 1 && g_bar.action <= 4) {
+        seek(g_bar.action, g_bar.repeats);
+        g_replay.auto_camera = 0;
+    } else if (g_bar.repeats == 0 && g_bar.action == 10 && g_drive.state != 4) {
+        camera_next(g_replay.cam);
+        /* (held: a frame from the new camera) */
+        if (g_drive.state == 2 && g_replay.speed == 0 && g_replay.hold < 1)
+            g_replay.hold = 2;
+        g_replay.auto_camera = 0;
+    } else if (g_bar.action >= 5 && g_bar.action <= 9)
+        speed_set(g_bar.action, g_bar.repeats);
+    g_bar.last_action = g_bar.action;
+}
+
 void replay_step(void)
 {
     /* 0x5e948: the mode asked for */
@@ -1166,6 +1459,8 @@ void replay_step(void)
         } else if (g_replay.mode == 6)
             g_replay.end = 0x20;
     }
+    if (g_drive.state != 1)
+        bar_step();
     if (!(g_drive.flags & 4))
         return;
     g_replay.pos = g_drive.steps % RING_COUNTS;

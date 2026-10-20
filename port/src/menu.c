@@ -109,6 +109,14 @@ void fe_mouse_hide(void)
     }
 }
 
+void fe_mouse_look(int pressed)
+{
+    fe_mouse_load();
+    if (g_mouse_fsh.d)
+        mouse_pointer(g_ptr[pressed != 0].pixels, g_ptr[pressed != 0].w, g_ptr[pressed != 0].h);
+    mouse_show(1);
+}
+
 void fe_mouse_press(void)
 {
     if (g_mouse_fsh.d)
