@@ -2,6 +2,8 @@
 #include "model.h"
 #include "exe.h"
 #include "trackfam.h"
+#include "font.h"
+#include "polyfill.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -58,12 +60,18 @@ int model_make(model *md, unsigned char *orip, const unsigned char *lo, const un
     n = (int)u32(orip + 0x24);
     md->ntex = (int)u32(orip + 0x38);
     md->view = calloc((size_t)md->npoints + 1, sizeof *md->view);
+    md->points = calloc((size_t)md->npoints + 1, sizeof *md->points);
     md->screen = calloc((size_t)md->npoints + 1, sizeof *md->screen);
     md->list = calloc((size_t)n + 1, sizeof *md->list);
     md->tex = calloc((size_t)md->ntex + 1, sizeof *md->tex);
-    if (!md->view || !md->screen || !md->list || !md->tex) {
+    if (!md->view || !md->points || !md->screen || !md->list || !md->tex) {
         model_free(md);
         return 0;
+    }
+    for (i = 0, t = field(md, 0x18); i < md->npoints; i++, t += 12) {
+        md->points[i].x = (int)u32(t);
+        md->points[i].y = (int)u32(t + 4);
+        md->points[i].z = (int)u32(t + 8);
     }
     /* every polygon in the list (0x981f7 with -1). The original tests the first polygon's
        0x400 each time round instead of each one's, and so takes all or none */
@@ -78,16 +86,27 @@ int model_make(model *md, unsigned char *orip, const unsigned char *lo, const un
         name[4] = 0;
         md->tex[i].shape = shpi_find(bank, name);
     }
+    model_match_colours(md);   /* (0x95755) */
     return 1;
 }
 
 void model_free(model *md)
 {
     free(md->view);
+    free(md->points);
     free(md->screen);
     free(md->list);
     free(md->tex);
     memset(md, 0, sizeof *md);
+}
+
+void model_match_colours(model *md)
+{
+    const unsigned char *t = field(md, 0x3c);
+    int i;
+
+    for (i = 0; i < md->ntex; i++)
+        md->tex[i].colour = nearest_colour(u32(t + 20 * i + 12) & 0xffffff);
 }
 
 int model_find_texture(const model *md, const char *name)
@@ -150,18 +169,54 @@ void model_turn(int axis, int a, int m[9])
     }
 }
 
+int model_find_part(const model *md, const char *name)
+{
+    const unsigned char *r = field(md, 0x44);
+    int i, n = (int)u32(md->orip + 0x40);
+
+    for (i = 0; i < n; i++, r += 20)
+        if (same_name(r, name, 8))
+            return i;
+    return -1;
+}
+
+void model_morph(model *md, int part, int s)
+{
+    const unsigned char *r = field(md, 0x44) + 20 * part, *pts = field(md, 0x18);
+    const unsigned *ix;
+    const unsigned char *mv;
+    int k, n;
+
+    if (part < 0 || part >= (int)u32(md->orip + 0x40))
+        return;
+    n = (int)u32(r + 8);
+    ix = index_table(md) + u32(r + 12);
+    mv = pts + 12 * u32(r + 16);
+    for (k = 0; k < n; k++, mv += 12) {
+        const unsigned char *p = pts + 12 * ix[k];
+        vec3 *o = &md->points[ix[k]];
+
+        o->x = (int)u32(p);
+        o->y = (int)u32(p + 4);
+        o->z = (int)u32(p + 8);
+        if (s) {
+            o->x += fix_mul((int)u32(mv), s);
+            o->y += fix_mul((int)u32(mv + 4), s);
+            o->z += fix_mul((int)u32(mv + 8), s);
+        }
+    }
+}
+
 void model_place(model *md, const int m[9], const vec3 *pos)
 {
-    const unsigned char *p = field(md, 0x18);
     int i;
 
     /* the library's own camera (0xf9678) is never turned in the game: its product with
        m is m, and the origin's place stays pos */
     memcpy(md->m, m, sizeof md->m);
     md->pos = *pos;
-    for (i = 0; i < md->npoints; i++, p += 12) {
-        vec3 v = {(int)u32(p), (int)u32(p + 4), (int)u32(p + 8)};
-        rotate(&v, md->m, &md->view[i]);
+    for (i = 0; i < md->npoints; i++) {
+        rotate(&md->points[i], md->m, &md->view[i]);
         md->view[i].x += pos->x;
         md->view[i].y += pos->y;
         md->view[i].z += pos->z;
@@ -234,7 +289,18 @@ static void draw_poly(model *md, unsigned i)
         }
         tex = &md->tex[flags >> 16 & 0xff];
         if (!(flags & 0x80) || !tex->shape) {
-            /* one colour (0xaa990): no car or traffic model the snapshots reach has one */
+            /* one colour (0xaa990): two corners a line (0x8bb3c), three or four filled
+               (0x8bc36, 0x8bc71's with the corners given by address) */
+            if (n == 2)
+                poly_line(md->screen[c[0]].x, md->screen[c[0]].y, md->screen[c[1]].x,
+                          md->screen[c[1]].y, tex->colour);
+            else if (n == 3 || n == 4) {
+                for (k = 0; k < n; k++) {
+                    xy[2 * k] = md->screen[c[k]].x;
+                    xy[2 * k + 1] = md->screen[c[k]].y;
+                }
+                poly_fill(n, xy, poly_solid_rows, tex->colour);
+            }
             goto next;
         }
         shape_tex(md, tex->shape, see, &t);

@@ -32,11 +32,15 @@ SOURCES = ["cardraw.c", "model.c", "polyfill.c", "camera.c", "car.c", "dash.c", 
 LEFT_OUT = {0x59294: 3, 0x66738: 0}
 
 
+class Tex(ctypes.Structure):
+    _fields_ = [("shape", P), ("colour", I)]
+
+
 class Model(ctypes.Structure):
     _fields_ = [("orip", P), ("lo", P), ("hi", P), ("npoints", I), ("flags", ctypes.c_uint),
                 ("m", I * 9), ("pos", Vec3), ("view", ctypes.POINTER(Vec3)), ("screen", P),
-                ("count", I), ("list", ctypes.POINTER(ctypes.c_uint)), ("tex", ctypes.POINTER(P)),
-                ("ntex", I)]
+                ("count", I), ("list", ctypes.POINTER(ctypes.c_uint)), ("tex", ctypes.POINTER(Tex)),
+                ("ntex", I), ("points", ctypes.POINTER(Vec3))]
 
 
 class Group(ctypes.Structure):
@@ -59,7 +63,7 @@ def lib():
     import subprocess
     out = "build/cars_test_%d.so" % os.getpid()        # (several runs at once)
     subprocess.check_call(["cc", "-O1", "-g", "-shared", "-fPIC", "-o", out] +
-                          ["port/src/" + f for f in SOURCES] + ["tools/timing_test.c", "tools/collide_test.c", "tools/replay_stub.c", "-Iport/src"] +
+                          ["port/src/" + f for f in SOURCES] + ["tools/timing_test.c", "tools/collide_test.c", "tools/replay_stub.c", "tools/cars_test.c", "-Iport/src"] +
                           subprocess.check_output(["sdl2-config", "--cflags", "--libs"]).decode().split())
     L = ctypes.CDLL(os.path.abspath(out))
     os.unlink(out)
@@ -105,7 +109,8 @@ def model_state(s, inst, mine, cfm_game, cfm_port, groups):
     tex = u(inst, 0x14)
     for k in range(mine.ntex):
         sh = u(tex + 20 * k, 0xc)
-        mine.tex[k] = cfm_port + (sh - cfm_game) if sh else None
+        mine.tex[k].shape = cfm_port + (sh - cfm_game) if sh else None
+        mine.tex[k].colour = g(tex + 20 * k, 4)
     mine.flags = u(inst, 0x10)
 
 
@@ -195,6 +200,9 @@ def load_cars(s, name, L):
         cfm_game = struct.unpack("<I", s.raw(a + 0x792, 4))[0]
         model_state(s, struct.unpack("<I", s.raw(a + 0x52e, 4))[0], c.near_m, cfm_game, c.cfm, c.groups)
         model_state(s, struct.unpack("<I", s.raw(a + 0x666, 4))[0], c.far_m, cfm_game, c.cfm, [])
+        # the tyres' pictures (0x66148) and the front wheels (0x6634c) as the original had them
+        L.cars_test_tyres(ctypes.byref(c), g(a, 0x68), g(a, 0x18), s.raw(a + 0x425, 1)[0],
+                          s.raw(a + 0x426, 1)[0], g(a, 0x602), g(a, 0x60a))
         cars.append(c)
     k, marks = racepal_emu.race_palette(s, name, L, [ctypes.addressof(c) for c in cars])
     racepal_emu.race_pictures(s, L, k, marks)
@@ -209,6 +217,10 @@ def load_cars(s, name, L):
         order[i] = ctypes.pointer(cars[addrs.index(s.u32(0x13c224 + 4 * i))])
     I.in_dll(L, "g_car_order_n").value = n
     I.in_dll(L, "g_player").value = s.i32(0x12dd58)
+    # (0x14e618, 0xf6fe0, 0xf6fe4, 0xf6fe8, 0xf6fec: the player's tyres as last drawn)
+    tyres = (I * 6).in_dll(L, "g_car_tyres")
+    tyres[:] = [s.i32(0x14e618), s.i32(0xf6fe0), s.i32(0xf6fe4), s.i32(0xf6fe8), s.i32(0xf6fec), 1]
+    I.in_dll(L, "g_cars_held").value = 1 if s.i32(0xf6b74) == 4 else 0
     I.in_dll(L, "g_racers").value = s.i32(0x13c18c)
     for sym, at in (("g_race_type", 0x12da20), ("g_field", 0x12da2c), ("g_humans", 0x12da30),
                     ("g_view_res", 0x12c308)):

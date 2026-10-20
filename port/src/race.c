@@ -736,6 +736,7 @@ int race_run(void)
         sky_draw(cam.yaw, cam.roll, &cam.pos, m, w, &win, g_rkeys.plain_sky);
         g_car_ticket = g_opp.ticket_up || g_opp.warning_up;
         g_road_steps = g_drive.steps;
+        g_cars_held = g_drive.state == 4;
         road_objects_start();
         road_draw(g_rkeys.drawn, cam.node, near, &win);
         g_hud.steps = g_drive.steps;

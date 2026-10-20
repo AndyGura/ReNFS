@@ -89,7 +89,7 @@ static void car_extents(race_car *c)
 static int car_models(race_car *c, int id)
 {
     const unsigned char *lo = c->cfm, *hi = c->cfm + c->cfm_len;
-    int k, front, rear, tire4;
+    int k, tire;
 
     if (!model_make(&c->near_m, ww_entry(c->cfm, 0), lo, hi, ww_entry(c->cfm, 1)) ||
         !model_make(&c->far_m, ww_entry(c->cfm, 2), lo, hi, ww_entry(c->cfm, 3))) {
@@ -108,14 +108,24 @@ static int car_models(race_car *c, int id)
     }
     car_extents(c);
     c->smoke_point = model_find_point(&c->near_m, "smok");
+    /* (0x65f3b: only the player's car looks its parts up; any car may be the player's
+       here, the parts are only moved for it, cardraw.c) */
+    c->turn_part[0] = model_find_part(&c->near_m, "left_turn");
+    c->turn_part[1] = model_find_part(&c->near_m, "right_turn");
+    c->tyre_tex[0] = c->tyre_tex[1] = -1;
     if (id >= 200) {
-        front = model_find_texture(&c->near_m, "frntires");
-        rear = model_find_texture(&c->near_m, "rertires");
-        tire4 = model_find_texture(&c->near_m, "tire4");
-        if (tire4 >= 0) {
-            model_set_texture(&c->near_m, front, c->near_m.tex[tire4].shape);
-            model_set_texture(&c->near_m, rear, c->near_m.tex[tire4].shape);
+        c->tyre_tex[0] = model_find_texture(&c->near_m, "frntires");
+        c->tyre_tex[1] = model_find_texture(&c->near_m, "rertires");
+        for (k = 0; k < 4; k++) {
+            char name[8];
+
+            snprintf(name, sizeof name, "tire%d", k + 1);  /* (0xf6f48) */
+            tire = model_find_texture(&c->near_m, name);
+            c->tyre_pics[k] = tire >= 0 ? c->near_m.tex[tire].shape : 0;
         }
+        model_set_texture(&c->near_m, c->tyre_tex[0], c->tyre_pics[3]);
+        model_set_texture(&c->near_m, c->tyre_tex[1], c->tyre_pics[3]);
+        c->tyre_shown[0] = c->tyre_shown[1] = 3;
     }
     return 1;
 }
@@ -210,8 +220,8 @@ void cars_remap(race_car *const *cars, int n, const unsigned char *marks, int ch
     for (i = 0; i < n; i++) {
         car_pics_remap(cars[i]->pics[0], cars[i]->pics_pal[0], marks[i], chase && i == 2);
         car_pics_remap(cars[i]->pics[1], cars[i]->pics_pal[1], marks[i], chase && i == 2);
-        /* (cars 0 and 1 then have their models' one-colour polygons matched again, 0x976c0:
-           none drawn yet) */
+        if (i < 2)             /* (their near models' colours matched again, 0x976c0) */
+            model_match_colours(&cars[i]->near_m);
     }
 }
 

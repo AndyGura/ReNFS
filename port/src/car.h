@@ -169,6 +169,12 @@ typedef struct {
     /* what the race's timing needs (timing.c) */
     unsigned char part;        /* +0x51a: 4 a racer (its finish checked), 2 it meets
                                   the other cars */
+    int tyre_tex[2];           /* +0x5fe, +0x606: a racer's front and rear tyres'
+                                  textures ("frntires", "rertires"), -1 none */
+    const unsigned char *tyre_pics[4]; /* +0x5ee ..: the pictures "tire1" .. "tire4" */
+    int tyre_shown[2];         /* +0x602, +0x60a: which of them each shows */
+    int turn_part[2];          /* +0x60e, +0x612: the player's car's front wheels turned
+                                  ("left_turn", "right_turn"), -1 none */
     int smoke_point;           /* +0x616: its near model's point "smok", where the smoke
                                   is drawn from (0x65f8b) */
     int size[3];               /* +0x64e, +0x652, +0x64a: its near model's width, height

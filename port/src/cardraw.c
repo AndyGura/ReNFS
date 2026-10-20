@@ -1,6 +1,7 @@
 /* The cars drawn into the road (NOTES §4.10). */
 #include "cardraw.h"
 #include "camera.h"
+#include "crash.h"
 #include "exe.h"
 #include "polyfill.h"
 #include "racepal.h"
@@ -22,6 +23,8 @@ int g_humans;
 unsigned char g_car_marks[RACE_CARS_MAX];
 int g_no_markers;
 int g_car_ticket;
+car_tyres g_car_tyres;
+int g_cars_held;
 unsigned char g_cars_seen[CARS_SEEN];
 unsigned char g_cars_behind[CARS_BEHIND];
 const race_camera *g_camera;
@@ -176,6 +179,94 @@ static int car_place(race_car *c, int xy[8], int mirror)
     return 1;
 }
 
+/* 0x66148: the player's car's tyres' pictures by its speed (+0x68): standing (below
+   0x1999) the first, above 30 m/s the fourth, between them the second and third in turn
+   (each frame, the first drawn in a step; below 10 m/s every other turn), the first frame
+   after the first in a step or while held the second. A front or rear tyre sliding
+   (+0x425 / +0x426 & 1) shows the first, at the limit (& 2) the fourth; the front ones
+   of most cars (not cars 1 and 10) also the first when the car has hardly moved since
+   the last frame drawn. A picture changed only when it is another (0x977f3) */
+static void player_tyres(race_car *c)
+{
+    car_tyres *w = &g_car_tyres;
+    int v = c->speed < 0 ? -c->speed : c->speed, pic, front, rear, dx, dy;
+
+    if (!w->ready) {
+        w->flip = exe_i32(0xf6fe0);
+        w->slow_flip = exe_i32(0xf6fe4);
+        w->x = exe_i32(0xf6fe8);
+        w->y = exe_i32(0xf6fec);
+        w->ready = 1;
+    }
+    if (v > 0x1e0000)
+        pic = 3;
+    else if (v < 0x1999)
+        pic = 0;
+    else {
+        if (w->step == g_road_steps || g_cars_held)
+            pic = 1;
+        else {
+            w->flip = 1 - w->flip;
+            if (v < 0xa0000) {
+                if (w->flip)
+                    w->slow_flip = 1 - w->slow_flip;
+                pic = w->slow_flip + 1;
+            } else
+                pic = w->flip + 1;
+        }
+        w->step = g_road_steps;
+    }
+    dx = w->x - c->pos.x;
+    dy = w->y - c->pos.y;
+    w->x = c->pos.x;
+    w->y = c->pos.y;
+    if (c->number == 1 || c->number == 10)
+        front = c->tyres[0] & 1 ? 0 : c->tyres[0] & 2 ? 3 : pic;
+    else if (c->tyres[0] & 1 || (dx < 0 ? -dx : dx) + (dy < 0 ? -dy : dy) < 0x1999)
+        front = 0;
+    else
+        front = c->tyres[0] & 2 ? 3 : pic;
+    rear = c->tyres[1] & 1 ? 0 : c->tyres[1] & 2 ? 3 : pic;
+    if (c->tyre_tex[0] < 0)
+        return;                /* (not a racer's car: no tyres to change) */
+    if (front != c->tyre_shown[0]) {
+        model_set_texture(&c->near_m, c->tyre_tex[0], c->tyre_pics[front]);
+        c->tyre_shown[0] = front;
+    }
+    if (rear != c->tyre_shown[1]) {
+        model_set_texture(&c->near_m, c->tyre_tex[1], c->tyre_pics[rear]);
+        c->tyre_shown[1] = rear;
+    }
+}
+
+/* 0x6634c: the player's car's front wheels turned with its steering (+0x18 / 32: the whole
+   move at an eighth of a turn), each only while the camera sees it from its side: the
+   left one from between 0xa0000 and 0x760000 of the car's heading round, the right one
+   from the other side (0x662e0: the camera's direction against the drawn heading) */
+static void player_wheels(race_car *c)
+{
+    int s = (c->steer < 0 ? c->steer + 31 : c->steer) >> 5, left = s, right = s;
+    int a = angle_of((c->pos.z - g_camera->pos.z) >> 8, (c->pos.x - g_camera->pos.x) >> 8),
+        y = c->yaw_drawn, d;
+
+    if (a > 0x800000)
+        a -= 0x1000000;
+    if (y > 0x800000)
+        y -= 0x1000000;
+    d = a - y;
+    if (d < 0)
+        d += 0x1000000;
+    d &= 0xffffff;
+    if (d > 0x800000)
+        d -= 0x1000000;
+    if (d < 0xa0000 || d > 0x760000)
+        left = 0;
+    if (d > -0xa0000 || d < -0x760000)
+        right = 0;
+    model_morph(&c->near_m, c->turn_part[0], -left);
+    model_morph(&c->near_m, c->turn_part[1], -right);
+}
+
 /* its models (0x66880): a racer's mark in its colour first (its brake lights' when
    braking), then the near model's groups each sorted and painted, or the far model */
 static void car_models(race_car *c, const int m[9])
@@ -216,6 +307,10 @@ static void car_models(race_car *c, const int m[9])
         unsigned char p8[3] = {(unsigned char)(rgb[0] << 2), (unsigned char)(rgb[1] << 2),
                                (unsigned char)(rgb[2] << 2)};
         video_palette(p8, g_car_marks[c->slot], 1);
+    }
+    if (c == g_cars[g_player]) {
+        player_tyres(c);
+        player_wheels(c);
     }
     model_place(&c->near_m, m, &c->seen);
     for (k = 0; k < 4; k++)

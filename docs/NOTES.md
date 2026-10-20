@@ -2201,6 +2201,38 @@ grid's yaw), the list made each frame (the step's job), the rows marked, the car
 as the road reaches them. At the standing start the rival is beside the player, out of
 the windscreen's view, in the original too (e1).
 
+**The player's car's wheels and one-colour polygons (2026-10-21; equal on h7, 0 pixels).**
+`0x66880` calls, for the player's car's near model only, before its points are turned:
+- **`0x66148`, the tyres' pictures.** At load (`0x65e55`, racers' ids ≥ 200) +0x5fe / +0x606
+  the texture slots "frntires" / "rertires" (`0x97521`), +0x5ee.. the pictures of "tire1" ..
+  "tire4" (`0xf6f48`), both slots set to the fourth, +0x602 / +0x60a = 3. Each frame:
+  |speed +0x68| above 0x1e0000 → 3, below 0x1999 → 0, else: in the same step as the last
+  frame (`0x14e618` = the counter `0x145c94`) or held (`0xf6b74` = 4) → 1, else
+  `0xf6fe0` = 1 − it, below 0xa0000 (and `0xf6fe0` ≠ 0) `0xf6fe4` = 1 − it and the
+  picture `0xf6fe4` + 1, above it `0xf6fe0` + 1. Front: tyres +0x425 & 1 → 0, & 2 → 3; for
+  cars other than numbers 1 and 10 also 0 when |Δx| + |Δy| since the last frame (`0xf6fe8`,
+  `0xf6fec`, the car's x and **y**) is below 0x1999. Rear +0x426 the same without the
+  distance. A slot changed only when it is another picture (`0x977f3`: the slot's +0xc).
+- **`0x6634c`, the front wheels.** s = +0x18 / 32 (towards 0). `0x662e0`: the angle of the
+  camera to the car, `0x3e7ec(dz >> 8, dx >> 8)` (**z first**), less the drawn yaw +0x351,
+  both and their difference to ±0x800000. The left part keeps s from 0xa0000 to 0x760000,
+  the right from −0x760000 to −0xa0000, else 0; then `0x97eb8(model, +0x60e "left_turn",
+  −s)`, `(+0x612 "right_turn", −s)` (found by `0x97cd0`, the ORIP's +0x44 records of 20
+  bytes, +0x40 of them: name, points' count +8, first in the index table +0xc, first move
+  among the points +0x10). **`0x97eb8`** sets each of the part's points in the instance's
+  own copy (+0x70) to the ORIP's point + its move × s (`0xaa4d0`, rounded; 0 a copy). The
+  instances are made with 1 (`0x95522`'s ebx at `0x65bff`): **every car model has its own
+  copy of its points** (`0x97d49` copies them); the port's `model.points`.
+- **One-colour polygons (`0x98482` → `0xaa990`)**: no 0x80 or no picture: two corners a
+  line `0x8bb3c`, three or four filled solid (`0x8bc36`, `0x8bc71`'s entry with the corners
+  by address), in the slot's +4: **the palette entry nearest the ORIP texture record's +0xc
+  colour** (`0x97638` → nearestcolour `0x80c80`), matched as the instance is made
+  (`0x976c0`) and again for cars 0 and 1's near models in `0x65020` (after the race's
+  palette pieces `0x55f58` and `0x2e74c`). The 512TR's rear bumper is one; the port's own
+  match gives the original's entries (82, the last 69) for both cars of h7. A slot's +0x10
+  (a drawing routine of its own, called first) is zeroed at creation and never set: not
+  ported. The cars' tyres on mirrored tracks (ids 100..199) have no slots: left alone.
+
 ### 4.11 The dashboard and the HUD (2026-10-19)
 
 **The frame** (`race_draw_frame` `0x5bc40`): the 3D view is painted into an off-screen
@@ -3734,9 +3766,7 @@ and `H(lo, hi)` (`view.h`); `RENFS_RES=320|640` overrides the settings for tests
   (`cars_emu`), 0 pixels off, and the 320x200 ones still equal (`tools/checks.sh`).
 - **Not ported at either resolution** (found on the way; h7 shows the first: 1,201 pixels
   of the player's own car from outside):
-  - the player's wheels: tyre pictures by speed `0x66148` (+0x425/+0x426, `0x977f3`,
-    +0x602/+0x60a) and the front wheels turned by the steering (+0x18 >> 5, `0x6634c` →
-    `0x662e0`, `0x97eb8`);
+  - ~~the player's wheels~~: done 2026-10-21, §4.10's end ("The player's car's wheels");
   - the tyres' dust and smoke `0x664bc` → `0x663e0` → `0x64714`/`0x64768` (`smo1..4`,
     `dir1..4`, `0x1464bc`/`0x1460ac`; half the scale at 320x200; EA's random `0x52580`);
   - the skid marks `0x679ec`/`0x67950` (125 records `0x149574` + 0xa0·i, ring `0xf6e2c`,

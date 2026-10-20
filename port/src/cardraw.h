@@ -7,6 +7,15 @@
 #include "view.h"
 
 #define RACE_CARS_MAX 12
+
+/* the player's car's tyres as last drawn (0x66148): the step they were chosen at
+   (0x14e618), the two turns of the picture (0xf6fe0, 0xf6fe4), the car's x and y then
+   (0xf6fe8, 0xf6fec); the state, 4 held (0xf6b74) */
+typedef struct {
+    int step, flip, slow_flip, x, y, ready;
+} car_tyres;
+extern car_tyres g_car_tyres;
+extern int g_cars_held;
 #define CARS_SEEN 35           /* road nodes from the camera's on (0x14e5d0) */
 #define CARS_BEHIND 11         /* road nodes back from the camera's (0x14e5c5) */
 

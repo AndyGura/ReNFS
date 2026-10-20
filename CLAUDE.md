@@ -192,8 +192,10 @@ The controls screen `0x22bd0` (NOTES §4.2): +0x5f36.. kinds and keys (menu key 
 the key `0x733a0`; the race's scan codes `0x36a0c` (`0x36758` German → US, `key_scancode` `0x91d60`, table `0xf7b74`).
 `tools/fecompare.py`: a port menu picture against DOSBox's, by palette entry.
 Races at 640x480 (NOTES §4.24): the default (+0x7f 0, `0x12c308` 1), `H(lo, hi)` in the port; detail 3
-every other line (`0x12d9da` the clear); not yet at either size: the player's wheels `0x66148`/`0x6634c`,
+every other line (`0x12d9da` the clear); not yet at either size:
 tyre dust `0x664bc`, skid marks `0x679ec`, the watching bar `0x7ef14`, the start beeps `0x5257c`.
+The player's wheels (NOTES §4.10): tyre pictures `0x66148`, front wheels `0x6634c` (`0x97eb8` moves a part's points in
+the model's own copy); one-colour polygons `0xaa990` in the slot's nearest colour (`0x976c0`).
 The joystick and the mouse (NOTES §4.23): EA's game port `0x94fa8`, the poll `0x4e3e8`, start-up
 `0x4d1fc`, `joystick.cfg` `0x4d4a0`/`0x4d5ec` (`0x12f294`, 23 ints), the calibration `0x4c6b0`, the race
 `0x4e0b8`, the control word by kinds `0x48bec`, the mouse `0x47b78`, the menus `0x4dfe0`.

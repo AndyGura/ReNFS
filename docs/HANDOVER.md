@@ -487,10 +487,15 @@ races 320x200 / 320x240; commit locally as the work goes.
    race underneath unchanged (the same REPLAY.RPL byte for byte off and on; the CD's
    replays equal to their snapshots). **Next: the rest of the PC game** (Danik's order):
    the gaps above, the cars' showcase (`fe_showcase` `0x17724`), the track records from
-   Control Central; then the MiSTer.
+   Control Central; then the MiSTer. **The player's car's wheels from outside (2026-10-21):
+   done**, the tyres' pictures by speed and the front wheels turned (NOTES §4.10's end), and
+   the one-colour polygons; equal on every snapshot (h7 0 pixels, was 1,201). Next gaps: the
+   skid marks (`0x671dc` writes the ring as the car is drawn, `0x679ec` paints it) and the
+   tyres' dust (`0x664bc`, from the skid records' wheel places), the start beeps, the bar
+   while watching after the finish.
    (`0x136618`, the sections drawn: the settings' +0x85 and F3, NOTES §4.19.)
    Open: the race's sound reaches full scale at the hits and the horn (0.2 to 0.7 % of
-   the samples in `build/snd_port/`): how EA's mixer sums the voices is still to compare. Model polygons of one colour (`0xaa990`) are not ported (none met so far).
+   the samples in `build/snd_port/`): how EA's mixer sums the voices is still to compare. Model polygons of one colour (`0xaa990`): ported 2026-10-21 (the 512TR's rear bumper).
 4. Front end (menus, car and track choice), then the race (track, cars, physics, HUD,
    sound), then the rest (replays, championship/tournament, cops, the showcase).
 5. MiSTer (`~/MiSTer-ReNFS`): the skill's steps 5–8 — `MISTER_HYBRID`, `mister_port.[ch]`,

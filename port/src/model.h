@@ -9,6 +9,8 @@
 /* a texture of the model (the instance's 20 bytes) */
 typedef struct {
     const unsigned char *shape;  /* +0xc: its picture, 0 if none */
+    int colour;                  /* +4: the palette entry nearest its colour (0x97638),
+                                    what a polygon without a picture is painted in */
 } model_tex;
 
 /* a model made drawable (orip_instance 0x95522): one per car and level of detail */
@@ -25,9 +27,11 @@ typedef struct {
     unsigned *list;              /* +0x84: all of them (0x981f7), sorted as drawn */
     model_tex *tex;              /* +0x14 */
     int ntex;
+    vec3 *points;                /* +0x70: its own copy of the points (made with 1, as
+                                    the cars' are), what is turned into the view */
 } model;
 
-/* the model `orip` of a file lo..hi made drawable (0x95522 with the points shared) and
+/* the model `orip` of a file lo..hi made drawable (0x95522 with its own points, 1) and
    its textures found in the bank of pictures (0x9759a); 0 if out of memory */
 int model_make(model *md, unsigned char *orip, const unsigned char *lo, const unsigned char *hi,
                unsigned char *bank);
@@ -44,6 +48,16 @@ int model_group(const model *md, const char *name, int *count, unsigned **list);
    the point); -1 if none */
 int model_find_point(const model *md, const char *name);
 void model_mirror(model *md);
+/* 0x976c0: every texture's colour (the model's +0x3c records' +0xc) matched again to the
+   palette as last given (nearestcolour 0x80c80) */
+void model_match_colours(model *md);
+/* a part by name (0x97cd0: the model's +0x44 records of 20 bytes, +0x40 of them, an
+   8-letter name, its points' count, where their numbers start in the index table and
+   where their moves start among the points); -1 if none */
+int model_find_part(const model *md, const char *name);
+/* 0x97eb8: the part's points moved by s times their moves (16.16, rounded), from the
+   model's own points (0 none, 0x10000 the whole move): the front wheels turned */
+void model_morph(model *md, int part, int s);
 
 /* the model turned by m and its origin at pos in the view (0x957ec, 0x9803e), its points
    into the view (orip_transform 0x98137) and onto the screen (0x98090) */
