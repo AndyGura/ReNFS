@@ -12,6 +12,8 @@ const char *files_home(void);      /* the port's own settings (made when first n
 
 /* a path inside the data folder, '/' or '\' between the parts, any case */
 FILE *file_open(const char *rel);
+/* the real path of a file or folder inside the data folder; 0 if it is not there */
+int file_path(const char *rel, char *out, size_t size);
 /* the whole file, allocated (free it); 0 if it is not there */
 unsigned char *file_load(const char *rel, long *len);
 

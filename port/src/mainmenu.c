@@ -11,6 +11,7 @@
 #include "menu.h"
 #include "options.h"
 #include "race.h"
+#include "session.h"
 #include "sound.h"
 #include "video.h"
 #include <stdio.h>
@@ -158,11 +159,24 @@ static void race_type_changed(void)
     }
 }
 
-/* 0x4235c: the race type left or right (a tournament running would ask to quit it: no
-   tournaments yet) */
+/* "Quit tournament ?" while a game is on (0x15d134: after any race from here, or a
+   loaded tournament); 1 to go on */
+static int quit_tournament(void)
+{
+    return !g_game_on || fe_yes_no_dialog(g_german ? "Wettkampf beenden ?" : "Quit tournament ?");
+}
+
+/* 0x4235c: the race type left or right; while a game is on only when it is quit: then
+   head to head and a new session */
 static void race_type_step(int right)
 {
-    cset(CFG_RACE_TYPE, (cw(CFG_RACE_TYPE) + (right ? 1 : 3)) % 4);
+    if (g_game_on) {
+        if (!quit_tournament())
+            return;
+        cset(CFG_RACE_TYPE, 1);
+        session_new();             /* 0x7469c (and 0x15d134 = 0) */
+    } else
+        cset(CFG_RACE_TYPE, (cw(CFG_RACE_TYPE) + (right ? 1 : 3)) % 4);
     race_type_changed();
 }
 
@@ -380,6 +394,8 @@ static void draw(int sel, int arrow)
     art("cham", 1);                        /* Chat, greyed */
     if (track >= 0 && track < 10)
         picture(PIC_TRACK, track_pic[version][track], track, g_mirror, g_rally);
+    if (type == 3 && track >= 0 && track < 9 && g_session.raced[track])
+        art("flad", 1);                    /* the tournament's track raced (0x43e3c) */
     if (car >= 0 && car < 12)
         picture(PIC_PLAYER, player_pic[car], car, 0, 0);
     opp_name = opp >= 0 && opp < 12 ? opponent_pic[opp] : "slew";
@@ -559,8 +575,22 @@ int fe_main_menu(void)
                     else if (in_rect(0x5c, 0x6b, 0x154, 0x16d))
                         race_type_step(0), redraw = 1;
                     break;
-                case RACE:                 /* (a tournament's segment already raced
-                                              is refused: no tournaments yet) */
+                case RACE:
+                    if (cw(CFG_RACE_TYPE) == 3 && g_session.raced[cw(CFG_TRACK) % 9]) {
+                        /* a tournament's track raced already (0x45a32) */
+                        fe_message_box(g_german ? "Strecke bereits fertiggestellt"
+                                                : "Track already completed");
+                        settimeout(100);
+                        while (!timedout() && !g_quit) {
+                            video_retrace();
+                            if (g_mouse_active)
+                                fe_mouse_read();
+                        }
+                        settimeout(12000);
+                        redraw = 1;
+                        break;
+                    }
+                    g_game_on = 1;         /* (0x45ab7) */
                     if (cw(CFG_RACE_TYPE) == 3) {
                         /* (the codes not taken into a tournament) */
                         g_explode = 0;
@@ -606,6 +636,8 @@ int fe_main_menu(void)
                     redraw = first = 1;
                     break;
                 case CANCEL:
+                    if (!quit_tournament())
+                        break;
                     fe_flush_keys();
                     done = 1;
                     result = 0;
@@ -619,9 +651,11 @@ int fe_main_menu(void)
             int left = k == 0x4b00, right = k == 0x4d00;
             if (k == 0x1b) {
                 fe_play_sound(0x48);
-                fe_flush_keys();
-                done = 1;
-                result = 0;
+                if (quit_tournament()) {
+                    fe_flush_keys();
+                    done = 1;
+                    result = 0;
+                }
             } else if (k == 0x4800 || k == 0x5000) {
                 static const int up[9] = { RACE, 0, LOCATION - 1, RACE_TYPE - 1, RACE - 1,
                                            RACE_TYPE, RACE_TYPE, RACE_TYPE, PLAYER };

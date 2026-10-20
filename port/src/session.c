@@ -11,6 +11,88 @@
 #include <string.h>
 
 race_session g_session;
+int g_game_on;
+
+#define PUT32(o, v) (d[o] = (unsigned char)(v), d[(o) + 1] = (unsigned char)((v) >> 8), \
+                     d[(o) + 2] = (unsigned char)((v) >> 16), d[(o) + 3] = (unsigned char)((v) >> 24))
+#define PUT16(o, v) (d[o] = (unsigned char)(v), d[(o) + 1] = (unsigned char)((v) >> 8))
+#define GET32(o) ((int)(d[o] | d[(o) + 1] << 8 | d[(o) + 2] << 16 | (unsigned)d[(o) + 3] << 24))
+#define GET16(o) ((short)(d[o] | d[(o) + 1] << 8))
+
+void session_to_bytes(unsigned char d[SESSION_FILE])
+{
+    int i, j;
+
+    memset(d, 0, SESSION_FILE);
+    for (i = 0; i < SESSION_RACERS; i++) {
+        const session_racer *r = &g_session.racer[i];
+        int o = i * 0x95;
+
+        memcpy(d + o, r->name, 9);
+        for (j = 0; j < 20; j++)
+            PUT32(o + 9 + 4 * j, r->laps[j]);
+        PUT32(o + 0x59, r->time);
+        PUT32(o + 0x5d, r->distance);
+        PUT32(o + 0x61, r->top);
+        PUT32(o + 0x65, r->total);
+        PUT32(o + 0x69, r->total_distance);
+        PUT32(o + 0x6d, r->best_top);
+        PUT32(o + 0x71, r->tickets);
+        PUT32(o + 0x75, r->warnings);
+        PUT32(o + 0x79, r->cleared);
+        for (j = 0; j < 6; j++)
+            PUT32(o + 0x7d + 4 * j, r->stats[j]);
+    }
+    memcpy(d + 0x4a8, g_session.kept, sizeof g_session.kept);
+    memcpy(d + 0x554, g_session.kept_keys, sizeof g_session.kept_keys);
+    PUT16(0x56e, g_session.vegas);
+    for (i = 0; i < 8; i++) {
+        PUT16(0x570 + 2 * i, g_session.points[i]);
+        PUT16(0x5a4 + 2 * i, g_session.gave_up[i]);
+    }
+    for (i = 0; i < 9; i++) {
+        PUT16(0x580 + 2 * i, g_session.won[i]);
+        PUT16(0x592 + 2 * i, g_session.raced[i]);
+    }
+    PUT16(0x5b4, g_session.race_type);
+}
+
+void session_from_bytes(const unsigned char d[SESSION_FILE])
+{
+    int i, j;
+
+    for (i = 0; i < SESSION_RACERS; i++) {
+        session_racer *r = &g_session.racer[i];
+        int o = i * 0x95;
+
+        memcpy(r->name, d + o, 9);
+        for (j = 0; j < 20; j++)
+            r->laps[j] = GET32(o + 9 + 4 * j);
+        r->time = GET32(o + 0x59);
+        r->distance = GET32(o + 0x5d);
+        r->top = GET32(o + 0x61);
+        r->total = GET32(o + 0x65);
+        r->total_distance = GET32(o + 0x69);
+        r->best_top = GET32(o + 0x6d);
+        r->tickets = GET32(o + 0x71);
+        r->warnings = GET32(o + 0x75);
+        r->cleared = GET32(o + 0x79);
+        for (j = 0; j < 6; j++)
+            r->stats[j] = GET32(o + 0x7d + 4 * j);
+    }
+    memcpy(g_session.kept, d + 0x4a8, sizeof g_session.kept);
+    memcpy(g_session.kept_keys, d + 0x554, sizeof g_session.kept_keys);
+    g_session.vegas = GET16(0x56e);
+    for (i = 0; i < 8; i++) {
+        g_session.points[i] = GET16(0x570 + 2 * i);
+        g_session.gave_up[i] = GET16(0x5a4 + 2 * i);
+    }
+    for (i = 0; i < 9; i++) {
+        g_session.won[i] = GET16(0x580 + 2 * i);
+        g_session.raced[i] = GET16(0x592 + 2 * i);
+    }
+    g_session.race_type = GET16(0x5b4);
+}
 
 void session_clear_results(void)
 {
@@ -48,6 +130,7 @@ void session_new(void)
     }
     snprintf(g_session.racer[0].name, sizeof g_session.racer[0].name, "%.8s",
              (const char *)g_config);
+    g_game_on = 0;
 }
 
 /* 0x36c3c: the game's car number to the menu's (the words at 0x36270) */

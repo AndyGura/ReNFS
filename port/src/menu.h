@@ -52,6 +52,15 @@ void fe_text_centre(const char *s, int x, int y);
 /* 0x74234: a line in red in a darkened box with two red frames, centred, at y 210 (the
    box text_width + 20 by 60), left on the screen */
 void fe_message_box(const char *text);
+/* 0x74dcc: fe_message_box for so many hundredths (or until a key or a button), a tenth
+   of a second more, then what it covered put back */
+void fe_timed_message(const char *text, unsigned ticks);
+/* the dialogs' box (0x89f3c, 0x8a0cf, 0x8a0f0): the screen under it darkened, two red
+   frames 2 and 3 pixels in */
+void fe_box(int x, int y, int w, int h);
+/* 0x717d0: the text cut to the first of its lengths from 7 characters on that is wider
+   than w (or whole), with its shadow */
+void fe_text_cut(const char *s, int x, int y, int w);
 /* fe_yes_no_dialog 0x73b04: the question in a box over the screen; 1 yes */
 int fe_yes_no_dialog(const char *question);
 /* "Exit to system ?" (German "Zurück zum system ?") */

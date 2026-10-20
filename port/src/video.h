@@ -44,6 +44,8 @@ int key_down(int scan);
 /* the mouse (0x848af): its place in the 640x480 picture; the buttons held (1 left,
    2 right) */
 int mouse_read(int *x, int *y);
+/* 0x84885: the mouse kept inside x0..x1, y0..y1 (the whole screen: 0, 0, 640, 480) */
+void mouse_limits(int x0, int y0, int x1, int y1);
 /* mouse_set 0x71ad4: the mouse put there */
 void mouse_place(int x, int y);
 /* the pointer's picture (palette numbers, 255 see-through), drawn over the screen at

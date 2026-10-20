@@ -120,6 +120,11 @@ const char *files_home(void)
     return g_home;
 }
 
+int file_path(const char *rel, char *out, size_t size)
+{
+    return resolve(g_data, rel, out, size);
+}
+
 FILE *file_open(const char *rel)
 {
     char path[1024];

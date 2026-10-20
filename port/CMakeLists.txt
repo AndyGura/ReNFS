@@ -34,7 +34,7 @@ add_executable(renfs
   src/font.c
   src/menu.c
   src/mainmenu.c
-  src/options.c src/audioopt.c src/gfxopt.c src/ctrlopt.c
+  src/options.c src/audioopt.c src/gfxopt.c src/ctrlopt.c src/loadsave.c
   src/raster.c
   src/poly.c
   src/road.c src/roaddraw.c src/sky.c src/view.c src/car.c src/camera.c src/dash.c src/hud.c src/race.c

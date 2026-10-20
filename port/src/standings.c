@@ -42,22 +42,6 @@ static const char *car_name(int n)
     return s ? (const char *)s : "";
 }
 
-/* 0x717d0: the text cut to the first of its lengths from 7 characters on that is wider
-   than w (or whole), with its shadow */
-static void text_cut(const char *s, int x, int y, int w)
-{
-    char cut[50];
-    int n;
-
-    memset(cut, 0, sizeof cut);
-    for (n = 7; n < 50; n++) {
-        strncpy(cut, s, n);
-        if (text_width(&g_fe_font, cut) > w)
-            break;
-    }
-    fe_text(cut, x, y);
-}
-
 /* a record of the track's (CONFIG.DAT +0xb5 ..) */
 static int record(int i)
 {
@@ -130,7 +114,7 @@ static void draw_segment(void)
         fe_text(dnf, 0x131, 0x89);
     sprintf(s, g_german ? "ETAPPE %d" : "SEGMENT %d", seg + 1);
     fe_text(s, 8, 0x5a);
-    text_cut(me->name, 0x131, 0x5a, 0x96);
+    fe_text_cut(me->name, 0x131, 0x5a, 0x96);
     fe_text(car_name(config_word(CFG_CAR)), 0x131, 0x6e);
     if (type == 0) {
         fe_text(g_german ? "Bestzeit" : "Best Time", 0x1d6, 0x5a);
@@ -178,14 +162,14 @@ static void draw_segment(void)
     /* the segment's records: its best time, its top speed */
     at = record(seg);
     fe_style(took == 1 || took == 3 ? 3 : 1);
-    text_cut((const char *)g_config + at, 7, 0x136, 200);
+    fe_text_cut((const char *)g_config + at, 7, 0x136, 200);
     fmt_time(s, config_long(at + 0x1b));
     fe_text(s, 0x131, 0x136);
     fe_text(car_name(config_long(at + 0xf)), 0x1d6, 0x136);
     record_kind(at, 0x136, 0);
     at = record(seg + 3);
     fe_style(took == 2 || took == 3 ? 3 : 1);
-    text_cut((const char *)g_config + at, 7, 0x17c, 200);
+    fe_text_cut((const char *)g_config + at, 7, 0x17c, 200);
     fmt_speed(s, config_long(at + 0x1f));
     fe_text(s, 0x131, 0x17c);
     fe_text(car_name(config_long(at + 0xf)), 0x1d6, 0x17c);
@@ -384,7 +368,7 @@ static void draw_track(void)
         }
     } else
         fe_text(dnf, 0x131, 0x89);
-    text_cut(me->name, 0x131, 0x5a, 0x96);
+    fe_text_cut(me->name, 0x131, 0x5a, 0x96);
     fe_text(car_name(config_word(CFG_CAR)), 0x131, 0x6e);
     if (type == 0) {
         fe_text(g_german ? "Bestzeit" : "Best Time", 0x1d6, 0x5a);
@@ -428,14 +412,14 @@ static void draw_track(void)
        race kind "t.t." in English whatever it is) */
     at = record(SESSION_TOP_TEN);
     fe_style(g_place == 0 ? 3 : 1);
-    text_cut((const char *)g_config + at, 7, 0x11d, 200);
+    fe_text_cut((const char *)g_config + at, 7, 0x11d, 200);
     fmt_time(s, config_long(at + 0x1b));
     fe_text(s, 0x131, 0x11d);
     fe_text(car_name(config_long(at + 0xf)), 0x1d6, 0x11d);
     record_kind(at, 0x11d, 0);
     at = record(SESSION_TOP_SPEED);
     fe_style(g_speed == 1 ? 3 : 1);
-    text_cut((const char *)g_config + at, 7, 0x177, 200);
+    fe_text_cut((const char *)g_config + at, 7, 0x177, 200);
     fmt_speed(s, config_long(at + 0x1f));
     fe_text(s, 0x131, 0x177);
     fe_text(car_name(config_long(at + 0xf)), 0x1d6, 0x177);
@@ -499,7 +483,7 @@ static void draw_best(void)
         y = 0x82 + i * 0x15;
         if (i == g_place)
             fe_style(3);
-        text_cut((const char *)g_config + at, 7, y, 0x11d);
+        fe_text_cut((const char *)g_config + at, 7, y, 0x11d);
         fmt_time(s, config_long(at + 0x1b));
         fe_text(s, 0x131, y);
         fe_text(car_name(config_long(at + 0xf)), 0x1d6, y);
@@ -509,7 +493,7 @@ static void draw_best(void)
     }
     at = record(SESSION_TOP_SPEED);
     fe_style(g_speed ? 3 : 1);
-    text_cut((const char *)g_config + at, 7, 0x177, 0x11d);
+    fe_text_cut((const char *)g_config + at, 7, 0x177, 0x11d);
     fmt_speed(s, config_long(at + 0x1f));
     fe_text(s, 0x131, 0x177);
     fe_text(car_name(config_long(at + 0xf)), 0x1d6, 0x177);
@@ -825,7 +809,7 @@ static void draw_circuit(void)
     }
     sprintf(s, g_german ? "%d Rundenrennen" : "%d Lap race", config_word(CFG_LAPS));
     fe_text(s, 8, 0x5f);
-    text_cut(me->name, 0x131, 0x5a, 0x96);
+    fe_text_cut(me->name, 0x131, 0x5a, 0x96);
     fe_text(car_name(config_word(CFG_CAR)), 0x131, 0x6e);
     if (type == 0) {
         fe_text(g_german ? "Bestzeit" : "Best Time", 0x1d6, 0x5a);
@@ -874,14 +858,14 @@ static void draw_circuit(void)
     /* the best total of this race length and the track's top speed (white when just
        taken) */
     fe_style(g_place == 0 ? 3 : 1);
-    text_cut((const char *)g_config + at, 7, 0x11d, 200);
+    fe_text_cut((const char *)g_config + at, 7, 0x11d, 200);
     fmt_time(s, config_long(at + 0x1b));
     fe_text(s, 0x131, 0x11d);
     fe_text(car_name(config_long(at + 0xf)), 0x1d6, 0x11d);
     record_kind(at, 0x11d, 0);
     at = record(SESSION_TOP_SPEED);
     fe_style(g_speed == 1 ? 3 : 1);
-    text_cut((const char *)g_config + at, 7, 0x177, 200);
+    fe_text_cut((const char *)g_config + at, 7, 0x177, 200);
     fmt_speed(s, config_long(at + 0x1f));
     fe_text(s, 0x131, 0x177);
     fe_text(car_name(config_long(at + 0xf)), 0x1d6, 0x177);
@@ -1009,7 +993,7 @@ static void draw_laps(void)
         lap_row(i, 0x7d + (i - n) * 0x14, 0x148, 0x1a6, 0x205);
     at = record(0);
     fe_style(g_lap_rec == 1 ? 3 : 1);
-    text_cut((const char *)g_config + at, 7, 0x144, 200);
+    fe_text_cut((const char *)g_config + at, 7, 0x144, 200);
     fmt_time(s, config_long(at + 0x1b));
     fe_text(s, 0x131, 0x144);
     fe_text(car_name(config_long(at + 0xf)), 0x1d6, 0x144);

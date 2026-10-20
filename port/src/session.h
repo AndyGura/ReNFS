@@ -30,6 +30,8 @@ typedef struct {
     unsigned char kept[0xac];  /* 0x15d010: CONFIG.DAT +9 .. +0xb4 as before the race,
                                   put back after it (+0x93 one segment on) */
     unsigned char kept_keys[26];       /* 0x15d0bc: +0x5f36, the keys */
+    short vegas;               /* 0x15d0d6: Lost Vegas offered (0xec460), as a game was
+                                  saved */
     short points[8];           /* 0x15d0d8: a tournament's points */
     short won[9], raced[9];    /* 0x15d0e8, 0x15d0fa: the tracks won in a tournament,
                                   and those raced */
@@ -51,6 +53,16 @@ typedef struct {
 } race_session;
 
 extern race_session g_session;
+/* 0x15d134: a game on: set when Control Central starts a race (0x45ab7) or a saved
+   tournament is loaded, cleared by a new session and "Quit tournament ?" */
+extern int g_game_on;
+
+/* a saved game (*.SAV, 0x3a1b0 / 0x3a0b4): the session 0x15cb68 .. 0x15d11e as the
+   original holds it, byte for byte: the racers (8 of 0x95), the settings kept, the keys,
+   Lost Vegas, the points, the tracks won and raced, the given-up flags, the race type */
+#define SESSION_FILE 0x5b6
+void session_to_bytes(unsigned char d[SESSION_FILE]);
+void session_from_bytes(const unsigned char d[SESSION_FILE]);
 
 /* fe_new_session 0x7469c: the keys kept, the results and points cleared (+0x93 the
    first segment), the names: the player's (CONFIG.DAT +0), then Drifter, Burnout ..

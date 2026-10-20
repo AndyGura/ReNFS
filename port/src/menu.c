@@ -256,6 +256,54 @@ void fe_message_box(const char *text)
     video_retrace();
 }
 
+void fe_box(int bx, int by, int w, int h)
+{
+    unsigned char remap[256];
+
+    darken_table(remap, video_palette8(), 0x9000);
+    for (int y = by; y < by + h && y < g_fb_h; y++)
+        for (int x = bx; x < bx + w && x < g_fb_w; x++)
+            g_fb[y * g_fb_w + x] = remap[g_fb[y * g_fb_w + x]];
+    frame(bx + 2, by + 2, bx + w - 3, by + h - 3, nearest_colour(0xff0000));
+    frame(bx + 3, by + 3, bx + w - 4, by + h - 4, nearest_colour(0xff0000));
+}
+
+void fe_timed_message(const char *text, unsigned ticks)
+{
+    enum { X = 100, Y = 210, W = 440, H = 60 };
+    static unsigned char saved[W * H];
+
+    for (int y = 0; y < H; y++)
+        memcpy(saved + y * W, g_fb + (Y + y) * g_fb_w + X, W);
+    fe_message_box(text);
+    settimeout(ticks);
+    g_mouse_buttons = 0;
+    while (!timedout() && !fe_read_keys() && !g_mouse_buttons && !g_quit) {
+        video_retrace();
+        if (g_mouse_active)
+            fe_mouse_read();
+    }
+    settimeout(10);
+    while (!timedout() && !g_quit)
+        video_retrace();
+    for (int y = 0; y < H; y++)
+        memcpy(g_fb + (Y + y) * g_fb_w + X, saved + y * W, W);
+}
+
+void fe_text_cut(const char *s, int x, int y, int w)
+{
+    char cut[50];
+    int n;
+
+    memset(cut, 0, sizeof cut);
+    for (n = 7; n < 50; n++) {
+        strncpy(cut, s, n);
+        if (text_width(&g_fe_font, cut) > w)
+            break;
+    }
+    fe_text(cut, x, y);
+}
+
 int fe_yes_no_dialog(const char *question)
 {
     enum { BX = 150, BY = 190, BW = 340, BH = 100 };

@@ -46,6 +46,13 @@ static void scan_put(int scan)
 
 /* the mouse, in the 640x480 picture's pixels, and its pointer drawn over the picture */
 static int g_mouse_x = 320, g_mouse_y = 240, g_mouse_buttons;
+static int g_lim_x0 = 0, g_lim_y0 = 0, g_lim_x1 = 639, g_lim_y1 = 479;
+
+static void mouse_clamp(void)
+{
+    g_mouse_x = g_mouse_x < g_lim_x0 ? g_lim_x0 : g_mouse_x > g_lim_x1 ? g_lim_x1 : g_mouse_x;
+    g_mouse_y = g_mouse_y < g_lim_y0 ? g_lim_y0 : g_mouse_y > g_lim_y1 ? g_lim_y1 : g_mouse_y;
+}
 static const unsigned char *g_cursor;
 static int g_cursor_w, g_cursor_h, g_cursor_on;
 
@@ -132,6 +139,7 @@ static void script_step(unsigned long retrace)
         if (e->x >= 0 && retrace == e->at) {
             g_mouse_x = e->x;
             g_mouse_y = e->y;
+            mouse_clamp();
         }
         if (retrace == e->at) {            /* a press, for the key queue too */
             scan_put(e->scan);
@@ -270,6 +278,7 @@ static void poll(void)
             /* the renderer's logical size: already the 640x480 picture's pixels */
             g_mouse_x = e.motion.x < 0 ? 0 : e.motion.x > 639 ? 639 : e.motion.x;
             g_mouse_y = e.motion.y < 0 ? 0 : e.motion.y > 479 ? 479 : e.motion.y;
+            mouse_clamp();
         } else if (e.type == SDL_MOUSEBUTTONDOWN || e.type == SDL_MOUSEBUTTONUP) {
             int bit = e.button.button == SDL_BUTTON_LEFT ? 1 : e.button.button == SDL_BUTTON_RIGHT ? 2 : 0;
             if (e.type == SDL_MOUSEBUTTONDOWN)
@@ -481,10 +490,22 @@ int mouse_read(int *x, int *y)
     return g_mouse_buttons | g_script_buttons;
 }
 
+void mouse_limits(int x0, int y0, int x1, int y1)
+{
+    g_lim_x0 = x0;
+    g_lim_y0 = y0;
+    g_lim_x1 = x1 < 639 ? x1 : 639;
+    g_lim_y1 = y1 < 479 ? y1 : 479;
+    mouse_clamp();
+}
+
 void mouse_place(int x, int y)
 {
     g_mouse_x = x;
     g_mouse_y = y;
+    mouse_clamp();
+    x = g_mouse_x;
+    y = g_mouse_y;
     if (!g_shot && (SDL_GetWindowFlags(g_win) & SDL_WINDOW_MOUSE_FOCUS)) {
         /* the window's pixels from the picture's (the renderer keeps it 4:3, centred) */
         int ww, wh;
