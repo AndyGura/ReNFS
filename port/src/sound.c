@@ -150,8 +150,6 @@ void music_level_from(int at)
     g_music_level = at;
 }
 
-static unsigned long g_music_counter;  /* 0xed0fc */
-
 static void music_stop(void)
 {
     audio_stream_close(g_music.stream);
@@ -246,7 +244,7 @@ void music_choose(void)
         "TECHNO1.AS4", "TECHNO2.AS4", "TECHNO3.AS4", "TECHNO4.AS4", "TECHNO5.AS4", "TECHNO6.AS4",
     };
     int mode = config_word(CFG_MENU_MUSIC), pick;
-    unsigned long c = g_music_counter;
+    unsigned long c = timer_counter();   /* 0xed0fc */
     if (mode < 0 || mode > 15)
         return;
     if (mode == 0)

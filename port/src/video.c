@@ -391,6 +391,20 @@ unsigned clock_ticks(void)
     return (SDL_GetTicks() - g_start_ms) / 10;
 }
 
+/* 0xed0fc: one more at every tick of the 100 Hz timer (race_timer_tick 0x4c454), set to 0
+   by the screens that time something with it; the menus' music is chosen by it */
+static unsigned g_counter_from;
+
+unsigned long timer_counter(void)
+{
+    return clock_ticks() - g_counter_from;
+}
+
+void timer_counter_set(unsigned long v)
+{
+    g_counter_from = clock_ticks() - (unsigned)v;
+}
+
 static unsigned g_timeout_at;
 
 void settimeout(unsigned n)

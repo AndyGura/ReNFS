@@ -8,6 +8,7 @@
 #include "ctrlopt.h"
 #include "loadsave.h"
 #include "config.h"
+#include "credits.h"
 #include "fe.h"
 #include "files.h"
 #include "fsh.h"
@@ -224,8 +225,17 @@ int fe_options_screen(void)
                     place(sel);
                     first = redraw = 1;
                     break;
-                case CREDITS:              /* fe_credits 0x25600, with credits.asf */
-                    fprintf(stderr, "renfs: that options screen is not written yet\n");
+                case CREDITS:              /* fe_credits 0x25600, with its own music */
+                    pal_fade_down(0, 256);
+                    music_fade_out();
+                    music_wait_end();
+                    music_start("CREDITS.ASF");
+                    fe_credits();
+                    music_fade_out();
+                    music_wait_end();
+                    music_random();        /* 0x63e2c */
+                    place(sel);
+                    first = redraw = 1;
                     break;
                 case DONE:
                     if (loaded)
