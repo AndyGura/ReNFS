@@ -439,8 +439,18 @@ races 320x200 / 320x240; commit locally as the work goes.
    at 320x200 (Danik's MiSTer choice; 640x480 races are a step of their own: ask him).
    The camera check had stopped building since the replay (fixed: `tools/replay_stub.c`,
    the check's copy of the car record brought up to date) and is equal on all 11
-   snapshots again. Next: the controls screen (`0x22bd0`, `0x4c6b0` the joystick), load / save (`0x3c0c8`,
-   `0x3d4c4`, `0x3aacc`), the credits (`0x25600`). The dashboard's keys F7 / F8 / M / F9 and Rusty Springs' measurements on the
+   snapshots again. **The controls screen (`0x22bd0`, from the options screen and the race
+   menus): done**, equal by palette entry on 25 pictures (the prompts and "Control
+   conflict" too); the race now drives with the keys chosen there (`0x36a0c`: every
+   driving key, the camera's and the map's; the German game's camera key is K). Keys are
+   read by their place on the keyboard (`scan_get`), whatever the computer's layout. A
+   joystick or the mouse to drive with: not yet (the screen offers only the keyboard, as
+   the original on a PC without them; `fe_joystick_calibrate` `0x4c6b0` waits for the
+   joystick). Drive, timing, opponent and collide checks had stopped building since the
+   replay (`g_replay`): `tools/replay_stub.c` added to them too. `tools/fecompare.py`
+   compares a menu picture with DOSBox's by palette entry. Next: load / save (`0x3c0c8`,
+   `0x3d4c4`, `0x3aacc`), the credits (`0x25600`), then a joystick for driving (the MiSTer
+   needs one). The dashboard's keys F7 / F8 / M / F9 and Rusty Springs' measurements on the
    status bar: done (NOTES §4.11). Not yet: races at 640x480 (settings +0x7f = 0).
    (`0x136618`, the sections drawn: the settings' +0x85 and F3, NOTES §4.19.)
    Open: the race's sound reaches full scale at the hits and the horn (0.2 to 0.7 % of

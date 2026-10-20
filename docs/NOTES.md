@@ -865,6 +865,68 @@ libraries `0x80000`..`0x94000` and `0x95000`..`0xb0000`, Watcom's runtime `0x940
   them. The end: `0x12bd3c` = 0, faded down, the art freed. After it the options screen
   puts the mouse on its row (`0x5458d`), the race menus only when the mouse is not in use
   (`0x12e1e`).
+- **`fe_controls_setup` `0x22bd0(race_menu)`** (2026-10-20; `port/src/ctrlopt.c`, equal to
+  the original by palette entry on 25 pictures from the options screen and the checkpoint
+  menu's options, prompts and the conflict included: 15 pixels of DOSBox's scaling inside
+  bgnd's labels, 29-30 when a pointer's line adds some). `OPTION/CNTRLSET.QFS`, from the
+  race menus (`0x12e88`, 1) `CHECK/CHCONSET.QFS`. **The controls** (`0x15cb4a` = CONFIG.DAT
+  +0x5f36, 26 bytes, a copy kept for Cancel and Esc): +0x5f36 the steering's kind (0 the
+  keys, 1 the joystick across, 4 the mouse), +0x5f38 the pedals' (0, 2 the joystick up and
+  down, 3 its buttons, 5 the mouse's buttons), +0x5f3a the gears' (0, 3, 5; the pedals and
+  the gears never both on buttons of one device), then the keys as `fe_read_keys`'s codes
+  (a character, an extended key's scan << 8): +0x5f3c left, +0x5f3e right, +0x5f40 faster,
+  +0x5f42 brake, +0x5f44 up, +0x5f46 down, +0x5f48 handbrake, +0x5f4a camera, +0x5f4c horn,
+  +0x5f4e the map (not on this screen). Rows: 0 Steering, 1 Accelerate/brake, 2 Shift
+  up/down, 3 Camera, 4 Handbrake, 5 Horn, 6 Calibrate joystick (only with one, `0x12f1c0`;
+  `fe_joystick_calibrate` `0x4c6b0(1)`), 7 Done, 8 Cancel; lit labels `strl accl shfl caml
+  hndl hrnl call donl canl`; the kinds' pictures dark/lit by kind (0 k, 1-3 j, 4-5 m):
+  `stkd stjd stmd`/`stkl ..`, `ackd ..`, `shkd ..`; rows 3-5 lit `cakl hbkl hnkl`. The
+  values are **text** (`fe_text` at 400, y 0x68 0x90 0xb8 0xe0 0x108 0x130): keys "%s/%s"
+  of their names (`0x73068`: Space Enter Insert Delete Home End Pgup Pgdown Up Down Left
+  Right Backspace Tab Center, else the character in capitals; German Leertaste .. Pos 1
+  Ende Nachste Vorherige Hoch Runter Links Rechts, the character as it is, umlauts too, none
+  upper-cased), else the kind's ("Keyboard" "Left/Right" "Up/Down" "Button1/Button2"
+  ..; German "Links/Rechts" "Hoch/Runter" "Taste1/Taste2"). The whole screen: style 0, bgnd,
+  the three kinds dark, the six texts, then style 1 the row chosen's label, kind lit and
+  its text again over the first. **On the first draw the palette is set black after the
+  drawing** (`0x23767`), before the fade up (set before, the letters' blending would mix
+  with black: 1,380 pixels off); before the loop the cleared screen (`0x72600`) has
+  already been faded up once. A change draws the two rows (0x47; never seen: the whole
+  screen follows at the next pass). The mouse by height: 0..0x86, 0x8a..0xae, 0xb2..0xd6,
+  0xda..0xfe, 0x102..0x127, 300..0x14e, (joystick) 0x152..0x18b, then x ≤ 0x140 Done (y
+  0x195..0x1e0), ≥ 0x145 Cancel (..0x1df); over x 0x186.., y 100..0x14a it is on the keys.
+  Keys put it at x 200 (Done 50, Cancel 565), y 118 157 196 237 277 317 356 450 450
+  (`0x229c0`, `0x229d2`). Up: Cancel as Done, one less, past row 6 without a joystick,
+  round to Done; Down: (+1) mod 8, Cancel → 0, past 6; Left/Right swap Done and Cancel.
+  **Enter, Space or a click** (0x48): rows 0-2, Space or a click on the name: the next kind
+  the machine has (`0x240c1`, `0x2440d`, `0x247f2`; a joystick `0x12f1d8`, the mouse
+  `0xec408`; DOSBox gives Keyboard ↔ Mouse for the steering); back to the keys a conflict
+  asks for keys at once; Enter or a click on the keys with the keys chosen: **the two
+  keys asked for**: the keyboard's picture lit, the row's text cleared (the window of 240
+  by 40 kept from bgnd), the prompt (`ensl`/`ensr`, `enac`/`enbr`, `enup`/`endn`: "Enter
+  key for left..") and `fe_button_text("_")`, the key, "%s/_" over it, the second key,
+  "%s/%s"; rows 3-5 one key (`enhb` "Enter key...", single name). Then **`0x7390c`**: two
+  controls of one kind, or two of nine keys equal (the kinds' places count as 0..5) →
+  `conf` ("Control conflict / Please re-enter") two seconds (`settimeout(200)`), `conb`,
+  asked again. The pointer is not seen meanwhile. **The key** (`0x733a0`): once every
+  key is up and the queue emptied (`0x84358`; the German game takes the BIOS's keyboard
+  meanwhile, `0x8447c` .. `0x843bc`, so the DOS driver's German layout), nothing while a
+  Shift is held; refused: `> ? @ ^ _ p { | } ~ m M P ( ) * + : < - Tab ! " # $ % &` and
+  anything without a name (German also `< > ^ \``); Esc or the right button keep the old
+  key; letters (and umlauts) come in capitals. After each press: 2 minutes again, wait for
+  the keys up, the mouse back on its row unless in use. Esc and Cancel put the 26 bytes
+  back; Done, 2 minutes or the right button keep them. The end: faded down, freed.
+  **In a race** (`race_run` → **`0x36a0c`**): the kinds to the player's entry
+  (`0x12d974`..: 0 keys, < 4 → 1, else 2; the pedals and gears 3 for buttons), each key
+  through **`0x36758`** (German only: the German layout's character to the US one of the
+  same key, Y and Z swapped, a table built in code) and **`key_scancode` `0x91d60`** (its
+  first place in EA's 5 × 0x5b character table `0xf7b74`, an extended key as scan | 0x80)
+  into `0x12d92c` left, `0x930` right, `0x934` faster, `0x938` brake, `0x93c` up, `0x940`
+  down, `0x944` handbrake, `0x948` horn, `0x94c` the camera, `0x950` the map. So the German
+  game's default camera key is K (+0x5f4a 'K'). The port reads a key by its physical place
+  (`scan_get`) and makes the code the BIOS would give with a US keyboard (EA's table without
+  Shift), or the German one in the German game; a joystick or the mouse to drive with:
+  not yet (the kinds stay the keys).
 - **The pause menu and the detail**: as it opens CONFIG.DAT +9..+0xb4 is put back from
   the copy kept for the race (`0x565c1`), then the race's detail written in (`0x56b48`:
   `0x12d9d9` at most 1 at 320x200 (`0x12c308` = 0), +0x83 = `0x12d9d9`, +0x85 =
