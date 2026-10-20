@@ -10,8 +10,9 @@ typedef struct {
     int x, y, w, h;
 } road_window;
 
-/* what the road hands its pieces to. quad, whole and picture are the painters (0x35348,
-   0x350d4, 0x35090) and are set to them; the others are left 0 until they are ported:
+/* what the road hands its pieces to. quad, whole, picture, roadside and model are the
+   painters (0x35348, 0x350d4, 0x35090, 0x59294, 0x66738) and are set to them; the others
+   are left 0 until they are ported:
    roadside 0x59294 (a row's pair of points and the strip's tile), model 0x66738 (a 3D
    object at pos, turned by angle), car_row 0x679ec and cars 0x6837c (the cars on a row) */
 typedef struct {
@@ -37,6 +38,20 @@ extern int g_road_mirror;
 
 /* a family shape as a picture to paint with */
 void shape_tex(const unsigned char *shape, raster_tex *t);
+
+/* road_wall 0x59294: a row's wall between the pair of its points (`pair`, from `first`),
+   2 m high or 0.9 m (flag 0), the texture of row `side` (the section's flags & 0x1f + 0x20)
+   at the tile's size and `variant`; a picture on its quad when the tile's size is not 0,
+   else cut as the road's near quads */
+void road_wall(const unsigned char *pair, int node, int first, const unsigned char *tile,
+               int variant, int side, int flag);
+
+/* draw_model 0x66738: the track's 3D object k (0x146f14 + 0x138 k) standing at pos (the
+   world, 16.16) turned by angle (2^24 a turn) about the upright, unless behind, beyond
+   0x1f40 or off to the side */
+void road_model(int k, const vec3 *pos, int angle);
+/* City 3 (0x12da12 = 0, 0x12da0e = 2): its objects kept twice as far out to the side */
+extern int g_model_wide;
 
 /* the painters: the whole picture less its border on a quad as two triangles (0x350d4),
    and the whole picture on a quad (0x35090); nothing for no shape */

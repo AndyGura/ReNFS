@@ -195,6 +195,7 @@ int race_test(const char *name)
         g_drive.kind = i < 0 ? 0 : i;
         g_drive.segment = i >= 0 && i < 3 && name[2] >= '1' && name[2] <= '3' ? name[2] - '1' : 0;
     }
+    g_model_wide = g_drive.kind == 0 && g_drive.segment == 2;
     g_drive.catch_up = 1;      /* (0x12dd10, race_setup_record) */
     /* the laps: an open road's one; a circuit's by the race length (+0xb3) as Control
        Central sets them (0x437fc): 4, 8 or 16, or 2, 6 or 12 on tracks 4..7 (or
@@ -297,7 +298,7 @@ int race_test(const char *name)
     /* (the opponent keeps the grid's node until its first step: the road's axes it
        drives by are worked out as that step moves it to the nearest, drive_opponent) */
     for (i = 0; i < RACERS; i++)
-        car_grid_place(&cars[i], 7 - i, RACERS, 0);
+        car_grid_place(&cars[i], 7 - i, RACERS, g_drive.kind);
     track_follow(&cars[0].pos, &cars[0].node);
     memset(&cam, 0, sizeof cam);
     camera_set_car(&cam, &cars[0], 0);

@@ -11,8 +11,8 @@ import ctypes, os, struct, subprocess, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from snap_emu import Snap
 
-SOURCES = ["trackinfo.c", "racepal.c", "exe.c", "files.c", "trackfam.c", "track.c", "font.c",
-           "video.c", "fsh.c", "unpack.c"]
+SOURCES = ["trackinfo.c", "racepal.c", "exe.c", "files.c", "trackfam.c", "model.c", "roaddraw.c", "road.c", "poly.c", "raster.c", "view.c", "sky.c", "polyfill.c", "track.c", "font.c",
+           "video.c", "fsh.c", "unpack.c", "config.c"]
 
 
 class Info(ctypes.Structure):
@@ -55,11 +55,21 @@ def check(path, name, L):
     check_textures(s, name, family, L)
 
 
+class Model(ctypes.Structure):
+    """port/src/model.h's model"""
+    _fields_ = [("orip", ctypes.c_void_p), ("lo", ctypes.c_void_p), ("hi", ctypes.c_void_p),
+                ("npoints", ctypes.c_int), ("flags", ctypes.c_uint), ("m", ctypes.c_int * 9),
+                ("pos", ctypes.c_int * 3), ("view", ctypes.c_void_p), ("screen", ctypes.c_void_p),
+                ("count", ctypes.c_int), ("list", ctypes.POINTER(ctypes.c_uint)), ("tex", ctypes.c_void_p),
+                ("ntex", ctypes.c_int)]
+
+
 class Fam(ctypes.Structure):
     _fields_ = [("file", ctypes.c_void_p), ("len", ctypes.c_long), ("banks", ctypes.c_void_p),
                 ("pictures", ctypes.c_void_p), ("horizon", ctypes.c_void_p),
                 ("texture", (ctypes.c_void_p * 8) * 144), ("picture", (ctypes.c_void_p * 4) * 64),
-                ("road_pal", ctypes.c_void_p), ("horizon_pal", ctypes.c_void_p)]
+                ("road_pal", ctypes.c_void_p), ("horizon_pal", ctypes.c_void_p),
+                ("nmodels", ctypes.c_int), ("models", Model * 16)]
 
 
 def check_textures(s, name, family, L):

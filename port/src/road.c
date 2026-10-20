@@ -36,6 +36,9 @@ int road_transform(const vec3 *pos, const int m[9], int node)
     int shift = g_view.far_shift, near = NEAR_PLANE >> shift, n = r->count, i, first;
     vec3 t;
 
+    r->cam = *pos;
+    for (i = 0; i < 9; i++)
+        r->cam_m[i] = m[i];
     t.x = (int)-(unsigned)pos->x >> shift;
     t.y = (int)-(unsigned)pos->y >> shift;
     t.z = (int)-(unsigned)pos->z >> shift;

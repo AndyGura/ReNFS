@@ -228,7 +228,7 @@ music, the race's music `0x63d88` and speech `0x722b4`), `config.c` (CONFIG.DAT;
 `tools/config_emu.py`), `main.c`.
 The race so far: `raster.c` (the quad and triangle painters), `poly.c` (projection, quad cutting),
 `road.c` (the frame's points, into the view; the mirror's five sections behind), `roaddraw.c` (the road painted far to near,
-the roadside objects, the mirror's road behind (`tools/mirror_emu.py`, NOTES §4.7); pixel-exact on the snapshots, `tools/roadpic_emu.py`), `model.c`
+the roadside objects, the walls `0x59294`, the 3D objects `0x66738`, the mirror's road behind (`tools/mirror_emu.py`, NOTES §4.7); pixel-exact on the snapshots, `tools/roadpic_emu.py`), `model.c`
 (EA's 3D library: ORIP models placed, sorted, painted), `cardraw.c` (the cars as the road
 reaches their rows, their shadows, the racers' markers; pixel-exact, `tools/cars_emu.py`;
 NOTES §4.10), `smoke.c` (the crash's smoke: SMOKE.QFS, the add-table `0x64488`, the

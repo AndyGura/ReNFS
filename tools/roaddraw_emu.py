@@ -18,7 +18,7 @@ from road_emu import Road, ROAD_SECTIONS
 from poly_emu import Vec3
 
 SOURCES = ["roaddraw.c", "sky.c", "trackinfo.c", "road.c", "poly.c", "raster.c", "track.c", "files.c", "exe.c",
-           "trackfam.c", "racepal.c", "font.c", "video.c", "fsh.c", "unpack.c", "view.c", "config.c", "polyfill.c"]
+           "trackfam.c", "model.c", "racepal.c", "font.c", "video.c", "fsh.c", "unpack.c", "view.c", "config.c", "polyfill.c"]
 
 
 def lib():
@@ -83,7 +83,7 @@ def original(s, n, node):
     def wall():
         a, d, b, c = regs()
         v, side, flag = stack(3)
-        return 3, ("roadside", a - game(0xf61bc), sign(d), sign(b), c - game(0x10000) + 0x10000,
+        return 3, ("roadside", a - game(0xf61bc), sign(d), sign(b), c - game(0xe0000) + 0xe0000,
                    sign(v), sign(side), sign(flag))
 
     def model():
@@ -138,7 +138,10 @@ def setup(s, name, L, n, node):
         road.sec[i].kind, road.sec[i].behind, road.sec[i].a, road.sec[i].points = k, b, a, p
     count, xcount = s.i32(0x13bb78), s.i32(0x1365c0)
     road.sec_mask, road.drawn, road.count = s.u32(0x13bb90), n, count
+    ctypes.memmove(road.world, s.read(0x137434, 12 * count), 12 * count)
     ctypes.memmove(road.view, s.read(0x138c58, 12 * count), 12 * count)
+    ctypes.memmove(ctypes.byref(road.cam), s.raw(s.u32(0x143df4) + 0x10, 12), 12)
+    ctypes.memmove(road.cam_m, s.raw(s.u32(0x143df8), 36), 36)
     ctypes.memmove(road.screen, s.read(0x13a47c, 8 * count), 8 * count)
     road.xsets, road.xcount, road.xfirst = s.i32(0x1365d8), xcount, s.i32(0x1365cc)
     ctypes.memmove(road.xworld, s.read(0x12f540, 12 * xcount), 12 * xcount)

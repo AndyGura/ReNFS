@@ -1538,8 +1538,41 @@ the window and the horizon **`road_draw` `0x5a4f0(N = 0x136618, S = the camera's
   (220..373 calls). `tools/roadpic_emu.py` lets both paint (cars, walls and models left
   out) into a 320 × 200 screen with the 3D view's window (0, 0, 320, 127): **equal pixel
   for pixel on all 6** (r1a after putting back the see-through mark of the picture it was
-  paused painting). The walls `0x59294` and the 3D models `0x66738` are not ported yet
-  and no CY1 frame reaches them.
+  paused painting). No CY1 frame reaches the walls or the 3D models.
+- **The walls `road_wall` `0x59294`** (2026-10-20; ported, `roaddraw.c`): (pair, node,
+  first point, tile; stack: variant, side, flag; `ret 0xc`). a, b = first + the pair's two
+  bytes; nothing if view[b].z < the view's near plane ([0x143dfc] +4, 30). Height 0x20000
+  with the flag (section flags & 0x20 clear), else 0xe666; the tops are the road's world
+  points `0x137434` + (0, height, 0) taken into the view by **`0x591a4`**: (point −
+  camera +0x10) >> `0xf6aa4` each (the difference shifted, not each shifted), turned by
+  [0x143df8], and onto the screen (shift 16) from a copy moved onto the near plane when
+  nearer (`move_to_near`'s EA division and rounded products); the quad's corners: top b,
+  top a, a, b (screen `0x13a47c`, view `0x138c58` for the bottoms). Left out when the four
+  corners' outcode (`0x91cee`) is not 0. Texture `0x140cd8`[side][tile +8 + variant] (0:
+  nothing); tile +8 ≠ 0 → `paint_picture` `[0x12c0d8]`, else the quad cutter `0x35348`
+  (tile +0, 0, tile +4, 0, the four view points, the screen corners, near).
+- **The 3D objects `draw_model` `0x66738`** (2026-10-20; ported, `roaddraw.c` `road_model`,
+  the models in `trackfam.c`): `load_track_models` `0x66118`, first thing in
+  `load_track_textures` (`0x6018c(1, 0)`): the family's entry 3 is a `wwww` of objects,
+  each a `wwww` of an ORIP (`orip_fix` `0x978a8`) and its SHPI; `0x65224` keeps them at
+  `0x146f14 + 0x138·i` (+0 the SHPI, +4 its "!PAL" (8 bits as shape type 0x24: >> 2),
+  +0xc the ORIP, +0x10 the instance `0x95522` with its pictures `0x9759a`), the palette
+  tinted (`0x560ec(0, 0x100)`) and its pictures queued for re-colouring (`0x55e68`); on a
+  mirrored track every polygon's 0x200 turned over. At most 8 (TR1, TR5). The drawing:
+  turn = the library's y turn (`0x988c8`, angle >> 14); v = ((place − camera) >> 12,
+  each) turned by [0x143df8]; nothing when v.z < −0x40 or > 0x1f40, or when |v.x| > v.z
+  and |v.x| > 0x500 (on City 3, `0x12da12` = 0 and `0x12da0e` = 2, |v.x / 2| > v.z);
+  instance flag 2 when v.z < 0x219; the turn times the view's (`0x839f8`) into `0x14e598`;
+  `0x666b0`: the origin at v (`0x9803e` of −v), placed (`0x957ec`), transformed
+  (`0x98137`), projected (`0x98090`), the whole list sorted (`0x983b4` → `0x982e1`) and
+  drawn (`0x98735`): a car's far model's path.
+- **Checked** (`tools/roadpic_emu.py --walls --models`, the sort orders taken from the
+  snapshot): **the road with its walls and objects equal pixel for pixel on TR1's t1..t6
+  and CY1's d2..d4, e1, e3, e5**; `roaddraw_emu.py` equal call for call on t1..t6 (its
+  wall's tile pointer compared by the data object's place: it was taken by the code's).
+- The grid on a circuit: `car_grid_place` `0x7c938`'s kind is the track (`0x12da12`):
+  `--race` gave City's 0 on every track until 2026-10-20; now TR1's player stands at 4.5 m
+  across, 121.6 m along, node 19, as in the original's t1.
 - **The mirror's view (2026-10-19; ported: `road_gather_behind` / `road_transform_behind`
   in `road.c`, `road_draw_behind` in `roaddraw.c`, `sky_behind` in `sky.c`,
   `cars_behind_at` in `cardraw.c`).** `race_draw_frame` `0x5be17`: the camera's `+0x68`

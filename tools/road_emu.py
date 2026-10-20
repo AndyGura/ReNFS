@@ -33,7 +33,8 @@ class Road(ctypes.Structure):
                 ("xmoved", Vec3 * EXTRA_POINTS), ("xview", Vec3 * EXTRA_POINTS),
                 ("xscreen", Scr2 * EXTRA_POINTS), ("fill", ctypes.c_int), ("xfill", ctypes.c_int),
                 ("base", ctypes.c_int), ("xfirst", ctypes.c_int), ("xnext", ctypes.c_int),
-                ("xnode", ctypes.c_int), ("xcursor", ctypes.c_int), ("bcount", ctypes.c_int),
+                ("xnode", ctypes.c_int), ("xcursor", ctypes.c_int), ("cam", Vec3),
+                ("cam_m", ctypes.c_int * 9), ("bcount", ctypes.c_int),
                 ("bworld", Vec3 * BEHIND_POINTS), ("bview", Vec3 * BEHIND_POINTS),
                 ("bscreen", Scr2 * BEHIND_POINTS)]
 

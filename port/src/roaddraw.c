@@ -7,9 +7,13 @@
 #include "exe.h"
 #include "track.h"
 #include "trackfam.h"
+#include "model.h"
+#include "view.h"
 #include <stddef.h>
+#include <stdlib.h>
 
-road_painters g_road_paint = { quad_view, paint_whole, paint_picture, 0, 0, 0, 0, 0 };
+road_painters g_road_paint = { quad_view, paint_whole, paint_picture, road_wall, road_model, 0, 0, 0 };
+int g_model_wide;
 int g_road_steps;
 
 #define RECORDS 0xf61bc        /* the section kinds: +0 points (far), +4 quads, +8 and +0x10
@@ -238,6 +242,104 @@ static int far_visible(const scr2 *s, int strip)
     return !raster_outcode(4, (const int *)s) && facing(s, strip, FAR_TRIPLES, 2);
 }
 
+/* --- the walls --- */
+
+static int g_near;             /* the view's near plane ([0x143dfc] +4) while painting */
+
+/* 0x591a4: a point of the world into the view (its offset from the camera >> the shift,
+   turned) and onto the screen, moved onto the near plane first when nearer (for its
+   projection only) */
+static void wall_point(const vec3 *w, vec3 *view, scr2 *s)
+{
+    int shift = g_view.far_shift;
+    vec3 d;
+
+    d.x = (int)((unsigned)w->x - (unsigned)g_road.cam.x) >> shift;
+    d.y = (int)((unsigned)w->y - (unsigned)g_road.cam.y) >> shift;
+    d.z = (int)((unsigned)w->z - (unsigned)g_road.cam.z) >> shift;
+    rotate(&d, g_road.cam_m, view);
+    if (view->z < g_near) {
+        vec3 c = *view;
+        move_to_near(&c, g_near);
+        project_points(1, &c, s, 16);
+    } else
+        project_points(1, view, s, 16);
+}
+
+void road_wall(const unsigned char *pair, int node, int first, const unsigned char *tile,
+               int variant, int side, int flag)
+{
+    road_state *r = &g_road;
+    int a = first + pair[0], b = first + pair[1], high = flag ? 0x20000 : 0xe666, size;
+    vec3 top_a, top_b, view_a, view_b;
+    const vec3 *p[4];
+    scr2 s[4];
+    unsigned char *shape;
+
+    (void)node;
+    if (r->view[b].z < g_near)
+        return;
+    /* its corners: the two tops, then the road's points under them */
+    top_b = r->world[b];
+    top_b.y += high;
+    top_a = r->world[a];
+    top_a.y += high;
+    wall_point(&top_b, &view_b, &s[0]);
+    wall_point(&top_a, &view_a, &s[1]);
+    s[2] = r->screen[a];
+    s[3] = r->screen[b];
+    p[0] = &view_b;
+    p[1] = &view_a;
+    p[2] = &r->view[a];
+    p[3] = &r->view[b];
+    if (raster_outcode(4, (const int *)s))
+        return;
+    size = rd32(tile + 8) + variant;
+    shape = side >= 0 && side < ROAD_TEXTURES && size >= 0 && size < 8 ? g_fam.texture[side][size] : 0;
+    if (!shape)
+        return;
+    if (rd32(tile + 8))
+        g_road_paint.picture(shape, s);
+    else {
+        raster_tex t;
+        shape_tex(shape, &t);
+        g_road_paint.quad(&t, rd32(tile), 0, rd32(tile + 4), 0, p, s, g_near);
+    }
+}
+
+/* --- the 3D objects --- */
+
+void road_model(int k, const vec3 *pos, int angle)
+{
+    model *md;
+    int turn[9], m[9], side;
+    vec3 d, v;
+
+    if (k < 0 || k >= g_fam.nmodels)
+        return;
+    md = &g_fam.models[k];
+    model_turn(1, angle >> 14, turn);
+    d.x = (int)((unsigned)pos->x - (unsigned)g_road.cam.x) >> 12;
+    d.y = (int)((unsigned)pos->y - (unsigned)g_road.cam.y) >> 12;
+    d.z = (int)((unsigned)pos->z - (unsigned)g_road.cam.z) >> 12;
+    rotate(&d, g_road.cam_m, &v);
+    /* behind, too far, or off to the side (twice as far out in City 3) */
+    if (v.z < -0x40 || v.z > 0x1f40)
+        return;
+    side = abs(g_model_wide ? v.x / 2 : v.x);
+    if (side > v.z && abs(v.x) > 0x500)
+        return;
+    if (v.z < 0x219)
+        md->flags |= 2;
+    else
+        md->flags &= ~2u;
+    mat_mul(turn, g_road.cam_m, m);   /* (0x839f8) */
+    /* draw_model 0x666b0: placed, turned, onto the screen, sorted and painted whole */
+    model_place(md, m, &v);
+    model_sort(md, md->count, md->list);
+    model_draw(md, md->count, md->list);
+}
+
 /* where the walls and the objects and cars of a quad's rows go: rows closes, the row's
    node going back one each */
 typedef struct {
@@ -342,6 +444,7 @@ void road_draw(int drawn, int node, int near_z, const road_window *win)
     int nearer = drawn > 4 ? 4 : drawn, first, sec, k, i, n;
     rows_state st;
 
+    g_near = near_z;
     g_left = win->x;
     g_top = win->y;
     g_right = win->x + win->w;

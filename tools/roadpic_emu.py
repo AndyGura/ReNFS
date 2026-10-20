@@ -5,7 +5,11 @@ out on both sides), against the port's sky_draw and road_draw with its own
 (port/src/sky.c, roaddraw.c, poly.c, raster.c) given the same road points and view. Writes both pictures, and one of
 the pixels that differ, to build/shots/road_<snapshot>_{orig,port,diff}.png.
 
-    build/venv/bin/python tools/roadpic_emu.py cy1 build/snap/d2.bin [...]
+    build/venv/bin/python tools/roadpic_emu.py [--walls] cy1 build/snap/d2.bin [...]
+
+--walls: the roadside walls (0x59294, the port's road_wall) painted on both sides.
+--models: the 3D objects too (0x66738, road_model), each model's order of polygons taken
+from the snapshot (the original sorts it in place, frame after frame).
 """
 import ctypes, os, struct, sys, zlib
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -18,6 +22,14 @@ from setup_check import Fam
 
 W, H = 320, 200
 LEFT_OUT = {0x679ec: 2, 0x6837c: 0, 0x59294: 3, 0x66738: 0}
+WALLS = "--walls" in sys.argv
+if WALLS:
+    sys.argv.remove("--walls")
+    del LEFT_OUT[0x59294]
+MODELS = "--models" in sys.argv
+if MODELS:
+    sys.argv.remove("--models")
+    del LEFT_OUT[0x66738]
 
 
 def png(path, pix, pal, W=W, H=H):
@@ -83,9 +95,26 @@ def port(s, name, L, n, node):
     v.far_shift, v.max_level = s.read(0xf6aa4, 1)[0], s.i32(0xeaad8)
     v.clip_x, v.clip_y, v.clip_z = s.i32(0x143e54), s.i32(0x143e58), s.i32(0x143e5c)
     paint = Painters.in_dll(L, "g_road_paint")
-    paint.roadside = paint.roadside.__class__()
-    for f in ("model", "car_row", "cars"):
+    if not WALLS:
+        paint.roadside = paint.roadside.__class__()
+    else:
+        ctypes.memmove(ctypes.addressof(paint) + Painters.roadside.offset,
+                       ctypes.byref(ctypes.c_void_p(ctypes.cast(L.road_wall, ctypes.c_void_p).value)), 8)
+    for f in ("car_row", "cars") if MODELS else ("model", "car_row", "cars"):
         setattr(paint, f, getattr(paint, f).__class__())
+    if MODELS:
+        ctypes.memmove(ctypes.addressof(paint) + Painters.model.offset,
+                       ctypes.byref(ctypes.c_void_p(ctypes.cast(L.road_model, ctypes.c_void_p).value)), 8)
+        ctypes.c_int.in_dll(L, "g_model_wide").value = int(s.i32(0x12da12) == 0 and s.i32(0x12da0e) == 2)
+        f = Fam.in_dll(L, "g_fam")
+        for k in range(f.nmodels):
+            inst = s.u32(0x146f24 + 0x138 * k)
+            polys, at = struct.unpack("<iI", s.raw(inst + 8, 4) + s.raw(inst + 0x84, 4))
+            if polys != f.models[k].count:
+                print("model %d: %d polygons, the port %d" % (k, polys, f.models[k].count))
+            order = struct.unpack("<%dI" % polys, s.raw(at, 4 * polys))
+            for i in range(min(polys, f.models[k].count)):
+                f.models[k].list[i] = order[i]
     for f, sym in (("quad", "quad_view"), ("whole", "paint_whole"), ("picture", "paint_picture")):
         ctypes.memmove(ctypes.addressof(paint) + getattr(Painters, f).offset,
                        ctypes.byref(ctypes.c_void_p(ctypes.cast(getattr(L, sym), ctypes.c_void_p).value)), 8)

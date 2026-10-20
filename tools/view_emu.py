@@ -12,7 +12,7 @@ from snap_emu import Snap, game
 from poly_emu import Vec3
 
 SOURCES = ["view.c", "sky.c", "roaddraw.c", "trackinfo.c", "road.c", "poly.c", "raster.c", "track.c",
-           "files.c", "exe.c", "trackfam.c", "racepal.c", "font.c", "video.c", "fsh.c", "unpack.c"]
+           "files.c", "exe.c", "trackfam.c", "model.c", "racepal.c", "font.c", "video.c", "fsh.c", "unpack.c", "config.c", "polyfill.c"]
 
 
 def lib():
@@ -36,9 +36,9 @@ class Rec(ctypes.Structure):
 
 class Camera(ctypes.Structure):
     """race_camera (view.h); the car pointer left out of the test"""
-    _fields_ = [("mode", I), ("pos", Vec3), ("off", Vec3), ("node", I), ("flags", I),
-                ("pitch", I), ("yaw", I), ("roll", I), ("tilt", I * 3), ("eye", Vec3),
-                ("mirror_on", I), ("yaw_follow", I), ("ahead", ctypes.POINTER(Rec)),
+    _fields_ = [("mode", I), ("wanted", I), ("frames", I), ("pos", Vec3), ("off", Vec3), ("node", I),
+                ("flags", I), ("pitch", I), ("yaw", I), ("roll", I), ("tilt", I * 3), ("eye", Vec3),
+                ("mirror_on", I), ("yaw_follow", I), ("step", Vec3), ("ahead", ctypes.POINTER(Rec)),
                 ("mirror", ctypes.POINTER(Rec)), ("car", ctypes.c_void_p), ("m", I * 9), ("mm", I * 9)]
 
 

@@ -42,6 +42,10 @@ typedef struct {
     int xnode;                         /* 0x1365d4: its node (-1: none left) */
     int xcursor;                       /* 0x1365c8: the objects' points not yet painted */
 
+    vec3 cam;                          /* the camera's place and turn the points were */
+    int cam_m[9];                      /* taken into the view with ([0x143df4] +0x10,
+                                          [0x143df8]): the walls' tops by them */
+
     /* the road behind, for the mirror */
     int bcount;                        /* 0x13bb7c */
     vec3 bworld[BEHIND_POINTS];        /* 0x13b494 */

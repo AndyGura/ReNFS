@@ -3,6 +3,7 @@
 #include "trackfam.h"
 #include "files.h"
 #include "racepal.h"
+#include "roaddraw.h"
 #include "track.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -101,6 +102,10 @@ static void to_6_bits(unsigned char *bank, unsigned char *pal)
 
 void trackfam_free(void)
 {
+    int i;
+
+    for (i = 0; i < g_fam.nmodels; i++)
+        model_free(&g_fam.models[i]);
     free(g_fam.file);
     memset(&g_fam, 0, sizeof g_fam);
 }
@@ -129,6 +134,36 @@ int trackfam_load(const char *name, int family, int kind)
     f->banks = ww_entry(f->file, 0);
     f->pictures = ww_entry(f->file, 1);
     f->horizon = ww_entry(f->file, 2);
+
+    /* load_track_models 0x66118, first (0x6018c): entry 3's objects, each a model (its
+       entry 0) and its pictures (entry 1) with their own palette "!PAL" (6 bits, or 8 as
+       shape type 0x24), tinted and queued to be re-coloured (0x65224) */
+    if (ww_count(f->file) > 3) {
+        unsigned char *all = ww_entry(f->file, 3);
+
+        for (i = 0; i < ww_count(all) && i < TRACK_MODELS; i++) {
+            unsigned char *e = ww_entry(all, i), *orip, *bank, *sh;
+
+            if (!e || ww_count(e) < 2)
+                break;
+            orip = ww_entry(e, 0);
+            bank = ww_entry(e, 1);
+            sh = shpi_find(bank, "!PAL");
+            if (sh) {
+                pal = sh + 16;
+                if (sh[0] == 0x24)
+                    for (k = 0; k < 0x300; k++)
+                        pal[k] >>= 2;
+                pal_tint(0, 0x100, pal);
+                pal_queue_remap(bank, pal);
+            }
+            if (!model_make(&f->models[i], orip, f->file, f->file + f->len, bank))
+                break;
+            if (g_road_mirror)
+                model_mirror(&f->models[i]);
+            f->nmodels = i + 1;
+        }
+    }
 
     count = ww_count(f->banks);
     if (count == 1) {
