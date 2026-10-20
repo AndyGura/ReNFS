@@ -242,7 +242,7 @@ Data folder: `-data`, else `$RENFS_DATA`, else `./NFSSE`, else `NFSSE` beside th
 (the port's own formats, never the game's files). `RENFS_LANG=de`: the German art;
 `RENFS_NOSOUND=1`: no sound; `RENFS_SNDWAV=f`: what is heard written to a WAV (checking);
 `RENFS_JOY=1|2`: a test joystick of 4 or 2 axes moved by `RENFS_INPUT`'s jl jr ju jd (the stick), jg jk
-(throttle, brake), jb1..jb4, jx/jy/jz/jw<n> (exact counts 0..511);
+(throttle, brake), jb1..jb6 (5/6 a pad's shoulders: the port's gear up/down), jx/jy/jz/jw<n> (exact counts 0..511);
 `RENFS_INPUT="<retrace>:<key> .."`: keys and mouse given at those retraces (esc enter
 space up down left right tab y n j f1-f9 bksp del ctrl alt lshift rshift end click
 rclick m<x>,<y>, t<text> typed, k<letter> or k<digit> held; `<from>-<to>:<key>` holds a key through those retraces, several at

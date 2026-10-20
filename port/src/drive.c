@@ -202,10 +202,15 @@ unsigned drive_keyboard(int mirrored)
 
     joy_race_read();                       /* 0x4e0b8 */
     held = g_joy.held;
+    /* (the port's: a control left on the keys takes a calibrated joystick too, when no
+       key is held, as its own kind would read it; car_steer and car_pedals then treat
+       it as keys: past half way, full) */
     if (sk == 0) {
         int left = key_down(g_drive.keys[0]), right = key_down(g_drive.keys[1]);
         if (left != right)
             steer = left != !mirrored ? 0x3c : 0;
+        else if (!left && g_joy.on)
+            steer = (unsigned)(mirrored ? 0x20 - g_joy.steer : g_joy.steer + 0x20);
     } else if (sk == 1) {
         int v = g_joy.steer;
         if (mirrored && (v == 0x1f || v == -0x20))
@@ -220,6 +225,8 @@ unsigned drive_keyboard(int mirrored)
             pedal = 5;
         if (key_down(g_drive.keys[3]))
             pedal = 0x3c;
+        if (pedal == 0x1e && g_joy.on)
+            pedal = (unsigned)(g_joy.pedal + 0x1e);
     } else if (pk == 1)
         pedal = (unsigned)(g_joy.pedal + 0x1e);
     else if (pk == 3) {
@@ -254,6 +261,8 @@ unsigned drive_keyboard(int mirrored)
         else if (g_mouse_btn == 2)
             b |= 2;
     }
+    if (!b && g_joy.on)                    /* (the port's: a pad's shoulders) */
+        b = g_joy.extra & 1 ? 1 : g_joy.extra & 2 ? 2 : 0;
     if (key_down(0x30) && key_down(0x13) && key_down(0x11) && g_cars[g_player]
         && g_cars[g_player]->gearbox)
         b |= 3;

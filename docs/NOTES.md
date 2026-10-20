@@ -3672,6 +3672,14 @@ fast to the last step recorded − 8 and race on (state `0xf6b78` = 1 after).
   throttle, left the brake, A B X Y buttons 1 2 4 8, the d-pad over the stick) or
   joysticks of two axes or more (a keyboard's "System Control" device has one: refused).
   Counts 0..511. `RENFS_JOY=1|2` a test stick of 4 or 2 axes driven by `RENFS_INPUT`.
+- **The port's own, not the original's** (Danik, 2026-10-20: "gas, brake and shifting does
+  not work on the controller"; his settings had all three controls on the keys, which the
+  original reads alone, and the automatic starts in neutral): with the joystick on, a
+  control left on the keys takes the joystick too when none of its keys is held (the
+  steering and pedal values its own kind would give; `car_steer` / `car_pedals` then read
+  them as keys: full past half way), and a pad's right / left shoulder (a joystick's
+  fifth / sixth button) are a gear up / down whatever the kinds. Only the control word
+  changes, so replays and the race record stay the original's.
 
 ## 5. The original in DOSBox (2026-10-19)
 

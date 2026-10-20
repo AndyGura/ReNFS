@@ -25,6 +25,8 @@ typedef struct {
     int x, y, throttle, brake; /* 0x12f278 0x12f27c 0x12f280 0x12f284: the counts read */
     int buttons;               /* 0x12f290: the buttons held (1, 2, 4, 8) */
     int held;                  /* 0x12f274: the same, as the race last read them */
+    int extra;                 /* (the port's) a pad's right and left shoulder (1, 2): a
+                                  gear up and down */
     int steer;                 /* 0x12f260: -0x20 .. 0x1f */
     int pedal;                 /* 0x12f264: -0x1e (faster) .. 0x1e (brake) */
     int cal[JC_COUNT];         /* 0x12f294 .. 0x12f2ec */

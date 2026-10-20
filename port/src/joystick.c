@@ -22,6 +22,7 @@ int joy_poll(void)
     if (!joy_device(count, &b))
         return 0;
     g_joy.buttons = b & 0xf;
+    g_joy.extra = b >> 4 & 3;
     /* (the game port's third and fourth axes: 0x12f280 the fourth, 0x12f284 the third;
        joyopt.cfg's remapping, 0x4e580 and 0x12f254, only with that file: never) */
     g_joy.x = count[0];

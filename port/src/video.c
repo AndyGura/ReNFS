@@ -65,7 +65,8 @@ void (*g_retrace_hook)(void);
    del ctrl alt lshift rshift end), "click", "rclick" (held 6 retraces unless a span is given), "m<x>,<y>",
    "t<text>": those letters typed, or "k<letter>": that letter's (or digit's) key held;
    the test joystick (RENFS_JOY): jl jr ju jd the stick to that side, jg / jk the fourth /
-   third axis down (the throttle / the brake), jb1..jb4 its buttons, jx<n> jy<n> jz<n>
+   third axis down (the throttle / the brake), jb1..jb4 its buttons (jb5 / jb6 a pad's right / left
+   shoulder), jx<n> jy<n> jz<n>
    jw<n> the four axes' counts */
 typedef struct {
     unsigned long at, until;
@@ -109,7 +110,7 @@ static void script_parse(const char *s)
         e->x = e->jc[0] = e->jc[1] = e->jc[2] = e->jc[3] = -1;
         if (what[0] == 'j' && what[1] && !what[2] && strchr("lrudgk", what[1]))
             e->joy = 1 << (strchr("lrudgk", what[1]) - "lrudgk");
-        else if (what[0] == 'j' && what[1] == 'b' && what[2] >= '1' && what[2] <= '4' && !what[3])
+        else if (what[0] == 'j' && what[1] == 'b' && what[2] >= '1' && what[2] <= '6' && !what[3])
             e->joy = 0x100 << (what[2] - '1');
         else if (what[0] == 'j' && what[1] && strchr("xyzw", what[1]) && what[2])
             e->jc[strchr("xyzw", what[1]) - "xyzw"] = atoi(what + 2);
@@ -545,7 +546,8 @@ void mouse_relative(int on)
 /* the joystick: a game controller (its left stick, the left trigger the third axis (the
    brake), the right the fourth (the throttle), A B X Y the four buttons, the pad as the
    stick) or else a joystick (its first four axes, its hat as the stick, its first four
-   buttons); RENFS_JOY=1 (four axes) or 2 (two) a test joystick played by RENFS_INPUT */
+   buttons); and the port's own two (16, 32): a pad's right and left shoulder, a
+   joystick's fifth and sixth buttons; RENFS_JOY=1 (four axes) or 2 (two) a test joystick played by RENFS_INPUT */
 static SDL_GameController *g_pad;
 static SDL_Joystick *g_joy;
 
@@ -574,7 +576,7 @@ int joy_device(int count[4], int *buttons)
             }
         count[0] = jc[0] >= 0 ? jc[0] : j & 1 ? 0 : j & 2 ? 511 : 256;
         count[1] = jc[1] >= 0 ? jc[1] : j & 4 ? 0 : j & 8 ? 511 : 256;
-        *buttons = j >> 8 & 0xf;
+        *buttons = j >> 8 & 0x3f;
         if (atoi(test) == 2)
             return 3;
         count[2] = jc[2] >= 0 ? jc[2] : j & 0x20 ? 0 : 511;
@@ -600,9 +602,10 @@ int joy_device(int count[4], int *buttons)
         }
     }
     if (g_pad) {
-        static const SDL_GameControllerButton b[4] = {
+        static const SDL_GameControllerButton b[6] = {
             SDL_CONTROLLER_BUTTON_A, SDL_CONTROLLER_BUTTON_B, SDL_CONTROLLER_BUTTON_X,
-            SDL_CONTROLLER_BUTTON_Y };
+            SDL_CONTROLLER_BUTTON_Y, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER,
+            SDL_CONTROLLER_BUTTON_LEFTSHOULDER };
         mask = 3;
         count[0] = joy_count(SDL_GameControllerGetAxis(g_pad, SDL_CONTROLLER_AXIS_LEFTX));
         count[1] = joy_count(SDL_GameControllerGetAxis(g_pad, SDL_CONTROLLER_AXIS_LEFTY));
@@ -613,7 +616,7 @@ int joy_device(int count[4], int *buttons)
             count[3] = 511 - (SDL_GameControllerGetAxis(g_pad, SDL_CONTROLLER_AXIS_TRIGGERRIGHT) >> 6);
             mask = 0xf;
         }
-        for (int i = 0; i < 4; i++)
+        for (int i = 0; i < 6; i++)
             if (SDL_GameControllerGetButton(g_pad, b[i]))
                 *buttons |= 1 << i;
         hat = (SDL_GameControllerGetButton(g_pad, SDL_CONTROLLER_BUTTON_DPAD_UP) ? SDL_HAT_UP : 0)
@@ -626,7 +629,7 @@ int joy_device(int count[4], int *buttons)
             count[i] = joy_count(SDL_JoystickGetAxis(g_joy, i));
             mask |= 1 << i;
         }
-        for (int i = 0; i < 4 && i < SDL_JoystickNumButtons(g_joy); i++)
+        for (int i = 0; i < 6 && i < SDL_JoystickNumButtons(g_joy); i++)
             if (SDL_JoystickGetButton(g_joy, i))
                 *buttons |= 1 << i;
         if (SDL_JoystickNumHats(g_joy) > 0) {
