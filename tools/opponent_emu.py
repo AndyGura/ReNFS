@@ -69,6 +69,7 @@ VARS = [(0x15d470, "brake"), (0x15d474, "lead"), (0x15d4b8, "ticks"), (0x15d4bc,
 ZONE, CFG, RECS, LEAD, RIVAL, GRID = 0x15d29c, 0x15d2bc, 0x15d490, 0x15d48c, 0x13c270, 0x12dca0
 BY_ROAD, BY_RACE, TOP = 0x13c298, 0x13c274, 0x14ec44
 TOP_G = D.GLOBALS.index((0x14ea80 + 0x1c4, 4))     # top_speed[0] in drive_test_global
+VIEW_G = [a for a, n in D.CRASH_GLOBALS].index(0x145c98)   # g_crash.view in crash_test_global
 
 W = D.word
 GAS, BRAKE, COAST = D.GAS, D.BRAKE, D.COAST
@@ -94,6 +95,11 @@ def pieces(name):
     if name == "twice":
         return [(850, W(pedal=GAS)), (150, W(pedal=BRAKE)), (150, W(pedal=COAST)),
                 (700, W(pedal=GAS)), (150, W(pedal=BRAKE)), (250, W(pedal=COAST))]
+    # the horn in bursts (its sound, 0x5316c)
+    if name == "horn":
+        return [(100, W(pedal=GAS)), (30, W(pedal=GAS, buttons=4)), (200, W(pedal=GAS)),
+                (40, W(40, GAS, 4)), (150, W(pedal=BRAKE)), (30, W(pedal=BRAKE, buttons=4)),
+                (100, W(pedal=GAS))]
     raise ValueError(name)
 
 
@@ -150,7 +156,8 @@ RUNS = [("gas", "as is"), ("weave", "as is"), ("wait", "as is"), ("gas", "single
         ("wait", "both thrown"), ("wait", "both thrown roof"),
         ("weave", "caught up later"), ("gas", "two-way"), ("weave", "two-way"), ("wait", "two-way"),
         ("chase", "as is"), ("long", "as is"), ("twice", "as is"), ("twice", "tickets only"),
-        ("chase", "two-way"), ("again", "tickets only"), ("long", "arrest"), ("chase", "arrest")]
+        ("chase", "two-way"), ("again", "tickets only"), ("long", "arrest"), ("chase", "arrest"),
+        ("horn", "as is"), ("horn", "beside")]
 
 
 def lib():
@@ -416,9 +423,16 @@ def run(L, F, OF, path, scr, var, coverage=False, full=False, sound=False):
         p = s.u32(0xf7790 + 4 * k)
         L.sound_test_near(k, cars.index(p) if p in cars else -1, 1)
     CAM = 0x129ecc
-    cc = s.u32(CAM + 0x90)
-    L.sound_test_camera(rd(s, CAM), rd(s, CAM + 0x10), rd(s, CAM + 0x14), rd(s, CAM + 0x18),
-                        rd(s, CAM + 0x38), rd(s, CAM + 0x44), cars.index(cc) if cc in cars else 0)
+    # (SND_VIEW=n: the camera put outside, camera_set_car 0x13530, as the race keys do)
+    if sound and os.environ.get("SND_VIEW"):
+        s.call(0x13530, eax=CAM, edx=cars[rd(s, 0x12dd54)], ebx=int(os.environ["SND_VIEW"]))
+
+    def camera():
+        cc = s.u32(CAM + 0x90)
+        return (rd(s, CAM), rd(s, CAM + 0x10), rd(s, CAM + 0x14), rd(s, CAM + 0x18), rd(s, CAM + 0x38),
+                rd(s, CAM + 0x44), cars.index(cc) if cc in cars else 0)
+    cam_then = camera()
+    L.sound_test_camera(*cam_then)
     heard = [0]
     vb = ctypes.create_string_buffer(0x28)
     out = ctypes.create_string_buffer(CAR)
@@ -459,11 +473,18 @@ def run(L, F, OF, path, scr, var, coverage=False, full=False, sound=False):
             s.call(0x518c0)
             s.call(0x1c878)
             s.call(0x518c0)
-            # (race_update_cars after the camera: the sounds, but at the pause)
+            # (race_update_cars: the camera (equal on its own, camera_emu.py: the port's is
+            # given the original's), then the sounds, but at the pause)
+            if sound:
+                s.call(0x6324c, eax=cars[rd(s, 0x12dd54)])
+                s.call(0x136b0, eax=s.u32(0x143df4))
+                cam_now = camera()
             if sound and rd(s, 0xf6b74) != 3 and sfx:
                 for a in (0x80974, 0x7fef8, 0x7fcbc) + ((0x7fe88,) if rd(s, 0x12da30) > 1 else ()) + (0x800a0,):
                     s.call(a)
-            # the port's
+            # the port's (its driving hears the step's first camera, its sounds the moved one)
+            if sound:
+                L.sound_test_camera(*cam_then)
             if fl & 4:
                 L.drive_controls(rc[0])
             arr = L.timing_test_array(7)
@@ -478,6 +499,10 @@ def run(L, F, OF, path, scr, var, coverage=False, full=False, sound=False):
             L.crash_world()
             L.timing_sort()
             if sound:
+                L.sound_test_camera(*cam_now)
+                # (and its count of the steps outside after a tumble, 0x145c98, which the
+                # driving may have set before the camera counted it)
+                L.crash_test_global(VIEW_G, 1, s.i32(0x145c98))
                 L.rsnd_step()
             # compared
             diff = []
@@ -522,7 +547,7 @@ def run(L, F, OF, path, scr, var, coverage=False, full=False, sound=False):
                         x = int.from_bytes(t[o:o + nb], "little", signed=True)
                         y = int.from_bytes(vb.raw[o:o + nb], "little", signed=True)
                         if x != y:
-                            diff.append("voice %d +%#x %d/%d" % (v, o, x, y))
+                            diff.append("voice %d (sound %d/%d) +%#x %d/%d" % (v, t[0x17], vb.raw[0x17], o, x, y))
                 for k in range(2):
                     p = s.u32(0xf7790 + 4 * k)
                     x = cars.index(p) if p in cars else -1 if not p else -2
@@ -563,6 +588,8 @@ def run(L, F, OF, path, scr, var, coverage=False, full=False, sound=False):
                     pol["came"] = (n, f(cars[2], 0x48))
                 pol["chase"] += 1 if rd(s, 0xf74a8) else 0
                 pol["caught"] += 1 if bytes(mu.mem_read(cars[0] + 0x176, 1))[0] & 1 else 0
+            if sound:
+                cam_then = camera()
             wr(s, 0x145c94, st + 2)
             clock = s.i32(0xed100) + 3
             wr(s, 0xed100, clock)

@@ -307,7 +307,10 @@ Ghidra project and `build/decomp`, one command). The git history was started aga
   silenced while thrown about. **Equal**: `opponent_emu.py --full --sound` runs the
   original's whole sound path in Unicorn (`snap_emu.py` steps over the library's
   `push ds; call 0x94710 .. pop ds`) and compares every voice record, channel and sound
-  global every step: all 495 runs on the 11 snapshots. The other checks still equal.
+  global every step: 47 settings on the 11 snapshots, the camera following the race,
+  from the driver's seat and again from outside (`SND_VIEW=3`), all 1,034 runs equal.
+  What no check runs yet (two players, tunnels, the rally, mono, the siren's echo, the
+  library's random spreads): NOTES §4.18's end. The other checks still equal.
   `--race cy1` is heard (`RENFS_SNDWAV=f` writes it). A voice's end comes from the clock
   (`snd_time`), not the mixer. Not yet: the race's music (voice 0 held for it), the speech.
 

@@ -2645,8 +2645,18 @@ and the device's records in Unicorn, no voice ever ending) and the port's from t
 snapshot's state (the banks loaded from the CD and compared record by record, the voices,
 the channels, the camera) and compares every step the 16 voice records, the 16 channels,
 the 39 sound globals, the radar, the camera's yaw, the cars' Doppler fields (+0x3a1,
-+0x3ad) and EA's random numbers: all 45 settings on all 11 snapshots equal. Without
-`--sound` the horns' random numbers are still compared (`0x80a60` runs on both sides).
++0x3ad) and EA's random numbers: all 47 settings (with "horn": the player's horn in
+bursts) on all 11 snapshots equal, 4 to 6 voices playing a step. The camera follows the
+race (the original's `0x6324c` and `0x136b0` run, the port given its camera, its yaw
+compared): the port's driving hears the camera as the step began, its sounds the one
+just moved, as in the original (the camera's own check, `camera_emu.py`). `SND_VIEW=3`
+puts the camera outside behind the car (`camera_set_car` `0x13530`, as the race keys do):
+all 517 runs equal again. Without `--sound` the horns' random numbers are still compared
+(`0x80a60` runs on both sides). **Not run by any check yet** (`--coverage`, e1): the
+two-player routine `0x7fe88`; the tunnel's and the rally's parts of `0x53338`, its mono
+pans and its sounds heard from outside far off; the siren's echo and channel 2's police
+path in `0x800a0`; the wrapper `0x52ea8`; the library's random spreads (`0x95aba`..,
+`0x95cfb`: no sound of these banks has a spread) and the stereo pairs (`0xa20a8`).
 In the port a voice's end is worked out from the clock (`snd_time`), not by the mixer, so
 that the game's side stays deterministic. Not yet: the race's music (voice 0 is held
 for it), the speech, the race keys' calls (`0x47c88`: the camera's changes, the pause).
