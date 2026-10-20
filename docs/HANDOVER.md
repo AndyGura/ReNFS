@@ -448,9 +448,16 @@ races 320x200 / 320x240; commit locally as the work goes.
    the original on a PC without them; `fe_joystick_calibrate` `0x4c6b0` waits for the
    joystick). Drive, timing, opponent and collide checks had stopped building since the
    replay (`g_replay`): `tools/replay_stub.c` added to them too. `tools/fecompare.py`
-   compares a menu picture with DOSBox's by palette entry. Next: load / save (`0x3c0c8`,
-   `0x3d4c4`, `0x3aacc`), the credits (`0x25600`), then a joystick for driving (the MiSTer
-   needs one). The dashboard's keys F7 / F8 / M / F9 and Rusty Springs' measurements on the
+   compares a menu picture with DOSBox's by palette entry. **Load and save (`0x3c0c8`,
+   `0x3d4c4`, the list `0x3aacc`): done**, equal by palette entry on 34 pictures: saving
+   and loading a tournament (`<name>.sav` in the home folder, the original's 0x5b6-byte
+   session; the original loads the port's file), saving, viewing and deleting replays
+   (the home folder's and the CD's listed together). Control Central now knows a game
+   is on (`0x15d134`): "Quit tournament ?", "Track already completed" and the raced
+   track's mark (`flad`). Two traps found on the way: stores to `[esp+N]` right after a
+   `push` (a row change redraws the whole screen; the list starts on its first file),
+   `tools/espdepth.py` lists them. Next: the credits (`0x25600`), then a joystick for
+   driving (the MiSTer needs one). The dashboard's keys F7 / F8 / M / F9 and Rusty Springs' measurements on the
    status bar: done (NOTES §4.11). Not yet: races at 640x480 (settings +0x7f = 0).
    (`0x136618`, the sections drawn: the settings' +0x85 and F3, NOTES §4.19.)
    Open: the race's sound reaches full scale at the hits and the horn (0.2 to 0.7 % of

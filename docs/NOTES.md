@@ -959,6 +959,73 @@ libraries `0x80000`..`0x94000` and `0x95000`..`0xb0000`, Watcom's runtime `0x940
   Esc and Cancel put +9..+0xb4 back and `0x721ec(+0x77)`; the end saves CONFIG.DAT
   (`0x3a134`). Both race menus call it (the finish menu's Options is `0x12760(1)`, not
   the chat `0x195d8`).
+- **Load and save: `fe_load_save_screen` `0x3c0c8(from_race_menu)` and `0x3d4c4(1)`**
+  (2026-10-20; `port/src/loadsave.c`; equal to the original by palette entry on 34
+  pictures: the screen, the list opening and closing, scrolling, the save box, the
+  messages, the delete list and its question, a tournament loaded: 47 pixels everywhere,
+  DOSBox's scaling on two lines, and the pointer where DOSBox put its own). `0x3c0c8(0)`
+  from the options screen (`OPTION/LOADSAVE.QFS`), `(1)` from the checkpoint menu's
+  options, `0x3d4c4(1)` from the finish menu's (both `CHECK/`, `0x12cbf4` = 1). Rows 0
+  Save tournament, 1 Load, 2 Delete tournament, 3 Save replay / highlights, 4 View
+  replay, 5 View highlights, 6 Delete replay, 7 Done; lit `savl loal dlgl sarl vwrl vwhl
+  dlrl donl`, greyed `savm loam` (`vwrm vwhm` in a network game). **`0x15d134` "a game
+  is on"**: set when Control Central starts a race (`0x45ab7`) and by Load; cleared by
+  `fe_new_session` `0x7469c` and by "Quit tournament ?" (`0x423a3`). Save can be chosen
+  from the options screen only while a game is on, from the finish menu only in a
+  tournament not complete (raced[0..7] sum 8, or 9 with raced[8] when Lost Vegas is
+  offered `0xec460`), never from the checkpoint menu; Load only from the options screen
+  with no game on. Start: Load; 3 from the checkpoint menu; Save while a tournament is on;
+  `0x3d4c4`: Save, else Delete tournament. Up/Down step past the rows that cannot be
+  chosen, round. The mouse by height (English 0..0x87, 0x8c..0xaf, 0xb4..0xd7, 0xdc..0xff,
+  0x104..0x127, 0x12c..0x14f, 0x154..0x190, 0x19a..0x1e0; German from row 3 0xdc..0x118,
+  0x11d..0x140, 0x145..0x168, 0x16d..0x1a4, 0x1ae..); keys put it at x 155 (Done 40), y
+  120 160 200 240 280 320 360 450 (German 120 160 200 251 302 340 390 450). **A change
+  draws the whole screen again** (0x47): `0x3ca8d` also draws the old row dark and the new
+  one lit into the menu's window, but its `mov [esp+0x730], 1` comes after a `push`, so it
+  is the full redraw's flag `0x72c`, and the window is shown only by that redraw: the
+  rows left show bgnd's own dark letters (the dark shapes differ from bgnd in ~1,800
+  pixels each; seen in the original's off-screen window, `nfsdos.py snap:`). The finish
+  menu's `0x3ddb7` the same (`0x6fc`). Enter (0x48): Save → **`0x3a2b0`**: a 400x100 box
+  at (0x78, 0xbe), darkened (0x9000) with two red frames, "Save game as" / "Spiel
+  speichern als" (style 2, centred, y 200), the text field (8 letters, centre 0x140, y
+  0xfa) over CONFIG.DAT +9; the session gets the keys +0x5f36 (26 bytes), `0x15d0d6` Lost
+  Vegas and +9..+0xb4; `gamedata/savegame/%s.SAV` = the session `0x15cb68`, 0x5b6 bytes
+  (the racers 8 × 0x95, then kept settings 0x4a8, keys 0x554, Vegas 0x56e, points 0x570,
+  won 0x580, raced 0x592, gave up 0x5a4, type 0x5b4); "Replace game ?" when it exists;
+  "Game saved" / "Spiel gespeichert" (**`0x74dcc(text, ticks)`**: 440x60 at (100, 210)
+  kept, the message box, until the ticks, a key held or a button, 10 more ticks, put
+  back; a key still held from the Enter ends it at once, in the original as well). Save
+  replay → **`0x3a628`**: a 480x100 box at (0x50, 0xbe), "Save replay as" /
+  "Wiederholung speichern als", the name +0x3b cut at its '.'; REPLAY, REPLAY1..3 →
+  "Cannot replace system replay"; "Replace replay ?"; replay.rpl copied (`0x3a218`);
+  "Replay saved". Load, Delete tournament, View replay / highlights (`0xec248`), Delete
+  replay → **the list `0x3aacc(kind)`** (0 view, 1 delete replay, 2 load, 3 delete game):
+  `LOADANIM.QFS` (CHECK or OPTION), a box at (353, 108) 205x262 opening `opn8` with
+  `opn1..7` see-through over it, a tenth of a second each (0x49), closing `opn7..1`
+  (0x49). The files of `*.SAV` / `*.RPL` (100 at most, `0x12c424`, 20 bytes each),
+  shown without the extension at (+0x23, +0x1c + 0x15 i), cut to 0x7d (`0x717d0`),
+  style 0, the chosen style 1 from the 7th frame; `arul` (+0x5b, +7), `ardl` (+0x5b,
+  +0xf1), `canl` (+0xb7, +0x55; German +0x4e) lit when chosen. **The first file is
+  chosen when there is one, Cancel only when none** (`0x3ada3`/`0x3adaa`, again stores
+  after two pushes: `0x134` back, `0x12c` the choice); then for kinds 2 and 0 the file
+  that +9 ("%s.SAV") or +0x3b ("%s.RPL") names: its row, or with ten or more at the top.
+  The mouse is kept in 0x165..0x22a × 0x6f..0x16e (`0x84885`); places x 455 (366 the up
+  arrow's, 545 Cancel's), y 121 + ~21.2 a row. Left from Cancel goes back to the row
+  left, Right to Cancel; Up/Down skip empty rows and scroll at the arrows (Up from the
+  first row in the original runs the choice below 0 over the memory before `0x12c424`:
+  nothing lit, the pointer in the box's corner; the port stops at the arrow). The right
+  button is Cancel. Load: "Load game ?", the results cleared (time, distance, top, totals,
+  laps), `0x15d134` = 1, the settings, keys and Vegas put back, type 3, "Game loaded
+  successfully", and the screen's choice goes to Done; 1 back when an open road's later
+  segment is next. View: "Load replay ?" / "Load highlight ?", +0x3b the name, played
+  with +0xaf 1 or 2 through `race_run(2)` (the session not kept around it). Delete: "Delete
+  game ?" / "Delete replay ?" (the system replays refused with a message). The DOSBox
+  copy of the original loads a `.SAV` written by the port (`build/dosls`).
+  **Control Central** with a game on: changing the race type or Cancel/Esc ask "Quit
+  tournament ?" / "Wettkampf beenden ?" (yes: head to head, a new session); Race on a
+  tournament's track already raced: "Track already completed" / "Strecke bereits
+  fertiggestellt" (100 ticks), and that track's picture carries `flad` see-through
+  (`0x43e3c`: type 3 and raced[+0x95]).
 
 ### 4.3 The race
 
