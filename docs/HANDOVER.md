@@ -494,8 +494,11 @@ races 320x200 / 320x240; commit locally as the work goes.
    car is drawn `0x671dc`, painted with the road's rows `0x679ec`; `tools/skid_emu.py`:
    random rings and cars on h7 and e3, 10,360 lines all equal). **The tyres' dust
    (2026-10-21): done** (`skid_dust`, 520 puffs equal; its random numbers the port's own,
-   the original's are the collisions'). Next gaps: the start beeps (`0x5257c`), the bar
-   while watching after the finish (`0x7ef14`).
+   the original's are the collisions'). The start beeps (`0x5257c`): an empty routine,
+   nothing to port. **The watching bar (2026-10-21): done** (Alt+Ctrl+a number while
+   racing: the cars 1..8, before / after, the camera, the driver's name; NOTES §4.22;
+   `tools/watch_emu.py`: 2,000 random steps and drawings on six snapshots, all equal).
+   Next: the cars' showcase, the track records from Control Central.
    (`0x136618`, the sections drawn: the settings' +0x85 and F3, NOTES §4.19.)
    Open: the race's sound reaches full scale at the hits and the horn (0.2 to 0.7 % of
    the samples in `build/snd_port/`): how EA's mixer sums the voices is still to compare. Model polygons of one colour (`0xaa990`): ported 2026-10-21 (the 512TR's rear bumper).

@@ -127,6 +127,9 @@ void hud_outside_frame(const hud_car *c, int redraw, int layout);
    drawn). Once both are 0 again (0x306e8) the race's colours come back (unless `over`)
    and the dashboard is drawn again: 2 that frame, else 0 */
 int hud_ticket(int ticket, int warning, int over);
+/* 0x5c5d0, at the end of both frames: playing back the replay's bar (0x5fcf0), racing
+   with another car watched or the player stopped the watching bar (0x7ef14) */
+void hud_bar_draw(void);
 /* 0x2dac4: the race held by P: "paus" on the screen at its own place */
 void hud_paused(void);
 

@@ -17,6 +17,7 @@
 #include "menu.h"
 #include "racepal.h"
 #include "replay.h"
+#include "session.h"
 #include "raster.h"
 #include "timing.h"
 #include "track.h"
@@ -74,6 +75,10 @@ int g_hud_small_needle[4];
    cameras' and the speeds' labels (normal, lit) */
 static const unsigned char *g_bar_strip, *g_bar_button[3][9], *g_bar_camera[2][8];
 static const unsigned char *g_bar_speed[2][3];
+/* the watching bar's (0x7ed30): its strip, the name's box, each button's look (normal,
+   lit, pressed), the camera's labels (normal, lit), the letters and digits */
+static const unsigned char *g_watch_strip, *g_watch_box, *g_watch_button[3][13];
+static const unsigned char *g_watch_label[2][6], *g_watch_letter[36];
 
 /* the window drawn into (0xf889c): a picture and its clip */
 /* a times b, 16.16, rounded by the last bit out */
@@ -273,6 +278,35 @@ int hud_load(void)
             if (!(g_bar_speed[0][k] = table_named(0xf6c6c, k))
                 || !(g_bar_speed[1][k] = table_named(0xf6c78, k)))
                 return 0;
+        /* the watching bar (0x7ed30): bard, namd; the buttons from the tables 0xf7604
+           (normal; Done's donm, greyed, but in a network game), 0xf766c (lit), 0xf7638
+           (pressed: their boxes the buttons'); the labels 0xf76a0, 0xf76b8 by the
+           camera's mode 1..5; 0-9 a-z from 0xf76d0 */
+        if (!(g_watch_strip = named(&g_mask, "bard")) || !(g_watch_box = named(&g_mask, "namd")))
+            return 0;
+        for (k = 1; k <= WATCH_CAMERA; k++) {
+            const unsigned char *in;
+
+            g_watch_button[0][k] = k == WATCH_DONE ? named(&g_mask, "donm") : table_named(0xf7604, k);
+            g_watch_button[1][k] = table_named(0xf766c, k);
+            g_watch_button[2][k] = in = table_named(0xf7638, k);
+            if (!g_watch_button[0][k] || !g_watch_button[1][k] || !in)
+                return 0;
+            g_watch.rect[k][0] = s16(in + 0xc);
+            g_watch.rect[k][2] = s16(in + 4) + s16(in + 0xc);
+            g_watch.rect[k][1] = s16(in + 0xe);
+            g_watch.rect[k][3] = s16(in + 6) + s16(in + 0xe);
+            g_watch.size[k][0] = s16(g_watch_button[0][k] + 4);
+            g_watch.size[k][1] = s16(g_watch_button[0][k] + 6);
+        }
+        for (k = 1; k <= 5; k++)
+            if (!(g_watch_label[0][k] = table_named(0xf76a0, k))
+                || !(g_watch_label[1][k] = table_named(0xf76b8, k)))
+                return 0;
+        for (k = 0; k < 36; k++)
+            if (!(g_watch_letter[k] = table_named(0xf76d0, k)))
+                return 0;
+        g_watch.label = 1;
         /* (load_cockpit_mask 0x5f7c8) none pressed or lit, the camera's label 1, full
            speed */
         g_bar.pressed = g_bar.lit = 0;
@@ -566,6 +600,8 @@ int hud_ticket(int ticket, int warning, int over)
         hud_redraw_due();
         if (!g_hud.running)
             g_bar.redraw = 1;
+        else
+            g_watch.whole = 1;
         return 2;
     }
     if (!g_ticket_on) {
@@ -1062,16 +1098,135 @@ static void bar_buttons(void)
     }
 }
 
+/* 0x7f310: the driver's name of the car watched (from the session: up to 8 letters and
+   digits, anything else a space), centred in its box (drawn again unless the whole bar
+   is) */
+static void watch_name(void)
+{
+    const char *name = g_session.racer[g_drive.viewed].name;
+    const char *end = memchr(name, 0, sizeof g_session.racer[0].name);
+    int pick[8], n = end ? (int)(end - name) : 9, w = 0, x, i;
+
+    if (!g_watch.whole)
+        blit_own(g_watch_box, COPY);
+    if (n < 1 || n > 8)
+        return;
+    for (i = 0; i < n; i++) {
+        int c = (unsigned char)name[i];
+
+        if (c >= '0' && c <= '9')
+            pick[i] = c - '0';
+        else {
+            pick[i] = c - 'a';
+            if (pick[i] < 0)
+                pick[i] += 0x20;
+            pick[i] += 10;
+        }
+        if (pick[i] >= 0 && pick[i] < 36)
+            w += s16(g_watch_letter[pick[i]] + 4);
+        else {
+            pick[i] = -1;
+            w += H(5, 10);
+        }
+    }
+    x = s16(g_watch_box + 0xc) + (s16(g_watch_box + 4) >> 1) - (w >> 1);
+    for (i = 0; i < n; i++)
+        if (pick[i] < 0)
+            x += H(5, 10);
+        else {
+            const unsigned char *p = g_watch_letter[pick[i]];
+
+            blit(p, x, s16(p + 0xe), COPY);
+            x += s16(p + 4);
+        }
+}
+
+/* 0x7f1d8: the bar's strip, its own and Done's greyed (all of it asked for); the button
+   pressed, or the one lit when that changed; under the cars' numbers their markers'
+   colours (0x7f998: the pressed one a pixel right, at 640x480 down too); the camera's
+   label (lit when its button is, pressed a pixel down and right); the name when another
+   car is watched */
+static void watch_buttons(void)
+{
+    const unsigned char *p;
+    int i, y;
+
+    if (g_watch.whole) {
+        g_watch.redraw = 1;
+        blit_own(g_bar_strip, COPY);
+        blit_own(g_watch_strip, COPY);
+        blit_own(g_watch_button[0][WATCH_DONE], COPY);
+    }
+    if (g_watch.pressed) {
+        blit_own(g_watch_button[2][g_watch.pressed], COPY);
+        g_watch.lit = g_watch.pressed;
+    } else if (g_watch.lit != g_watch.lit_drawn || g_watch.redraw) {
+        if (g_watch.lit_drawn)
+            blit_own(g_watch_button[0][g_watch.lit_drawn], COPY);
+        g_watch.lit_drawn = g_watch.lit;
+        if (g_watch.lit)
+            blit_own(g_watch_button[1][g_watch.lit], COPY);
+    }
+    y = s16(g_watch_button[1][WATCH_CAR1] + 0xe) + 3;
+    for (i = 0; i < 8; i++) {
+        int x = s16(g_watch_button[1][WATCH_CAR1 + i] + 0xc) + H(3, 4), yy = y;
+
+        if (WATCH_CAR1 + i == g_watch.pressed) {
+            x++;
+            yy += H(0, 1);
+        }
+        raster_fill(x, yy, H(2, 5), H(1, 6), g_marker_colour[i]);
+    }
+    if (g_watch.pressed == WATCH_CAMERA) {
+        p = g_watch_label[1][g_watch.label];
+        blit(p, s16(p + 0xc) + 1, s16(p + 0xe) + 1, COPY);
+    } else
+        blit_own(g_watch_label[g_watch.lit == WATCH_CAMERA][g_watch.label], COPY);
+    if (g_watch.name_for != g_drive.viewed || g_watch.whole) {
+        g_watch.name_for = g_drive.viewed;
+        watch_name();
+    }
+}
+
+/* 0x5c636: racing, another car watched or the player stopped: the camera's label from
+   the camera's mode 1..5 (the crash's view 13 as 3, else as it was), then 0x7ef14: the
+   bar drawn again when asked, the pointer, pressed while a button is */
+static void watch_draw(void)
+{
+    int m = g_hud.cam_mode;
+
+    if (m >= 1 && m <= 5 && m != g_watch.label) {
+        g_watch.label = m;
+        g_watch.redraw = 1;
+    } else if (m == 13) {
+        g_watch.label = 3;
+        g_watch.redraw = 1;
+    } else if (!g_watch.label) {
+        g_watch.label = 1;
+        g_watch.redraw = 1;
+    }
+    window_set(&g_hud_screen);
+    if (g_watch.redraw || g_watch.whole) {
+        clip_set(0, H(0x140, 0x280), H(0xb4, 0x1c0), H(0xc8, 0x1e0));
+        watch_buttons();
+        g_watch.redraw = g_watch.whole = 0;
+    }
+    fe_mouse_look(g_watch.pressed > 0);
+}
+
 /* 0x5c5d0 when not racing, 0x5fcf0: the camera's label from the camera's mode (the
    crash's view 13 as 3); the whole bar when asked, else the time and how far through
    the recording (a dark green line 122 long over black) when the counter moved; the
    mouse's pointer, pressed while a button is */
-static void bar_draw(void)
+void hud_bar_draw(void)
 {
     int w;
 
     if (g_drive.state == 1) {
-        mouse_show(0);
+        if (g_drive.viewed != g_player || g_hud.stopped)
+            watch_draw();
+        else
+            mouse_show(0);
         return;
     }
     if (g_hud.cam_mode >= 0 && g_hud.cam_mode < 8 && g_bar.cam != g_hud.cam_mode) {
@@ -1154,7 +1309,7 @@ void hud_frame(const hud_car *c)
     if (g_hud.map && g_hud_map.pix)
         blit_pixels(g_hud_map.pix, g_hud_map.w, g_hud_map.h, H(0x103, 0x206), H(0x7e, 0x130),
                     COPY);
-    bar_draw();                /* 0x5c5d0 */
+    hud_bar_draw();            /* 0x5c5d0 */
 }
 
 /* hud_keys 0x2f644: the status bar again some steps after the start's lights; the
@@ -1310,7 +1465,7 @@ void hud_outside_frame(const hud_car *c, int redraw, int layout)
     small_tach(c);
     if (g_hud.map && g_hud_map.pix)
         blit_pixels(g_hud_map.pix, g_hud_map.w, g_hud_map.h, H(0x103, 0x206), H(0x7e, 0x130), COPY);
-    bar_draw();                /* 0x5c5d0 */
+    hud_bar_draw();            /* 0x5c5d0 */
 }
 
 /* the map (0x31cb4), 58 x 54 at 320x200: positions in 1/2^20 of the world's units round

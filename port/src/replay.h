@@ -120,6 +120,30 @@ typedef struct {
 
 extern replay_bar g_bar;
 
+/* the bar while racing, the car watched not the player's or the player stopped (0x7ef14,
+   0x7f010; a network game's flag 0x15d13a besides, never set here): 12 buttons, 1 Done
+   (only in a network game: greyed), 2 the car before, 3..10 the cars 1..8 (those
+   racing), 11 the car after, 12 the camera (while a player's car is watched); each car's
+   marker colour under its number, the camera's label, the watched car's driver */
+enum { WATCH_DONE = 1, WATCH_BEFORE, WATCH_CAR1, WATCH_AFTER = 11, WATCH_CAMERA };
+typedef struct {
+    int pressed;               /* 0x15d6f8: the button held down, 0 none */
+    int lit;                   /* 0x15d6fc */
+    int label;                 /* 0x15d700: the camera's label, the camera's mode 1..5 */
+    int name_for;              /* 0x15d704: the car whose driver's name is shown */
+    int last_pressed;          /* 0x15d70c */
+    int lit_drawn;             /* 0x15d710: the button drawn lit */
+    int redraw;                /* 0x15d718: the buttons drawn again */
+    int whole;                 /* 0x15d71c: the whole bar drawn again */
+    int mouse_was[2];          /* 0x15d724, 0x15d720 */
+    int last_key;              /* 0xf7764 */
+    int rect[13][4];           /* 0x15d638 ..: each button's box, x0 y0 x1 y1 (its
+                                  pressed picture's) */
+    int size[13][2];           /* each normal picture's width and height */
+} watch_bar;
+
+extern watch_bar g_watch;
+
 /* race_setup_record 0x36c5c: the record from CONFIG.DAT's settings */
 void replay_setup_record(void);
 /* replay_settings 0x5c340: the record from REPLAY.RPL (the name in CONFIG.DAT +0x3b,

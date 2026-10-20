@@ -2386,7 +2386,7 @@ picture (clip its whole): `tach` copied at its place, `sped` too (see-through fo
 two gauges' boxes (`0x12b884`, `0x12b894`: x, y, w, h of `tach` and `sped`) as clips and
 the view's picture copied at (0, 0) through each. Then `0x2e4f0(car)`, `0x30214`,
 `0x2f644`, `0x30d8c(car)` (the status bar's numbers: not yet), the map `0xf4584` at
-(0x103, 0x7e) with `0x12b988`, `0x5c5d0` (the replay's buttons, `0x7ef14`: not yet).
+(0x103, 0x7e) with `0x12b988`, `0x5c5d0` (the replay's buttons; racing, the watching bar `0x7ef14`, §4.22).
 `0x83908` between the steps is EA's timer service, nothing drawn.
 **Ported: every frame equal to the original's, on e1 and e3 with the wheel, engine and
 speed set seven ways (`tools/dash_emu.py`, the routines not yet ported left out of both).**
@@ -3642,6 +3642,53 @@ fast to the last step recorded − 8 and race on (state `0xf6b78` = 1 after).
   machines, so another place decides): the same buttons, the arrow keys' light, the
   camera's and the speed's turns (FULL → 1/2 → 1/4), the pause menu's replay starting
   again at its first count after its last.
+- **The watching bar** (2026-10-21; ported, `hud.c` `watch_draw`, `replay.c` `watch_step`):
+  racing (`0xf6b74` = 1) with the car watched `0x12dd54` not the player's `0x12dd58`, or
+  the player stopped `0x145c90` (or `0x15d13a`, written only as 0 in this build: a
+  network game's), `0x5c5d0` draws it (`0x5c636`) and `0x5e948`'s end reads it (`0x7f010`).
+  The pictures (`0x7ed30`, from `0x5f240`, MASKLO/MASKHI.FSH): `repl` `0x15d4c0`, `bard`
+  `0x15d4c4`, the name's box `namd` `0x15d4c8`; 12 buttons k = 1..12 (normal `0x15d4cc`+4k
+  from `0xf7604`, lit `0x15d500` from `0xf766c`, pressed `0x15d534` from `0xf7638`; button
+  1's normal is `donm` (greyed) unless a network game; the boxes `0x15d628`+16k, x0 y0 x1 y1
+  inclusive, from the pressed pictures); 1 Done, 2 `<`, 3..10 the cars 1..8, 11 `>`, 12
+  the camera; its labels `0x15d568`/`0x15d580` + 4j (normal / lit, j 1..5 `bumd taid held
+  skyd chad`, from `0xf76a0`/`0xf76b8`); the letters `0x15d598` (36: `00d 1d .. 9d 0a .. 0z`,
+  `0xf76d0`). The state: `0x15d6f8` pressed, `0x15d6fc` lit, `0x15d700` the camera's
+  label (1 at load), `0x15d704` the car named, `0x15d70c` last pressed, `0x15d710` lit as
+  drawn, `0x15d718` redraw, `0x15d71c` all (`replay_start` `0x5dd68`: all, pressed = lit =
+  last = 3, lit drawn 1, named 0; set again by `camera_set_mode` `0x14b00`, every Alt+Ctrl
+  car, F1 `0x14324`, the ticket's end `0x306e8` racing, back from a replay `0x5e020`; two
+  players with the first in and stopped, `0x519d8`: pressed = lit = the other + 3).
+  **Drawn** (`0x5c65a`: the label = the camera's mode 1..5 (redraw), 13 → 3, 0 → 1; then
+  `0x7ef14`): only with redraw or all, clip (0, 320, 180, 200) / (0, 640, 448, 480):
+  `0x7f1d8` all: redraw, `repl`, `bard`, Done's `donm`; pressed: its pressed picture, lit =
+  pressed; else when lit ≠ lit drawn or redraw: lit drawn's normal, lit drawn = lit, its lit
+  picture; `0x7f998` the 8 cars' marker colours `0x13d5e8` (fill_rect at the lit picture of
+  button 3+i x + 3 / 4, its y + 3; 2 x 1 / 5 x 6; the pressed one x + 1, at 640x480 y + 1
+  too); the label (pressed 12: the lit one at +1, +1; lit 12: lit; else normal); `0x7f310`
+  when the car named ≠ the watched or all: `namd` again (not with all), the session's name
+  `0x15cb68` + 0x95 · car (1..8 characters, else none): digits `c − '0'`, letters `c − 'a'`
+  (+0x20 below) + 10, others a gap of 5 / 10; centred (x = box x + w/2 − total/2), each at
+  its own y. All copies. The pointer (`0x52394`) pressed while a button is.
+  **Read** (`0x7f010`): the mouse (`0x7f470`: limits (0, 180..200 / 450..480); once moved
+  (`0x15d724`, `0x15d720`) or pressed: each button in its box, but 4..10 past the racers
+  `0x12da2c`, 12 unless a player's car is watched (`< 0x12da30`), 1 unless a network
+  game; over one: unpressed → lit (pressed 0), pressed → pressed (lit 0)); else the keys
+  (`0x7f5e8`): with no menu key (`0x72f28`) held ',' → 2, '.' → 11, '1'..'8' → 3..10 if that
+  many race (the first of them held decides); left / right (a new key): lit − 1 (Done
+  passed: below 1 → 12 or 11, 10 → racers + 2) / lit + 1 (past 12, or 12 not allowed → 2;
+  4..10 past the racers → 11); up: 2 → 3, 11 → racers + 2; down: 3 → 2, racers + 2 → 11;
+  Space / Enter: pressed = lit. Nothing: the pressed one lit, pressed 0. Pressed: 1 Done
+  `0x15d138` = 1 (network); 2 / 11 once a press: the car before / after round the racers,
+  `camera_set_car(.., 4)` (no engine); 3..10: that car if not watched, mode 4 and the
+  engine heard `0x53214`; 12 once a press, a player's car watched: `camera_next`. Then
+  last = pressed, lit = pressed if any; after a key the mouse at the lit button's normal
+  picture's middle (`0x52480`; the port rounds up into 640x480 so that it reads back that
+  pixel at 320x200, the replay bar's too). Esc is the pause menu's, not the bar's.
+  **Checked** (`tools/watch_emu.py`, in `checks.sh`): random states, cars, racers, names,
+  camera modes, mouse places and buttons, keys held, on e1, e3, h1, h7 (CY1) and t1, t4
+  (TR1): 2,000 steps (the fields, the car watched, the key kept, the mouse, the calls
+  out) and 2,000 drawings on a screen kept between them (every pixel), all equal.
 - **The highlights checked** (2026-10-20): the original's attract mode read in DOSBox
   (`peek:` of `0x144d88` and the table `0x144ba8`): REPLAY1's 720..1500, 1620..2820,
   4800..6960 (0xdc), 7080..7524 (0xd7) and REPLAY2's 180..600 (0xf8), 1320..2820 (0xa8),
@@ -3839,9 +3886,8 @@ and `H(lo, hi)` (`view.h`); `RENFS_RES=320|640` overrides the settings for tests
   - ~~the player's wheels~~: done 2026-10-21, §4.10's end ("The player's car's wheels");
   - ~~the tyres' dust~~: done 2026-10-21, §4.10's end ("The tyres' dust");
   - ~~the skid marks~~: done 2026-10-21, §4.10's end ("The tyres' marks on the road");
-  - the bar while racing but watching another car, stopped or in a replay from the race
-    `0x7ef14` → `0x7f1d8`/`0x7f310`/`0x7f998`, `0x7f010`/`0x7f470` (`0x5c636`: running and
-    (`0x15d13a` or the car watched not the player's or stopped `0x145c90`));
+  - ~~the bar while racing but watching another car~~: done 2026-10-21, §4.22 ("The
+    watching bar");
   - ~~the start lights' beeps `0x5257c`~~: nothing to port, `0x5257c` is a bare `ret` (the
     calls stay, the sound was taken out of this build).
 

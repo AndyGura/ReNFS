@@ -1,15 +1,18 @@
 /* What the checks that leave out replay.c, menu.c, joystick.c, racekeys.c and race.c
    still need (hud.c, crash.c, drive.c, config.c, skid.c refer to them): nothing
-   recorded, no replay bar, no pointer, no joystick, the keys' detail at its first, no
+   recorded, no replay bar, no watching bar, no session's names, no pointer, no joystick, the keys' detail at its first, no
    loading picture. Weak, so a check that links the real ones gets those. */
 #include "joystick.h"
 #include "replay.h"
 #include "menu.h"
 #include "race.h"
 #include "racekeys.h"
+#include "session.h"
 
 __attribute__((weak)) replay_state g_replay;
 __attribute__((weak)) replay_bar g_bar;
+__attribute__((weak)) watch_bar g_watch;
+__attribute__((weak)) race_session g_session;
 __attribute__((weak)) race_keys_state g_rkeys;
 __attribute__((weak)) int g_race_slide = -1;
 

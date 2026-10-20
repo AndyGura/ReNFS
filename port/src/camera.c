@@ -6,6 +6,7 @@
 #include "exe.h"
 #include "opponent.h"
 #include "poly.h"
+#include "replay.h"
 #include "timing.h"
 #include "track.h"
 #include <string.h>
@@ -75,6 +76,7 @@ void camera_set_mode(race_camera *cam, int mode)
     if (cam->ahead->current > -1)
         view_layout(cam->ahead, cam->ahead->current);
     g_view_redraw = 1;
+    g_watch.whole = 1;
 }
 
 void camera_set_car(race_camera *cam, const race_car *c, int mode)

@@ -26,6 +26,7 @@
 unsigned char g_rec[REC_SIZE];
 replay_state g_replay;
 replay_bar g_bar;
+watch_bar g_watch;
 
 /* the file's blocks (§3.15): the race record, then 0x9a4 bytes from 0x144ba8 (the
    highlights), the recording (UsrCtrlBuff 0xf6b98), 0xcc8 bytes from 0x143ed8 (the
@@ -328,6 +329,11 @@ void replay_start(void)
     g_replay.attract = 0;
     g_replay.end = 0;
     g_replay.plays = 1;
+    /* (the watching bar: drawn whole, the first car's button pressed) */
+    g_watch.whole = 1;
+    g_watch.pressed = g_watch.lit = g_watch.last_pressed = WATCH_CAR1;
+    g_watch.lit_drawn = 1;
+    g_watch.name_for = 0;
     /* (the bar: play pressed, full speed, drawn again) */
     g_bar.redraw = 1;
     g_bar.speed = 0;
@@ -1092,6 +1098,7 @@ static void back_to_race(void)
     g_replay.highlight = -2;
     rsnd_mute(0);
     rsnd_engine_restart();
+    g_watch.whole = 1;         /* (0x5e020) */
 }
 
 /* 0x5ec04: the next highlight (after the last, the first again; the attract mode's
@@ -1272,6 +1279,13 @@ static void bar_mouse(int *x, int *y)
     *y = *y * H(200, 480) / 480;
 }
 
+/* the mouse put at a pixel of the race's screen (0x84848): rounded up into the 640x480
+   picture's, so that bar_mouse reads that pixel back */
+static void mouse_place_at(int x, int y)
+{
+    mouse_place((x * 640 + H(319, 639)) / H(320, 640), (y * 480 + H(199, 479)) / H(200, 480));
+}
+
 static int bar_in(int k, int x, int y)
 {
     const int *r = g_bar.rect[k];
@@ -1349,8 +1363,8 @@ static void bar_input(void)
             /* the mouse to the middle of the lit picture */
             const int *r = g_bar.rect[g_bar.lit];
 
-            mouse_place((g_bar.lit_size[g_bar.lit][0] / 2 + r[0]) * 640 / H(320, 640),
-                        (g_bar.lit_size[g_bar.lit][1] / 2 + r[1]) * 480 / H(200, 480));
+            mouse_place_at((g_bar.lit_size[g_bar.lit][0] / 2 + r[0]),
+                           (g_bar.lit_size[g_bar.lit][1] / 2 + r[1]));
         }
         if (key == 0x20 || key == 0x0d) {
             g_bar.pressed = g_bar.lit;
@@ -1412,6 +1426,168 @@ static void bar_input(void)
         break;
     }
     g_bar.last_pressed = g_bar.pressed;
+}
+
+static int watch_in(int k, int x, int y)
+{
+    const int *r = g_watch.rect[k];
+
+    return r[0] <= x && x <= r[2] && r[1] <= y && y <= r[3];
+}
+
+/* 0x7f470: the watching bar's buttons by the mouse, once it moved or is pressed: those
+   of the cars racing, the camera's while a player's car is watched, never Done (a
+   network game's); 1 while it is on one */
+static int watch_mouse(void)
+{
+    int over = 0, x, y, k;
+
+    mouse_limits(0, H(0xb4 * 480 / 200, 0x1c2), 640, 480);
+    fe_mouse_moved();
+    if (g_mouse_active)
+        fe_mouse_read();
+    bar_mouse(&x, &y);
+    if (x != g_watch.mouse_was[0] || y != g_watch.mouse_was[1] || g_mouse_buttons)
+        for (k = 1; k <= WATCH_CAMERA; k++) {
+            if (k > WATCH_CAR1 && k < WATCH_AFTER && k - WATCH_CAR1 >= g_field) {
+                k = WATCH_AFTER - 1;
+                continue;
+            }
+            if ((k == WATCH_CAMERA && g_drive.viewed >= g_humans) || k == WATCH_DONE
+                || !watch_in(k, x, y))
+                continue;
+            if (!g_mouse_buttons) {
+                if (k != g_watch.lit) {
+                    g_watch.redraw = 1;
+                    g_watch.pressed = 0;
+                    g_watch.lit = k;
+                }
+            } else if (k != g_watch.pressed) {
+                g_watch.redraw = 1;
+                g_watch.lit = 0;
+                g_watch.pressed = k;
+            }
+            over = 1;
+        }
+    g_watch.mouse_was[0] = x;
+    g_watch.mouse_was[1] = y;
+    return over;
+}
+
+/* 0x7f5e8: with no menu key held, ',' the car before, '.' the car after, 1..8 a car
+   (the first held, if it races); the arrows move the light along (up and down between
+   the cars' row and the buttons each side), Space or Enter press the lit one */
+static int watch_keys(void)
+{
+    static const unsigned char scan[10] = { 0x33, 0x34, 2, 3, 4, 5, 6, 7, 8, 9 };
+    int key = held_key(), i, done = 0;
+
+    if (!key) {
+        for (i = 0; i < 10; i++)
+            if (key_down(scan[i])) {
+                if (i >= 2 && g_field < i - 1)
+                    break;
+                g_watch.pressed = i == 0 ? WATCH_BEFORE : i == 1 ? WATCH_AFTER : WATCH_CAR1 + i - 2;
+                g_watch.redraw = done = 1;
+                break;
+            }
+        g_watch.last_key = 0;
+        return done;
+    }
+    if (key != g_watch.last_key) {
+        if (key == 0x4b00) {
+            /* (Done passed over: a network game's) */
+            int k = --g_watch.lit == WATCH_DONE ? 0 : g_watch.lit;
+
+            if (k < 1)
+                g_watch.lit = g_drive.viewed < g_humans ? WATCH_CAMERA : WATCH_AFTER;
+            else if (k == WATCH_AFTER - 1)
+                g_watch.lit = g_field + 2;
+            g_watch.redraw = done = 1;
+        } else if (key == 0x4d00) {
+            ++g_watch.lit;
+            if (g_watch.lit <= WATCH_CAMERA
+                && (g_watch.lit != WATCH_CAMERA || g_drive.viewed < g_humans)) {
+                if (g_watch.lit > WATCH_CAR1 && g_watch.lit < WATCH_AFTER
+                    && g_watch.lit > g_field + 2)
+                    g_watch.lit = WATCH_AFTER;
+            } else
+                g_watch.lit = WATCH_BEFORE;
+            g_watch.redraw = done = 1;
+        } else if (key == 0x4800) {
+            if (g_watch.lit == WATCH_BEFORE) {
+                g_watch.lit = WATCH_CAR1;
+                g_watch.redraw = done = 1;
+            } else if (g_watch.lit == WATCH_AFTER) {
+                g_watch.lit = g_field + 2;
+                g_watch.redraw = done = 1;
+            }
+        } else if (key == 0x5000) {
+            if (g_watch.lit == WATCH_CAR1) {
+                g_watch.lit = WATCH_BEFORE;
+                g_watch.redraw = done = 1;
+            } else if (g_watch.lit == g_field + 2) {
+                g_watch.lit = WATCH_AFTER;
+                g_watch.redraw = done = 1;
+            }
+        }
+    }
+    g_watch.last_key = key;
+    if (key == 0x20 || key == 0x0d) {
+        g_watch.pressed = g_watch.lit;
+        g_watch.redraw = done = 1;
+    }
+    return done;
+}
+
+static void watch_car(int n, int engine)
+{
+    g_drive.viewed = n;
+    camera_set_car(g_replay.cam, g_cars[n], 4);
+    if (engine)
+        rsnd_engine_on();
+}
+
+/* 0x7f010, each step while the watching bar is up: the mouse, else the keys (the mouse
+   then put on the lit button); let go, the pressed one stays lit. The car before or
+   after (once a press, round the racers), a car (its engine heard), the camera's next
+   mode */
+static void watch_step(void)
+{
+    int over = watch_mouse(), keyed = 0;
+
+    if (!over && (over = watch_keys()))
+        keyed = 1;
+    if (!over) {
+        if (g_watch.pressed) {
+            g_watch.lit = g_watch.pressed;
+            g_watch.redraw = 1;
+            g_watch.pressed = 0;
+        }
+    } else if (g_watch.pressed == WATCH_BEFORE) {
+        if (g_watch.pressed != g_watch.last_pressed)
+            watch_car(g_drive.viewed - 1 < 0 ? g_field - 1 : g_drive.viewed - 1, 0);
+    } else if (g_watch.pressed >= WATCH_CAR1 && g_watch.pressed < WATCH_AFTER) {
+        if (g_watch.pressed - WATCH_CAR1 != g_drive.viewed)
+            watch_car(g_watch.pressed - WATCH_CAR1, 1);
+    } else if (g_watch.pressed == WATCH_AFTER) {
+        if (g_watch.pressed != g_watch.last_pressed)
+            watch_car(g_drive.viewed + 1 >= g_field ? 0 : g_drive.viewed + 1, 0);
+    } else if (g_watch.pressed == WATCH_CAMERA) {
+        if (g_watch.pressed != g_watch.last_pressed && g_drive.viewed < g_humans)
+            camera_next(g_replay.cam);
+    }
+    /* (Done, 1: a network game's leaving, 0x15d138) */
+    g_watch.last_pressed = g_watch.pressed;
+    if (g_watch.pressed)
+        g_watch.lit = g_watch.pressed;
+    if (keyed) {
+        /* the mouse to the middle of the lit button's normal picture */
+        const int *r = g_watch.rect[g_watch.lit];
+
+        mouse_place_at((g_watch.size[g_watch.lit][0] >> 1) + r[0],
+                       (g_watch.size[g_watch.lit][1] >> 1) + r[1]);
+    }
 }
 
 /* 0x5e948's second half: the bar read, its action done (a new one: the bar drawn again,
@@ -1479,6 +1655,8 @@ void replay_step(void)
     }
     if (g_drive.state != 1)
         bar_step();
+    else if (g_drive.viewed != g_player || g_timing.stopped)
+        watch_step();
     if (!(g_drive.flags & 4))
         return;
     g_replay.pos = g_drive.steps % RING_COUNTS;

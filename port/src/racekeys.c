@@ -8,6 +8,7 @@
 #include "exe.h"
 #include "hud.h"
 #include "racesnd.h"
+#include "replay.h"
 #include "timing.h"
 #include "video.h"
 
@@ -49,6 +50,7 @@ static void watch(race_camera *cam, int n)
     if (n >= g_ncars)          /* (the original took whatever the table held) */
         return;
     g_drive.viewed = n;
+    g_watch.whole = 1;
     camera_set_car(cam, g_cars[n], 4);
     rsnd_engine_on();
 }
@@ -118,6 +120,7 @@ void race_keys(race_camera *cam)
             if (g_rkeys.window == 3)
                 g_hud.clear = 1;
             g_view_redraw = 1;
+            g_watch.whole = 1;
         }
     } else if (key_down(K_F2)) {
         if (g_rkeys.fkey_up) {

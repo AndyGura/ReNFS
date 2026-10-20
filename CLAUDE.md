@@ -177,6 +177,7 @@ playing `0x5efb0`→`0x5e948`/`0x5ee14`/`0x5dc54`, jumps `0x5d690`, highlights `
 marks `0x5c6d4`, the bar `0x5e4ec`/`0x5fcf0`; the controls' kinds (+0x33/+0x37 → `0x12d974`) go
 with the file (the CD's were driven with a joystick); the race menus' Replay/Highlights keep
 the session (`0x1add8`), the pause menu's keeps the clocks and races on after Done (`0x5e020`),
+watching another car while racing its own bar (`0x7ef14`, `0x7f010`),
 the attract mode plays REPLAY1..3 from its second round (`0x34284`).
 Menus: held keys, letters blended per pixel, an inverse colour table after every fade up
 (NOTES §4.2).
@@ -192,8 +193,9 @@ The controls screen `0x22bd0` (NOTES §4.2): +0x5f36.. kinds and keys (menu key 
 the key `0x733a0`; the race's scan codes `0x36a0c` (`0x36758` German → US, `key_scancode` `0x91d60`, table `0xf7b74`).
 `tools/fecompare.py`: a port menu picture against DOSBox's, by palette entry.
 Races at 640x480 (NOTES §4.24): the default (+0x7f 0, `0x12c308` 1), `H(lo, hi)` in the port; detail 3
-every other line (`0x12d9da` the clear); not yet at either size:
-the watching bar `0x7ef14`, the start beeps `0x5257c`.
+every other line (`0x12d9da` the clear); the start beeps `0x5257c` are an empty routine.
+The watching bar (NOTES §4.22): another car watched or the player stopped, drawn `0x7ef14` (`hud.c`
+`watch_draw`), read `0x7f010` (`replay.c` `watch_step`): the cars 1..8, < >, the camera, the driver's name.
 Skid marks (NOTES §4.10's end, `skid.c`): 125 records `0x149574` written as the player's car is drawn
 `0x671dc`, painted at the road's near rows `0x679ec(-999)` as shadows `0x989a0`; none with +0x87. The dust
 `0x664bc` at their newest wheel points (smo/dir of SMOKE.QFS): its random numbers the port's own (the
