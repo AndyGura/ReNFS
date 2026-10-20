@@ -276,7 +276,7 @@ int race_run(void)
     hud_car driver;
     hud_map_state map;
     unsigned start, now;
-    int mirror_skip = 0, redraw, in_seat = 1;
+    int mirror_skip = 0, redraw, in_seat = 1, seat;
     unsigned done = 0;
     const char *car;
 
@@ -575,6 +575,7 @@ int race_run(void)
         /* the view changed: the screen round it into the view's picture first (0x3081c,
            whatever the view; from the driver's seat the dashboard covers it) */
         redraw = g_view_redraw;
+        g_view_redraw = 0;
         if (redraw)
             hud_outside_screen(cam.ahead->box);
         /* the view painted off the screen (0xf4578), then the dashboard puts it on the
@@ -594,21 +595,35 @@ int race_run(void)
             map.nodes[i] = (short)cars[i].node;
         map.place = g_timing.place_shown;   /* (the last frame's, as the map comes first) */
         memcpy(map.places, g_timing.places, sizeof map.places);
-        map.driver = cam.mode == 0;
+        map.driver = cam.mode == 0 && !g_hud.no_dash;
+        g_hud.cam_mode = cam.mode;
+        g_hud.stopped = g_timing.stopped;
         hud_map(&map);
         k = hud_ticket(g_opp.ticket_up, g_opp.warning_up, g_timing.result);
+        /* (the seat this frame is drawn from: F9 inside the dashboard's frame changes it
+           for the next) */
+        seat = cam.mode == 0 && !g_hud.no_dash;
         if (k == 1)
             ;                  /* the police's ticket or warning instead */
-        else if (cam.mode == 0) {
+        else if (seat) {
             /* back in the driver's seat: the whole dashboard again (0x143e68, 0x2d284) */
             if (!in_seat)
                 hud_redraw_due();
             hud_frame(&driver);
         } else
             hud_outside_frame(&driver, redraw, cam.ahead->current);
-        in_seat = cam.mode == 0;
+        in_seat = seat;
+        /* F9 (0x2f644): the driver's view with the dashboard or without, mode 0's view
+           (0xe80f0) and the camera's mode taken up again, the screen round it redrawn */
+        if (g_hud.view_changed) {
+            g_hud.view_changed = 0;
+            g_cam_modes[0].kind = g_hud.no_dash;
+            camera_set_mode(&cam, cam.mode);
+            g_view_redraw = 999;
+        }
         /* (after the ticket, the screen round the view drawn again: 0xeaaa8) */
-        g_view_redraw = k == 2;
+        if (k == 2)
+            g_view_redraw = 1;
         video_retrace();
     }
 

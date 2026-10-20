@@ -38,6 +38,11 @@ typedef struct {
     int laps;                  /* 0x13c160: the race's laps */
     int lap_limit;             /* 0x12dd14: the most the bar shows */
     int finish_node;           /* 0x13c164: an open road's finish */
+    int no_dash;               /* 0x12ba2c: F9, the driver's view without the dashboard
+                                  (camera mode 0's view 1, 0xe80f0) */
+    int view_changed;          /* F9 pressed: the camera's mode to be taken up again */
+    int cam_mode;              /* 0x129ecc: the camera's mode */
+    int stopped;               /* 0x145c90: the player finished and stopped */
 } hud_status;
 
 /* what the map shows (0x31cb4) */
@@ -86,6 +91,11 @@ extern hud_picture g_hud_map;        /* 0xf4584: the map */
    in German), their colours queued for re-colouring with the program's 13 at 0xf0 */
 int hud_load(void);
 void hud_free(void);
+/* race_stats_max 0x2d71c: the acceleration test's times (steps, 1,200 at most; 0 left
+   as it was) and the speed at the quarter mile; 0x2d778: the steps from 60 and from 80
+   mph to standing (500 at most), as feet */
+void hud_accel_times(int t60, int t100, int quarter, int speed);
+void hud_braking(int from60, int from80);
 /* the whole dashboard drawn again, as a view starts (0x30094): the dashboard's picture,
    the map's dim background taken from it, the status bar */
 void hud_redraw(void);

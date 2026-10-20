@@ -62,8 +62,8 @@ static const struct { const char *name; int scan; } g_script_keys[] = {
     { "esc", 0x01 }, { "enter", 0x1c }, { "space", 0x39 }, { "up", 0x48 }, { "down", 0x50 },
     { "left", 0x4b }, { "right", 0x4d }, { "tab", 0x0f }, { "y", 0x15 }, { "n", 0x31 },
     { "j", 0x24 }, { "f1", 0x3b }, { "f2", 0x3c }, { "f3", 0x3d }, { "f4", 0x3e },
-    { "bksp", 0x0e }, { "del", 0x53 }, { "f5", 0x3f }, { "f6", 0x40 }, { "ctrl", 0x1d },
-    { "alt", 0x38 }, { "lshift", 0x2a }, { "rshift", 0x36 }, { "end", 0x4f },
+    { "bksp", 0x0e }, { "del", 0x53 }, { "f5", 0x3f }, { "f6", 0x40 }, { "f7", 0x41 },
+    { "f8", 0x42 }, { "f9", 0x43 }, { "ctrl", 0x1d }, { "alt", 0x38 }, { "lshift", 0x2a }, { "rshift", 0x36 }, { "end", 0x4f },
 };
 
 static const SDL_Scancode g_pc_keys[0x59][2];

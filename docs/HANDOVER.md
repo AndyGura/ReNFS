@@ -405,8 +405,8 @@ races 320x200 / 320x240; commit locally as the work goes.
    Central, the segments in a row, every standings page, the checkpoint and finish
    menus, a tournament from race to race. Next: the race menus' Options (`0x12760`,
    `0x195d8`) and Replay / Highlights (race_run in replay mode, +0xaf 1 / 2, the RPL
-   record); the measurements' HUD on Rusty Springs (`0x2d71c`, `0x2d778`, values
-   `0x12b968`..).
+   record). The dashboard's keys F7 / F8 / M / F9 and Rusty Springs' measurements on the
+   status bar: done (NOTES §4.11). Not yet: races at 640x480 (settings +0x7f).
    (`0x136618`, the sections drawn: the settings' +0x85 and F3, NOTES §4.19.)
    Open: the race's sound reaches full scale at the hits and the horn (0.2 to 0.7 % of
    the samples in `build/snd_port/`): how EA's mixer sums the voices is still to compare. Model polygons of one colour (`0xaa990`) are not ported (none met so far).

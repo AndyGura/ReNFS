@@ -2142,7 +2142,34 @@ grey `0xf6c84` (→ `0x1456b8`), yellow `0xf6cb0` (yel0..9, `yelr` 10, `yeln` 11
   48 units a node over 1600 a mile (1000 a km), + 1 tenth while short of it (else 0):
   the whole and the tenths 8 + 2 on; in km (`0x15d140`) the whole in two places, which
   overlap the `MILES` label, as in the original. Caches `0x12b91c`, `0x12b920`.
-- Mode 2 (the acceleration test, `0x2d8c0`): not ported.
+- Mode 2 (the acceleration test, `0x2d8c0`; 2026-10-20): `stat` then `acct`, then each
+  figure only when it differs from its shown copy (`0x12b950`..`0x12b964`, cleared by
+  `0x2d150`). The figures are made while driving Rusty Springs' time trial
+  (`car_physics_player` `0x417a2`, §4.21): **`0x2d71c(t60, t100, quarter, speed)`** keeps
+  each time above 0 (above `0x4b0` it becomes 0) in `0x12b968`, `0x12b96c`, `0x12b970`
+  and `0x12b974` = speed · 224 / `0x640000` (mph); **`0x2d778(from60, from80)`** (capped
+  at `0x1f4`) `0x12b97c` = from60 · `0xa76` / 12000 · 33 / 10 and `0x12b978` = from80 ·
+  `0xdf3` / 12000 · 33 / 10 (feet). Times by `0x2d7f0`: seconds = v / 60, tenths =
+  (v − seconds · 60) / 6, two digits at x and one at x + 2 · 8 + 2 (y 1), x `0x14`,
+  `0x45`, `0x76`; mph 3 digits at `0xaa`, `0x12b97c` at `0x11f`, `0x12b978` at `0xee`;
+  `0x2d50c` the yellow digits (`0x1456e8`), leading zeros blank (entry 14) but the last.
+  All cleared when the car is loaded (`0x2e8d4(1)`, with `0x12ba2c` and `0xe80f0`).
+**The dashboard's keys, `hud_keys` `0x2f644`** (2026-10-20), from both frames (`0x31ba1`,
+`0x315ae`): first the status bar if due (steps > `0x12b944`); then, with the latch
+`0xea9a0` (1 at the start; any of these keys clears it, none sets it): **F8** the bar's
+mode, on Rusty Springs' time trial (track 3, type 0) (mode + 1) % 3, else 1 − mode, the
+bar shown, drawn; **F7** the bar shown or not; **the map key** (settings `+0x5f4e`, `M`,
+or the joystick's) the map on or off: off → `0x12b8d4` = 1, and from outside or without
+the dashboard `0x2f84c` (the map corner's tiles and border again; the port draws the whole
+screen round the view again instead); `0x12d9d9` == 3 → `0x12d9da` = 1 (not ported);
+**F9** (not in a replay `0x15d13a`, not stopped `0x145c90`, camera mode ≤ 1):
+`0x12ba2c` ^= 1, camera mode 0's kind `0xe80f0` = it (the bumper's eye), `camera_set_mode`
+`0x14b00` again, `0x143e00` = 999 (the screen round the view drawn next frame).
+`race_draw_frame` `0x5c008` uses the dashboard only with camera mode 0 and `0x12ba2c` 0;
+coming back to it the whole dashboard is drawn (`0x143e68`).
+**Ported (`hud.c` `hud_keys`, `accel_figures`; `race.c`).** Checked by eye against the
+original (build/circ/h_*.png: F8's three modes, 5.1 / 10.7 / 13.4 at 111 mph, F7, the map
+off, F9 there and back); not pixel for pixel, as those were taken in a 640x480 race.
 **Ported (`hud.c` `bar_numbers`): equal pixel for pixel on e3 in 27 cases (speeds,
 gears, places, times, splits both ways, laps, miles, a new best lap; `tools/dash_emu.py`).**
 
@@ -2156,8 +2183,8 @@ its `+8`, y − its `+0xa`), the small rev counter `tach` see-through at its own
 the numbers' caches reset (`0x2d150`). Each frame then **`0x314e4(car, redraw)`**:
 `0x30b64`: with redraw the rev counter put in again and the whole picture copied to the
 screen; else only the view's spans by a BAMF list: `MASKLO.B<l><d>` with the map on, else
-the entries of `MASKLO.MMB`, by (layout − 1, detail); then the keys' bar `0x2f644` (not
-ported), the numbers `0x30d8c`, **the small needle `0x31168`**: the angle = min(rpm, red
+the entries of `MASKLO.MMB`, by (layout − 1, detail); then the keys' bar `0x2f644` (ported
+2026-10-20), the numbers `0x30d8c`, **the small needle `0x31168`**: the angle = min(rpm, red
 line + 0x3d4) · 600 / red line + 0x1a9, the end = the centre (w/2 + `+0xc`, h/2 + `+0xe`)
 + r · (cos, sin), r = hw − hw/4 − hw/16, the start a quarter of the way out; the old
 needle's two halves (`0xeaa98`..`0xeaaa4`) erased in clip boxes ±2 by drawing the `tach`
@@ -2227,8 +2254,8 @@ reads the word before the table.)
 segments, circuit, circuit time trial, single race, tournament, two players;
 `tools/timing_emu.py`).** Not yet: the race-end screens and the records written, the
 tickets and the record's other fields, the speech (`0x722b4`, `0x72438`), the network
-branches, the old race's splits (`+0x44`), a computer car's gear from `+0x308`, the HUD's
-keys `0x2f644`, km/h from the settings.
+branches, the old race's splits (`+0x44`), a computer car's gear from `+0x308`, km/h from the
+settings.
 
 ### 4.13 The opponent's driving (2026-10-19)
 

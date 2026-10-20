@@ -18,6 +18,7 @@
 #include "track.h"
 #include "trackfam.h"
 #include "video.h"
+#include "view.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -50,6 +51,13 @@ static int g_split_drawn;            /* 0x12b8e0: the split (its place shared wi
                                         laps and miles) */
 static int g_lap_shown;              /* 0x12b928 */
 static int g_mile_shown[2];          /* 0x12b91c, 0x12b920: whole and tenths */
+static int g_accel[6];               /* 0x12b968 ..: the acceleration test's figures: the
+                                        steps to 60 and to 100 mph and to a quarter mile,
+                                        the mph there, the feet from 80 and from 60 mph to
+                                        standing (0 none) */
+static int g_accel_shown[6];         /* 0x12b950 ..: those on the screen */
+static int g_keys_up = 1;            /* 0xea9a0: no dashboard key held since the last */
+static void hud_keys(void);
 /* the views from outside: the HUD's lists of what of the view reaches the screen, by the
    view's size and the detail (MASKLO.MMB, 0x145a28; the .B<s><n> files leave out the map's
    box too, 0x145a58), and the small rev counter (0x145788 its centre, 0x145790 its
@@ -165,6 +173,9 @@ int hud_load(void)
     int i;
 
     hud_free();
+    /* (0x2e8d4 as the player's car is loaded: the acceleration test's figures none) */
+    memset(g_accel, 0, sizeof g_accel);
+    memset(g_accel_shown, 0, sizeof g_accel_shown);
     if (!fsh_load(&g_mask, g_german ? "SIMDATA/MISC/MASKLOG.FSH" : "SIMDATA/MISC/MASKLO.FSH")) {
         fprintf(stderr, "renfs: SIMDATA/MISC/MASKLO.FSH is missing\n");
         return 0;
@@ -321,7 +332,93 @@ static void numbers_reset(void)
     g_gear_shown = g_place_drawn = g_split_drawn = g_lap_shown = -99;
     g_time_shown[0] = g_time_shown[1] = g_time_shown[2] = -99;
     g_mile_shown[0] = g_mile_shown[1] = -99;
+    memset(g_accel_shown, 0, sizeof g_accel_shown);
     g_bar_at = 0x7d000;
+}
+
+/* n yellow digits of v, the leading noughts blank but the last (0x2d50c) */
+static void yellow_digits(int v, int x, int y, int step, int n)
+{
+    int d[8], i, leading = 1;
+
+    for (i = 0; i < n; i++) {
+        d[i] = v >= 10 ? v % 10 : v;
+        v = v >= 10 ? v / 10 : 0;
+    }
+    for (i = n - 1; i >= 0; i--, x += step)
+        if (d[i] == 0 && i > 0 && leading)
+            blit(table_named(YELLOW, YELLOW_BLANK), x, y, COPY);
+        else {
+            blit(table_named(YELLOW, d[i]), x, y, COPY);
+            leading = 0;
+        }
+}
+
+/* steps as seconds and tenths (0x2d7f0: more than 1,200 shown as none) */
+static void accel_time(int v, int x)
+{
+    int sec;
+
+    if (v > 0x4b0)
+        v = 0;
+    sec = v / 60;
+    yellow_digits(sec, x, 1, 8, 2);
+    yellow_digits((v - sec * 60) / 6, x + 2 * 8 + 2, 1, 8, 1);
+}
+
+/* the acceleration test's figures on the status bar, each when it changes (0x2d8c0) */
+static void accel_figures(void)
+{
+    static const int time_x[3] = { 0x14, 0x45, 0x76 };
+    int i;
+
+    for (i = 0; i < 3; i++)
+        if (g_accel_shown[i] != g_accel[i]) {
+            accel_time(g_accel[i], time_x[i]);
+            g_accel_shown[i] = g_accel[i];
+        }
+    if (g_accel_shown[3] != g_accel[3]) {
+        yellow_digits(g_accel[3], 0xaa, 1, 8, 3);
+        g_accel_shown[3] = g_accel[3];
+    }
+    if (g_accel_shown[5] != g_accel[5]) {
+        yellow_digits(g_accel[5], 0x11f, 1, 8, 3);
+        g_accel_shown[5] = g_accel[5];
+    }
+    if (g_accel_shown[4] != g_accel[4]) {
+        yellow_digits(g_accel[4], 0xee, 1, 8, 3);
+        g_accel_shown[4] = g_accel[4];
+    }
+}
+
+void hud_accel_times(int t60, int t100, int quarter, int speed)
+{
+    if (t60 > 0x4b0)
+        t60 = 0;
+    if (t100 > 0x4b0)
+        t100 = 0;
+    if (quarter > 0x4b0)
+        quarter = 0;
+    if (t60 > 0)
+        g_accel[0] = t60;
+    if (t100 > 0)
+        g_accel[1] = t100;
+    if (quarter > 0)
+        g_accel[2] = quarter;
+    if (speed > 0)
+        g_accel[3] = speed * 224 / 0x640000;
+}
+
+void hud_braking(int from60, int from80)
+{
+    if (from60 > 0x1f4)
+        from60 = 0;
+    if (from80 > 0x1f4)
+        from80 = 0;
+    if (from60 > 0)
+        g_accel[5] = from60 * 0xa76 / 12000 * 33 / 10;
+    if (from80 > 0)
+        g_accel[4] = from80 * 0xdf3 / 12000 * 33 / 10;
 }
 
 static void status_bar(void)
@@ -347,7 +444,10 @@ static void status_bar(void)
         time_draw((g_hud.circuit ? g_hud.best_lap : record_time(g_hud.track, g_hud.segment)) + 300,
                   0x11, 3, 6, 2);
     }
-    /* (mode 2, the acceleration test: 0x145780 and 0x2d8c0, not yet) */
+    else {
+        blit_own(named(&g_mask, "acct"), COPY);
+        accel_figures();
+    }
     if (g_hud.mode < 2)
         blit_own(named(&g_mask, g_hud.race_type <= 1 ? "head" : "sing"), COPY);
     numbers_reset();
@@ -825,8 +925,9 @@ static void bar_numbers(const hud_car *c)
         else
             miles_number(c, 0xd9, 1, 8, 2);
     }
-    /* (mode 2, the acceleration test's figures 0x2d8c0: not yet; a network race's
-       "lost" 0x12b93c) */
+    if (g_hud.mode == 2)
+        accel_figures();
+    /* (a network race's "lost" 0x12b93c: not here) */
     g_bar_black = 1;
 }
 
@@ -867,14 +968,57 @@ void hud_frame(const hud_car *c)
     window_set(&g_hud_screen);
     /* (0x2e4f0: the gear lever's gate, in the map's box when the map is off: not yet) */
     radar();
-    /* 0x2f644: the status bar again some steps after the start's lights (and the keys
-       that switch it, the map and the view: not yet) */
-    if (g_hud.steps > g_bar_at)
-        status_bar();
+    hud_keys();
     bar_numbers(c);
     if (g_hud.map && g_hud_map.pix)
         blit_pixels(g_hud_map.pix, g_hud_map.w, g_hud_map.h, 0x103, 0x7e, COPY);
     /* (0x5c5d0: the replay's buttons, not yet) */
+}
+
+/* hud_keys 0x2f644: the status bar again some steps after the start's lights; the
+   dashboard's keys, one at a time until all are let go: F8 what the bar shows (the race
+   or the segment; on Rusty Springs' time trial the acceleration test too), F7 the bar
+   on or off, M the map (off: the dashboard drawn again; from outside the map's corner
+   0x2f84c, here the whole screen round the view), F9 the driver's view without the
+   dashboard (not after the race or in a replay, only from the driver's seat) */
+static void hud_keys(void)
+{
+    if (g_hud.steps > g_bar_at)
+        status_bar();
+    if (key_down(0x42)) {                  /* F8 */
+        if (g_keys_up) {
+            g_hud.mode = g_hud.track == 3 && g_hud.race_type == 0 ? (g_hud.mode + 1) % 3
+                                                                 : 1 - g_hud.mode;
+            g_hud.shown = 1;
+            status_bar();
+            g_keys_up = 0;
+        }
+    } else if (key_down(0x41)) {           /* F7 */
+        if (g_keys_up) {
+            g_hud.shown = 1 - g_hud.shown;
+            status_bar();
+            g_keys_up = 0;
+        }
+    } else if (key_down(0x32)) {           /* M: the settings' +0x5f4e (or the joystick's
+                                              map button, 0x12f1d8: no joystick yet) */
+        if (g_keys_up) {
+            g_hud.map = 1 - g_hud.map;
+            if (!g_hud.map) {
+                g_redraw = 1;
+                if (g_hud.cam_mode != 0 || g_hud.no_dash)
+                    g_view_redraw = 1;
+            }
+            /* (0x12d9d9 = 3, the detail with every other line: 0x12d9da, not yet) */
+            g_keys_up = 0;
+        }
+    } else if (key_down(0x43) && !g_hud.stopped && g_hud.cam_mode <= 1) {
+        if (g_keys_up) {                   /* F9 (0x15d13a, a replay: none yet) */
+            g_hud.no_dash = !g_hud.no_dash;
+            g_hud.view_changed = 1;
+            g_keys_up = 0;
+        }
+    } else
+        g_keys_up = 1;
 }
 
 /* a picture by its centre (0x812bc: less its +8, +0xa), copied */
@@ -966,10 +1110,7 @@ void hud_outside_frame(const hud_car *c, int redraw, int layout)
         bamf_copy(&g_hud_view, g_lists[g_hud.map != 0][(layout > 1 ? layout - 1 : 0) * 4
                                                         + (g_hud.detail & 3)]);
     }
-    /* 0x2f644: the status bar again some steps after the start's lights (the keys: not
-       yet) */
-    if (g_hud.steps > g_bar_at)
-        status_bar();
+    hud_keys();
     bar_numbers(c);
     small_tach(c);
     if (g_hud.map && g_hud_map.pix)

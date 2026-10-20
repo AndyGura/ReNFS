@@ -3,6 +3,7 @@
    either round towards zero (the compiler's signed division: / here) or down (sar:
    >> here), each as the machine code does. */
 #include "drive.h"
+#include "hud.h"
 #include "sound.h"
 #include "cardraw.h"
 #include "crash.h"
@@ -1073,8 +1074,8 @@ static void road_edges(race_car *c)
    (nodes up to 0x61 and from 0x1d1): standing (below 0x3333) starts the clock; with the
    throttle down, the steps to 60 and 100 mph and to a quarter mile (0x53 of the road on)
    with the speed then; braking, the steps from 60 or 80 mph to standing. The best of the
-   race goes into its statistics; the times shown on the screen as they are made (0x2d71c,
-   0x2d778) are not here yet. The clocks are kept from race to race. */
+   race goes into its statistics, and each onto the status bar as it is made (0x2d71c,
+   0x2d778). The clocks are kept from race to race. */
 static void rusty_springs_test(race_car *c)
 {
     static int braked80, braked60;                   /* 0xec3c4, 0xec3c8 */
@@ -1096,11 +1097,13 @@ static void rusty_springs_test(race_car *c)
     if (c->throttle > 0x32 && dt < 0x5dc && dt > 0x64) {
         if (c->speed > 0x1ac937 && dt < best60) {
             best60 = dt;
+            hud_accel_times(dt, 0, 0, 0);
             if (dt < st[0])
                 st[0] = dt;
         }
         if (c->speed > 0x2ca666 && dt < best100) {
             best100 = dt;
+            hud_accel_times(0, dt, 0, 0);
             if (dt < st[1])
                 st[1] = dt;
         }
@@ -1113,6 +1116,7 @@ static void rusty_springs_test(race_car *c)
                 st[5] = dt;
                 st[4] = c->speed;
             }
+            hud_accel_times(0, 0, dt, c->speed);
             bestq = dt;
         }
     }
@@ -1123,12 +1127,14 @@ static void rusty_springs_test(race_car *c)
             braked60 = g_drive.steps;
         if (c->speed < 0x1999 && braked60 > 0) {
             dt = g_drive.steps - braked60;
+            hud_braking(dt, 0);
             braked60 = 0;
             if (dt < st[3])
                 st[3] = dt;
         }
         if (c->speed < 0x1999 && braked80 > 0) {
             dt = g_drive.steps - braked80;
+            hud_braking(0, dt);
             braked80 = 0;
             if (dt < st[2])
                 st[2] = dt;

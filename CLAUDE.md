@@ -216,7 +216,7 @@ Data folder: `-data`, else `$RENFS_DATA`, else `./NFSSE`, else `NFSSE` beside th
 (the port's own formats, never the game's files). `RENFS_LANG=de`: the German art;
 `RENFS_NOSOUND=1`: no sound; `RENFS_SNDWAV=f`: what is heard written to a WAV (checking);
 `RENFS_INPUT="<retrace>:<key> .."`: keys and mouse given at those retraces (esc enter
-space up down left right tab y n j f1-f6 bksp del ctrl alt lshift rshift end click
+space up down left right tab y n j f1-f9 bksp del ctrl alt lshift rshift end click
 rclick m<x>,<y>, t<text> typed, k<letter> or k<digit> held; `<from>-<to>:<key>` holds a key through those retraces, several at
 once; for `--shot` tests);
 `RENFS_SHOTRAW=f`: `--shot` also writes the palette numbers (comparing by entry);
@@ -246,7 +246,7 @@ reaches their rows, their shadows, the racers' markers; pixel-exact, `tools/cars
 NOTES §4.10), `smoke.c` (the crash's smoke: SMOKE.QFS, the add-table `0x64488`, the
 puffs `0x64a74` stretched by EA's `0x96aa8`; exact, `tools/smoke_emu.py`), `polyfill.c` (EA's polygon filler `0x8bc71`, lines `0x8bb3c`, the smoothed
 wide line `0x8b195`; exact, `tools/polyfill_emu.py`), `hud.c` (the dashboard over the view:
-`0x30094`, `0x31684`, the needles, the map `0x31cb4`; from outside `0x3081c`, `0x314e4`, the small rev counter `0x31168`;
+`0x30094`, `0x31684`, the needles, the map `0x31cb4`; from outside `0x3081c`, `0x314e4`, the small rev counter `0x31168`; the keys F7 F8 M F9 `0x2f644`, the measurements `0x2d8c0`;
 pixel-exact, `tools/dash_emu.py`; NOTES §4.11), `track.c`
 (the TRI and its ring of sections), `trackinfo.c`, `trackfam.c`, `racepal.c`, `sky.c` (the sky, the circuits' ring `0x4ace8`, the mirror's horizon), `view.c` (windows, lens,
 matrices), `car.c` (cars' files, the grid), `camera.c` (the driver's eyes; outside, modes 2..5 and 8..13, the crash's view
