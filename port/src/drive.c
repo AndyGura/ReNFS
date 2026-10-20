@@ -3,6 +3,7 @@
    either round towards zero (the compiler's signed division: / here) or down (sar:
    >> here), each as the machine code does. */
 #include "drive.h"
+#include "sound.h"
 #include "cardraw.h"
 #include "crash.h"
 #include "opponent.h"
@@ -1473,11 +1474,16 @@ int drive_check_lap(race_car *c)
         if (p == g_player && p < DRIVE_PLAYERS && c->lap >= 2 && c->lap <= DRIVE_LAPS) {
             int t = g_drive.lap_times[p][c->lap - 1] - g_drive.lap_times[p][c->lap - 2];
 
+            /* said: a best lap, a best lap and the last to come, or the last lap */
             if (t < g_drive.best_lap) {
                 g_drive.best_lap = t;
                 g_drive.new_best = 1;
-            }
-            /* (the speech: a best lap, the last lap, 0x722b4 / 0x72438: not yet) */
+                if (c->lap < g_drive.laps)
+                    speech_say("BESTTIME.EAS");
+                else if (c->lap == g_drive.laps)
+                    speech_say("BESTLAST.EAS");
+            } else if (c->lap == g_drive.laps)
+                speech_say("FINALLAP.EAS");
         }
     } else if (was < 2 && g_drive.last_node - 2 < n)
         c->lap--;

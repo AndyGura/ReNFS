@@ -2,12 +2,14 @@
 #include "racesnd.h"
 #include "cardraw.h"
 #include "collide.h"
+#include "config.h"
 #include "crash.h"
 #include "drive.h"
 #include "exe.h"
 #include "files.h"
 #include "hud.h"
 #include "sndlib.h"
+#include "sound.h"
 #include "timing.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -314,15 +316,21 @@ void rsnd_quiet(void)
 
     for (c = 0; c < SND_CHANNELS; c++)
         snd_volume(g_rsnd.voice[c], 0);
-    /* (0x72224(0, .., 0x80): the music's volume 0 too; the race's music: not yet) */
+    music_volume(0);           /* (0x72224) */
+}
+
+void rsnd_music_back(void)
+{
+    if (!g_rsnd.muted)
+        music_volume(config_word(CFG_MUSIC_VOLUME));
 }
 
 void rsnd_mute(int on)
 {
     if (on)
         rsnd_quiet();
-    /* (off, 0x721ec gives the music its volume again) */
     g_rsnd.muted = on;
+    rsnd_music_back();
 }
 
 void rsnd_engine_off(void)

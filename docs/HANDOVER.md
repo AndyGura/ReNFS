@@ -312,7 +312,7 @@ Ghidra project and `build/decomp`, one command). The git history was started aga
   What no check runs yet (two players, tunnels, the rally, mono, the siren's echo, the
   library's random spreads): NOTES §4.18's end. The other checks still equal.
   `--race cy1` is heard (`RENFS_SNDWAV=f` writes it). A voice's end comes from the clock
-  (`snd_time`), not the mixer. Not yet: the race's music (voice 0 held for it), the speech.
+  (`snd_time`), not the mixer. The race's music and speech too.
 
 - **The race keys** (`port/src/racekeys.c`, NOTES §4.19): C changes the camera
   (`camera_next` `0x1494c`; racing: the seat, behind, further back, higher, the seat
@@ -359,8 +359,11 @@ races 320x200 / 320x240; commit locally as the work goes.
    timing, the camera outside and the crash's smoke, the opponent's driving, and cars
    meeting cars, the roadside objects knocked over, the traffic, the police and the
    sounds, and the race's keys, P's pause and the pause menu (NOTES §4.20; its Replay,
-   Audio and Graphics wait for their screens), Shift+End's giving up. Next: the race's music
-   (`0x34xxx`, the loops "loop1".., "p1".."p8") and the speech (`0x722b4`/`0x72438`).
+   Audio and Graphics wait for their screens), Shift+End's giving up, the race's music and its speech (NOTES §4.18's end). Next:
+   what the race still draws wrong or not at all: the roadside walls `0x59294` and the
+   circuits' sky ring `0x4ace8` (`--race tr1` shows the circuits now), the 3D roadside
+   objects `0x66738`; then the race started from Control Central with its choices, then
+   the results screens and the records.
    (`0x136618`, the sections drawn: the settings' +0x85 and F3, NOTES §4.19.)
    Open: the race's sound reaches full scale at the hits and the horn (0.2 to 0.7 % of
    the samples in `build/snd_port/`): how EA's mixer sums the voices is still to compare. The walls `0x59294`

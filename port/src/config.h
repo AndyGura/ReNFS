@@ -18,6 +18,8 @@ int config_word(int at);
 void config_set_word(int at, int v);
 
 #define CFG_MENU_MUSIC 0x73    /* 0 none, 1 all twelve in turn, 2 and 4-9 rock, 3 and 10-15 techno */
+#define CFG_SPEECH 0x7b        /* the race's spoken words on (0x722b4) */
+#define CFG_MUSIC_VOLUME 0x75  /* 0..127, the race's music (0x12da6b's, 0x52640) */
 #define CFG_SFX_VOLUME 0x79    /* 0..127, the menus' sounds (fe_play_sound 0x72510) */
 
 /* the main menu's choices (fe_main_menu 0x42c30) */

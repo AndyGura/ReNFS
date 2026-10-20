@@ -15,4 +15,8 @@ int eacs_header(eacs *h, const unsigned char *p, long len);
    out (16-bit, channels interleaved, room for max frames); the frames decoded */
 int eacs_stream_block(eacs *h, const unsigned char *p, long len, short *out, int max);
 
+/* a whole sound (an .EAS's or a bank's, its data from h->data): IMA from a decoder at
+   0 with no block header; the frames decoded */
+int eacs_sound(eacs *h, const unsigned char *p, long len, short *out, int max);
+
 #endif

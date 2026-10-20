@@ -60,6 +60,9 @@ void rsnd_engine_off(void);
 /* 0x525b8 (on) / 0x525ec: every channel's volume 0 and kept there, or the sounds heard
    again as they are next set (F5, the pause) */
 void rsnd_mute(int on);
+/* 0x52640 (and 0x525ec's end): the music's volume back (the settings' +0x75) unless F5
+   has the sound off */
+void rsnd_music_back(void);
 /* 0x52ab4: every channel stopped (the pause menu) */
 void rsnd_stop_all(void);
 /* the pause menu's end (0x56474): the engine's loops started again (0x52670), heard

@@ -99,3 +99,27 @@ int eacs_stream_block(eacs *h, const unsigned char *p, long len, short *out, int
                                : (short)(p[2 * i] | p[2 * i + 1] << 8);
     return n;
 }
+
+int eacs_sound(eacs *h, const unsigned char *p, long len, short *out, int max)
+{
+    int n = h->samples < max ? (int)h->samples : max;
+
+    if (h->compression != 2)
+        return eacs_stream_block(h, p, len, out, n);
+    h->ima_index[0] = h->ima_index[1] = 0;
+    h->ima_value[0] = h->ima_value[1] = 0;
+    if (h->channels == 2) {
+        if (n > len)
+            n = (int)len;
+        for (int k = 0; k < n; k++) {
+            out[2 * k] = ima(h, 0, p[k] >> 4);
+            out[2 * k + 1] = ima(h, 1, p[k] & 15);
+        }
+    } else {
+        if (n > 2 * len)
+            n = (int)(2 * len);
+        for (int k = 0; k < n; k++)
+            out[k] = ima(h, 0, k & 1 ? p[k >> 1] & 15 : p[k >> 1] >> 4);
+    }
+    return n;
+}

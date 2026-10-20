@@ -28,7 +28,7 @@ I, U8, P = ctypes.c_int, ctypes.c_ubyte, ctypes.c_void_p
 SOURCES = ["cardraw.c", "model.c", "polyfill.c", "camera.c", "car.c", "dash.c", "hud.c", "config.c", "view.c", "sky.c", "roaddraw.c",
            "trackinfo.c", "road.c", "poly.c", "raster.c", "track.c", "files.c", "exe.c", "trackfam.c",
            "racepal.c", "font.c", "video.c", "fsh.c", "unpack.c", "crash.c", "smoke.c", "drive.c", "timing.c", "opponent.c",
-           "sndlib.c", "racesnd.c", "audio.c"]
+           "sndlib.c", "racesnd.c", "audio.c", "sound.c", "eacs.c"]
 LEFT_OUT = {0x59294: 3, 0x66738: 0}
 
 

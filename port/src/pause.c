@@ -41,7 +41,7 @@ static void hold(race_camera *cam)
     hud_redraw_due();
     camera_set_mode(cam, cam->mode);
     wait_key(0);
-    /* (0x52640: the music's volume back, unless F5 has it off: no music yet) */
+    rsnd_music_back();         /* (0x52640) */
     g_pause.pending = 0;
     g_pause.last = g_drive.steps;
     g_pause.held_ticks += clock_ticks() - from;
@@ -155,6 +155,7 @@ static void menu(void)
     fe_font_load();
     fe_mouse_load();
     fe_sound_bank_load();
+    music_wait_end();          /* (0x7211c, 0x72150: the race's music stopped) */
     music_start("PAUSE.ASF");
     if (g_pause.track < 3)
         snprintf(path, sizeof path, "%s/CHECK/%s%d.QFS", art_dir(), names[g_pause.track],
@@ -297,8 +298,10 @@ static void menu(void)
     inv_build();                           /* (make_inverse_table 0x8227c) */
     hud_redraw_due();
     g_view_redraw = 1;
-    if (!g_pause.quit)
+    if (!g_pause.quit) {
         rsnd_engine_restart();
+        race_music_start();    /* (0x63d88: another one chosen) */
+    }
     g_pause.pending = 0;
     g_pause.last = g_drive.steps;          /* (0x632f8) */
 }

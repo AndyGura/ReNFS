@@ -900,7 +900,7 @@ race_from_menu 0x3770c (from fe_main_menu)
   `0x5c3b0` writes it at the race's end, `replay_start` `0x5dd68` allocates `UsrCtrlBuff`.
 - Track names: `0x41b68` (`city coast alpine springs avalley bsienna vridge tpolis lvegas`
   and their `m` / `r` variants = mirrored? / reversed?), `0x68dcc` (four-letter: city coas
-  alpi rust autu burt mont trop neod). `0x5636e`: the music loops `loop1` .. `loopx`.
+  alpi rust autu burt mont trop neod). (`0x563a4`: the pause menu's map names `cy cl al loop1 loop2 loop6 loop3 loop7 loopx`, not music; NOTES §4.20.)
 
 ### 4.4 The libraries the game leans on (read from their code)
 
@@ -2664,8 +2664,34 @@ pans and its sounds heard from outside far off; the siren's echo and channel 2's
 path in `0x800a0`; the wrapper `0x52ea8`; the library's random spreads (`0x95aba`..,
 `0x95cfb`: no sound of these banks has a spread) and the stereo pairs (`0xa20a8`).
 In the port a voice's end is worked out from the clock (`snd_time`), not by the mixer, so
-that the game's side stays deterministic. Not yet: the race's music (voice 0 is held
-for it), the speech, the race keys' calls (`0x47c88`: the camera's changes, the pause).
+that the game's side stays deterministic. Not yet: the speech.
+
+**The race's music** (2026-10-20): the menus' own streamed music (`music_start` `0x72010`,
+EA's stream on voice 0), started as the loading's last act in `race_main` (`0xf749a` = 1,
+`0x63d88`, `fe_service_stream`) when CONFIG.DAT +0x73 is not 0: mode 1 any of the twelve,
+2 a rock one, 3 a techno one, chosen by `0x52580(n)` = (EA's random number `0x91e04` &
+0xffff) · n >> 16 (**the cars' random numbers**: one drawn here, after the seeding), 4..15
+that one (`0xf6d7c`'s names; here ROCK6 can play). Volume: the stream's own (127) at the
+start; `0x72224(v)` sets it at once (0 under P, F5 and the menu's start, `0x52618`),
+`0x721ec(v)` moves to it over 0x32 ticks: `0x52640` / `0x525ec` give back the player's
+music volume `0x12da6b` (CONFIG.DAT +0x75) unless F5 has the sound off (`0xeded0`). The
+pause menu stops it (`0x7211c`, `0x72150`) for `pause.asf` and, on Continue, starts
+another (`0x63d88`, a random number again); `race_run` `0x37228` fades it out
+(`0x720d8`, 100 ticks) and waits (`0x72150`). **Ported** (`sound.c` `race_music_start`,
+`music_volume`; the half-second move made at once).
+
+**The race's speech** (2026-10-20): only `car_check_lap` `0x5056c` speaks in a race, on a
+circuit, when the player's car (the car watched in a replay) starts a new lap: its lap
+better than the best shown (`0x13c20c`, which it becomes; `0x13c208` = 1) → `besttime.eas`
+while laps remain (lap < `0x13c160`), `bestlast.eas` as the last lap starts; else
+`finallap.eas` as the last starts. `0x722b4(name)`: with the sound on (`0x15d128`) and
+CONFIG.DAT +0x7b, the file is loaded by its bare name (the installed game's root holds the
+eleven words; on the CD `FRONTEND/SPEECH/`, German `GSPEECH/`), EA's speech queue emptied
+and set up (`0x98f66(4, 4, volume)`: the sounds' volume +0x79 × 3 / 2, 127 at most; 0 if
+the menus' F5 has it off, `0xf748e`) and the word queued (`0x9901f`); `0x72438` starts the
+queue (`0x990a6`). The race's F5 does not silence it. An `.EAS` in IMA has no block header:
+its decoder starts at 0 (`eacs_sound`, equal to `tools/eacs.py` on the three words).
+**Ported** (`sound.c` `speech_say`, `drive.c`; heard on TR1 with `RENFS_LAPS`).
 
 ### 4.19 The race keys (2026-10-20)
 

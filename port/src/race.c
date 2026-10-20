@@ -17,6 +17,7 @@
 #include "pause.h"
 #include "racekeys.h"
 #include "racesnd.h"
+#include "sound.h"
 #include "sndlib.h"
 #include "road.h"
 #include "roaddraw.h"
@@ -185,7 +186,10 @@ int race_test(const char *name)
     g_drive.state = 1;
     g_drive.kind = 0;          /* City 1 (0x12da12), its first segment */
     g_drive.catch_up = 1;      /* (0x12dd10, race_setup_record) */
-    g_drive.laps = 1;
+    /* (a test: RENFS_LAPS=n laps on a circuit) */
+    g_drive.laps = getenv("RENFS_LAPS") ? atoi(getenv("RENFS_LAPS")) : 1;
+    if (g_drive.laps < 1 || g_drive.laps > DRIVE_LAPS)
+        g_drive.laps = 1;
     /* where the race ends (race_main before 0x506dc): a circuit's laps, an open road's
        last section less 45 nodes */
     g_drive.last_node = g_track.loop ? g_track.length * 4
@@ -367,6 +371,8 @@ int race_test(const char *name)
     driver.human = 1;
     driver.player = 0;
     hud_redraw_due();
+    /* the race's music, the loading's last (race_main 0x6356c: 0x63d88, with 0xf749a) */
+    race_music_start();
     start = clock_ticks();
 
     while (!g_quit && !g_pause.quit && !g_timing.result) {
@@ -469,6 +475,8 @@ int race_test(const char *name)
     }
 
     rsnd_free();               /* (0x52a70) */
+    music_fade_out();          /* (race_run 0x37228: 0x720d8, 0x72150) */
+    music_wait_end();
     g_road_paint.cars = g_road_paint.cars_behind = 0;
     g_ncars = 0;
     for (i = 0; i < RACE_CARS; i++)
