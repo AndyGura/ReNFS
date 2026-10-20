@@ -18,6 +18,7 @@
 #include "opponent.h"
 #include "racekeys.h"
 #include "racesnd.h"
+#include "skid.h"
 #include "timing.h"
 #include "track.h"
 #include "video.h"
@@ -821,6 +822,7 @@ static void jump(int to, int end)
     step_flags();
     g_replay.put_back = 1;
     crash_smoke_reset();
+    skid_reset();
     /* (0x2d2e4) the police's picture taken down */
     if (g_opp.ticket_up || g_opp.warning_up)
         g_opp.msg_time = g_drive.steps;

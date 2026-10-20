@@ -1,11 +1,13 @@
 /* The cars drawn into the road (NOTES §4.10). */
 #include "cardraw.h"
 #include "camera.h"
+#include "config.h"
 #include "crash.h"
 #include "exe.h"
 #include "polyfill.h"
 #include "racepal.h"
 #include "roaddraw.h"
+#include "skid.h"
 #include "smoke.h"
 #include "track.h"
 #include "video.h"
@@ -138,6 +140,20 @@ void car_road_plane(race_car *c, int yaw, vec3 *centre)
     c->across = b;
 }
 
+/* the player's car's tyres' marks as it is drawn (0x671dc), its axes on the road >> 10 */
+static void player_marks(const race_car *c)
+{
+    vec3 a, b;
+
+    a.x = c->along.x >> 10;
+    a.y = c->along.y >> 10;
+    a.z = c->along.z >> 10;
+    b.x = c->across.x >> 10;
+    b.y = c->across.y >> 10;
+    b.z = c->across.z >> 10;
+    skid_record_car(c, &a, &b, &c->shadow);
+}
+
 /* the car's place in the view (0x67f1c, 1/128 units); 0 if it is behind, too far or off
    to the side, or in the mirror (no shadow there). Then its shadow's four corners on the
    screen */
@@ -175,7 +191,8 @@ static int car_place(race_car *c, int xy[8], int mirror)
         xy[2 * k] = s.x;
         xy[2 * k + 1] = s.y;
     }
-    /* (the player's own car then 0x671dc: never from the driver's seat) */
+    if (c == g_cars[g_player])
+        player_marks(c);
     return 1;
 }
 
@@ -450,8 +467,15 @@ void cars_at_node(int node)
         race_car *c = g_car_order[i];
         if (c->state == 6 || node != c->draw_node)
             continue;
-        if (c == g_cars[g_player] && g_camera->mode == 0)
-            continue;          /* the player's own, from the driver's seat (0x6829c) */
+        if (c == g_cars[g_player] && g_camera->mode == 0) {
+            /* the player's own from the driver's seat: only its marks (0x6829c), with
+               the cars in full detail (the settings' +0x87, 0x12d9d7) */
+            if (!(config_word(0x87) & 0xff)) {
+                car_road_plane(c, c->yaw_drawn, &c->shadow);
+                player_marks(c);
+            }
+            continue;
+        }
         if (c->own_turn)
             c->yaw_drawn = (int)((unsigned)ea_atan2(c->turn[6], c->turn[8]) << 8);
         if (car_place(c, xy, 0))  /* 0x68258: its shadow first, darkening the road */

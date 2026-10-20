@@ -2233,6 +2233,51 @@ the windscreen's view, in the original too (e1).
   (a drawing routine of its own, called first) is zeroed at creation and never set: not
   ported. The cars' tyres on mirrored tracks (ids 100..199) have no slots: left alone.
 
+**The tyres' marks on the road (2026-10-21; `port/src/skid.c`, checked by
+`tools/skid_emu.py`: 600 cars recorded, 120 rounds of the road's rows, 600 lines painted,
+10,360 lines compared, all equal; h7's own two lines in `cars_emu`, 0 pixels).** Only the
+player's car leaves them, only as it is drawn, and none with the settings' +0x87 (the cars
+in less detail, `0x12d9d7`).
+- **The ring**: 125 records of 0xa0 at `0x149574` (`0xf6e2c` the one being written): +0 four
+  corners about the centre (the front pair A'+B, A'−B, the rear −A'+B, −A'−B, with A' = A −
+  A/4 towards 0, A the half length along and B the half width across the road, both
+  `0x38548`'s >> 10), +0x30 the shadow's centre in the world, +0x3c the corners seen and
+  +0x6c on the screen (written by the painter), +0x8c the node, +0x90 / +0x94 the front's /
+  rear's mark from here back (the *last frame's* slide, `0xf6ff4` / `0xf6ff8`; 0 none),
+  +0x98 the step counter `0x145c94`, +0x9c 2 on a surface whose `0x12cc00` row's 4th word
+  is set, else 1. `0x65094` empties it (record 0's node 0x10000, the marks 0) at the race's
+  start (`0x650c8`) and at a replay's jump (`0x5d690`).
+- **`0x671dc(car; A, B, C on the stack)`**, from `0x67f1c` (outside, after the shadow's
+  corners) and `0x6829c` (from the driver's seat: `0x38548(car, 1)` then the same). A tyre
+  pair slides when +0x405 / +0x409 ≥ 0x3c0000 and +0x425 / +0x426 & 3. Neither: only the
+  last slides kept (0). Else the record at `0xf6e2c` is written (a pair that does not slide
+  gets 0 and keeps its old corners); d = |Δz| + |Δx| from the centre where the last record
+  began (`0x14e620`). d ≤ 0xa666: the record moves on with the car, and when the rear slides
+  `0x679ec(record, 3 records)` paints it. Else the ring moves on (the new record's marks
+  0); with d ≥ 0x30000, when the record before (at the ring's start, **the one past its
+  end**, `0x14e394`, never written: empty) left the same marks, the record is copied on and
+  its corners moved half way back to the one before; the next record's marks 0, the centre
+  kept, and the rear's painting from the record before (**at the start the one before the
+  ring**, `0x1494d4`: never written but for its points seen, so node 0 and no marks).
+- **`0x67784(camera node)`**, before the road (`0x5bdfe`): `0x14e5f3`[d] = 1 for each record
+  with a mark d nodes from the camera's − 2, d < 15. The painter reads byte 15 too: the
+  loading pictures' used flag of picture 0 (`0x14e602`).
+- **`0x679ec(-999, camera node, row node, 0; the row's edge)`**, from the road's painter at
+  each near row (`0x5a85d`, after its walls, before its cars): d = the row's from the
+  camera's − 2 (round a circuit), none past 15 or when `0x14e5f3`[d] is 0. The records from
+  `0xf6e2c` − 1 back, 123 of them; one more than 2 nodes from the row stops the joining.
+  Each: the centre seen (`0x83a54`, >> 9), each corner turned and added; joined to the
+  newer one before it when both left that pair's mark: either end nearer than 0x40 is cut to
+  0x40 along the line (both: nothing, not even projected; a cut newer end projected again),
+  the width 0x2580 / the farther z (z 0: 100), at most 15, halved at 320x200 and with F2's
+  detail (`0x12d9d9`), at least 1; a line only when an end is beyond the row's edge
+  (`0x67950`: (b.y − a.y)(x − a.x) − (b.x − a.x)(y − a.y) ≥ 0 for one end). A record's
+  painting (`0x671dc`'s) the same without the edge.
+- **`0x989a0(x0, y0, x1, y1, w)`**: a = `0x8bb7c(dx, dy + dy/4)` (the screen's y a quarter
+  longer), u = w·(−cos a), v = w·sin a then v − v>>2 + v>>4, the quad (x0 + u/2, y0 + v/2),
+  (x1 + u/2, y1 + v/2), (x1 − (u − u/2), ..), (x0 − .., ..), darkened as a shadow
+  (`0x8a094`).
+
 ### 4.11 The dashboard and the HUD (2026-10-19)
 
 **The frame** (`race_draw_frame` `0x5bc40`): the 3D view is painted into an off-screen
@@ -3769,8 +3814,7 @@ and `H(lo, hi)` (`view.h`); `RENFS_RES=320|640` overrides the settings for tests
   - ~~the player's wheels~~: done 2026-10-21, §4.10's end ("The player's car's wheels");
   - the tyres' dust and smoke `0x664bc` → `0x663e0` → `0x64714`/`0x64768` (`smo1..4`,
     `dir1..4`, `0x1464bc`/`0x1460ac`; half the scale at 320x200; EA's random `0x52580`);
-  - the skid marks `0x679ec`/`0x67950` (125 records `0x149574` + 0xa0·i, ring `0xf6e2c`,
-    width 0x2580/z up to 15, halved at 320x200 and by detail; on `0x12d9d7`);
+  - ~~the skid marks~~: done 2026-10-21, §4.10's end ("The tyres' marks on the road");
   - the bar while racing but watching another car, stopped or in a replay from the race
     `0x7ef14` → `0x7f1d8`/`0x7f310`/`0x7f998`, `0x7f010`/`0x7f470` (`0x5c636`: running and
     (`0x15d13a` or the car watched not the player's or stopped `0x145c90`));

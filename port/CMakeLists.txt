@@ -37,7 +37,7 @@ add_executable(renfs
   src/options.c src/audioopt.c src/gfxopt.c src/ctrlopt.c src/loadsave.c src/credits.c src/joystick.c src/smooth.c
   src/raster.c
   src/poly.c
-  src/road.c src/roaddraw.c src/sky.c src/view.c src/car.c src/camera.c src/dash.c src/hud.c src/race.c
+  src/road.c src/roaddraw.c src/sky.c src/skid.c src/view.c src/car.c src/camera.c src/dash.c src/hud.c src/race.c
   src/model.c src/cardraw.c src/polyfill.c src/drive.c src/crash.c src/smoke.c src/timing.c src/opponent.c src/collide.c
   src/track.c
   src/exe.c

@@ -29,6 +29,7 @@
 #include "road.h"
 #include "roaddraw.h"
 #include "session.h"
+#include "skid.h"
 #include "sky.h"
 #include "smooth.h"
 #include "standings.h"
@@ -153,6 +154,8 @@ static void replay_clocks(unsigned *done, unsigned long start, race_camera *cam)
 /* load_slide 0x64d28: at 640x480 the player's car in one of its seven pictures
    (SIMDATA/SLIDES/<car>S<n>.QFS, "SCRN" with its palette, n from EA's random numbers),
    left on the screen while the race loads */
+int g_race_slide = -1;
+
 static void race_slide(int car)
 {
     char path[80];
@@ -163,8 +166,9 @@ static void race_slide(int car)
     int i;
 
     video_mode(640, 480);
+    g_race_slide = collide_below(7);
     snprintf(path, sizeof path, "SIMDATA/%s/%sS%d.QFS", g_german ? "GSLIDES" : "SLIDES", name,
-             collide_below(7));
+             g_race_slide);
     if (!fsh_load(&f, path))
         return;
     if (fsh_find(&f, "SCRN", &sh) && fsh_palette(&f, &sh, pal)) {
@@ -586,6 +590,8 @@ int race_run(void)
     g_camera = &cam;
     g_road_paint.cars = cars_at_node;
     g_road_paint.cars_behind = cars_behind_at;
+    g_road_paint.car_row = skid_paint_row;
+    skid_reset();              /* (0x650c8) */
 
     /* the dashboard as the race starts: the status bar still black (its first 360
        steps), standing with the engine idling (+0x3c1 700 at the start) */
@@ -712,6 +718,7 @@ int race_run(void)
         }
         view_matrix(&cam);
         g_camera_m = m;
+        skid_rows(cam.node);
         cars_seen(cam.node);
         w = g_view_now->win;
         near = road_transform(&cam.pos, m, cam.node);
@@ -822,6 +829,7 @@ int race_run(void)
     music_wait_end();
     music_level_from(CFG_MENU_VOLUME);
     g_road_paint.cars = g_road_paint.cars_behind = 0;
+    g_road_paint.car_row = 0;
     g_ncars = 0;
     for (i = 0; i < ncars; i++)
         car_free(&cars[i]);

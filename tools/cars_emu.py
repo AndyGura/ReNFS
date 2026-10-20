@@ -25,7 +25,7 @@ from roaddraw_emu import Painters, CARS
 from setup_check import Fam
 
 I, U8, P = ctypes.c_int, ctypes.c_ubyte, ctypes.c_void_p
-SOURCES = ["cardraw.c", "model.c", "polyfill.c", "camera.c", "car.c", "dash.c", "hud.c", "config.c", "view.c", "sky.c", "roaddraw.c",
+SOURCES = ["cardraw.c", "skid.c", "model.c", "polyfill.c", "camera.c", "car.c", "dash.c", "hud.c", "config.c", "view.c", "sky.c", "roaddraw.c",
            "trackinfo.c", "road.c", "poly.c", "raster.c", "track.c", "files.c", "exe.c", "trackfam.c",
            "racepal.c", "font.c", "video.c", "fsh.c", "unpack.c", "crash.c", "smoke.c", "drive.c", "timing.c", "opponent.c",
            "sndlib.c", "racesnd.c", "audio.c", "sound.c", "eacs.c"]
@@ -63,7 +63,7 @@ def lib():
     import subprocess
     out = "build/cars_test_%d.so" % os.getpid()        # (several runs at once)
     subprocess.check_call(["cc", "-O1", "-g", "-shared", "-fPIC", "-o", out] +
-                          ["port/src/" + f for f in SOURCES] + ["tools/timing_test.c", "tools/collide_test.c", "tools/replay_stub.c", "tools/cars_test.c", "-Iport/src"] +
+                          ["port/src/" + f for f in SOURCES] + ["tools/timing_test.c", "tools/collide_test.c", "tools/replay_stub.c", "tools/cars_test.c", "tools/skid_test.c", "-Iport/src"] +
                           subprocess.check_output(["sdl2-config", "--cflags", "--libs"]).decode().split())
     L = ctypes.CDLL(os.path.abspath(out))
     os.unlink(out)
@@ -124,10 +124,10 @@ def port(s, name, L, n, node, cars):
     v.far_shift, v.max_level = s.read(0xf6aa4, 1)[0], s.i32(0xeaad8)
     v.clip_x, v.clip_y, v.clip_z = s.i32(0x143e54), s.i32(0x143e58), s.i32(0x143e5c)
     paint.roadside = paint.roadside.__class__()
-    for f in ("model", "car_row"):
-        setattr(paint, f, getattr(paint, f).__class__())
+    paint.model = paint.model.__class__()
+    skid_state(s, L)
     for f, sym in (("quad", "quad_view"), ("whole", "paint_whole"), ("picture", "paint_picture"),
-                   ("cars", "cars_at_node")):
+                   ("cars", "cars_at_node"), ("car_row", "skid_paint_row")):
         ctypes.memmove(ctypes.addressof(paint) + getattr(Painters, f).offset,
                        ctypes.byref(ctypes.c_void_p(ctypes.cast(getattr(L, sym), ctypes.c_void_p).value)), 8)
     ctypes.c_void_p.in_dll(L, "g_paint").value = ctypes.cast(L.raster_quad, ctypes.c_void_p).value
@@ -138,6 +138,21 @@ def port(s, name, L, n, node, cars):
     L.road_objects_start()
     L.road_draw(n, node, near, ctypes.byref(win))
     return bytes(fbuf)
+
+
+def skid_state(s, L):
+    """the tyres' marks as the snapshot has them: the ring with the records before and
+    after it (0x1494d4), its place and the last slides and centre, the rows' marks; the
+    world round them"""
+    g = ctypes.addressof(ctypes.c_char.in_dll(L, "g_skid"))
+    st = s.read(0x1494d4, 127 * 0xa0) + s.read(0xf6e2c, 4) + s.read(0xf6ff4, 8) + \
+        s.read(0x14e620, 12) + s.read(0x14e5f3, 15)
+    ctypes.memmove(g, st, len(st))
+    used = s.read(0x14e602, 7)
+    slide = used.index(1) if 1 in used else -1
+    L.skid_test_world(s.u32(0x13bb88), s.i32(0x13bb8c), s.i32(0x12c308), s.read(0x12d9d9, 1)[0],
+                      s.i32(0x145c94), slide, (I * 16)(*struct.unpack("<16i", s.read(0x12cc00, 64))),
+                      (U8 * 256)(*s.read(0xf8118, 256)))
 
 
 def police_in_view(s, along, across):

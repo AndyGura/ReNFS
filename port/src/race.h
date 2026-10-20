@@ -13,6 +13,9 @@ typedef struct {
 
 extern race_codes g_race_codes;
 
+/* the loading picture shown this race, 0 .. 6 (its used flag 0x14e602 + n), -1 none */
+extern int g_race_slide;
+
 /* race_run 0x37228: the race CONFIG.DAT's settings ask for (the track, segment, type,
    car, opponent and laps as Control Central left them), from the loading picture to its
    end. 1 finished, 4 arrested, 0x10 everyone turned back, 2 left from the pause menu, 0
