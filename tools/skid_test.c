@@ -3,7 +3,9 @@
 #include "skid.h"
 #include "cardraw.h"
 #include "drive.h"
+#include "collide.h"
 #include "polyfill.h"
+#include "smoke.h"
 #include "race.h"
 #include "racekeys.h"
 #include "roaddraw.h"
@@ -17,6 +19,19 @@ static race_camera cam;
 static int cam_m[9];
 static race_car car;
 static int lines[LINES][5], nlines;
+static int puffs[256][5], npuffs;
+
+static void catch_puff(int dirt, int pick, int size, int x, int y)
+{
+    if (npuffs < 256) {
+        puffs[npuffs][0] = dirt;
+        puffs[npuffs][1] = pick;
+        puffs[npuffs][2] = size;
+        puffs[npuffs][3] = x;
+        puffs[npuffs][4] = y;
+    }
+    npuffs++;
+}
 
 static void catch_line(int x0, int y0, int x1, int y1, int w)
 {
@@ -59,8 +74,63 @@ void skid_test_view(const int *pos, const int *m, int cx, int cy, int min_z, con
 
 void skid_test_catch(int on)
 {
+    static void (*painter)(int, int, int, int, int);
+
+    if (!painter)
+        painter = g_skid_puff;
     g_skid_line = on ? catch_line : skid_line;
-    nlines = 0;
+    g_skid_puff = on ? catch_puff : painter;
+    nlines = npuffs = 0;
+}
+
+int skid_test_puffs(int *out, int max)
+{
+    int n = npuffs < 256 ? npuffs : 256;
+
+    memcpy(out, puffs, sizeof(int) * 5 * (n < max ? n : max));
+    max = npuffs;
+    npuffs = 0;
+    return max;
+}
+
+void skid_test_random(const unsigned *s)
+{
+    memcpy(g_skid.random, s, sizeof g_skid.random);
+}
+
+void skid_test_random_get(unsigned *s)
+{
+    memcpy(s, g_skid.random, sizeof g_skid.random);
+}
+
+void skid_test_dust(int slide_front, int slide_rear, int tyres_front, int tyres_rear, int far,
+                    int seen_z, const int *pos, int yaw_drawn, int behind)
+{
+    car.slide_front = slide_front;
+    car.slide_rear = slide_rear;
+    car.tyres[0] = (unsigned char)tyres_front;
+    car.tyres[1] = (unsigned char)tyres_rear;
+    car.far = far;
+    car.seen.z = seen_z;
+    car.pos.x = pos[0];
+    car.pos.y = pos[1];
+    car.pos.z = pos[2];
+    car.yaw_drawn = yaw_drawn;
+    skid_dust(&car, behind);
+}
+
+void skid_test_solid(int scale, int w, int h, int cx, int cy, const unsigned char *pixels, int x,
+                     int y)
+{
+    shape sh;
+
+    memset(&sh, 0, sizeof sh);
+    sh.w = w;
+    sh.h = h;
+    sh.cx = cx;
+    sh.cy = cy;
+    sh.pixels = pixels;
+    smoke_stretch_solid(scale, &sh, x, y);
 }
 
 int skid_test_lines(int *out, int max)

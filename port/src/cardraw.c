@@ -260,9 +260,8 @@ static void player_tyres(race_car *c)
    move at an eighth of a turn), each only while the camera sees it from its side: the
    left one from between 0xa0000 and 0x760000 of the car's heading round, the right one
    from the other side (0x662e0: the camera's direction against the drawn heading) */
-static void player_wheels(race_car *c)
+int car_seen_angle(const race_car *c)
 {
-    int s = (c->steer < 0 ? c->steer + 31 : c->steer) >> 5, left = s, right = s;
     int a = angle_of((c->pos.z - g_camera->pos.z) >> 8, (c->pos.x - g_camera->pos.x) >> 8),
         y = c->yaw_drawn, d;
 
@@ -276,6 +275,14 @@ static void player_wheels(race_car *c)
     d &= 0xffffff;
     if (d > 0x800000)
         d -= 0x1000000;
+    return d;
+}
+
+static void player_wheels(race_car *c)
+{
+    int s = (c->steer < 0 ? c->steer + 31 : c->steer) >> 5, left = s, right = s;
+    int d = car_seen_angle(c);
+
     if (d < 0xa0000 || d > 0x760000)
         left = 0;
     if (d > -0xa0000 || d < -0x760000)
@@ -330,11 +337,15 @@ static void car_models(race_car *c, const int m[9])
         player_wheels(c);
     }
     model_place(&c->near_m, m, &c->seen);
+    if (c == g_cars[g_player])
+        skid_dust(c, 1);
     for (k = 0; k < 4; k++)
         if ((unsigned)c->groups[k].index < 8) {
             model_sort(&c->near_m, c->groups[k].count, c->groups[k].list);
             model_draw(&c->near_m, c->groups[k].count, c->groups[k].list);
         }
+    if (c == g_cars[g_player])
+        skid_dust(c, 0);
 }
 
 /* a racer's marker (0x66b98): a small triangle pointing down at (x, y), in the racer's

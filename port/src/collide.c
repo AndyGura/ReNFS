@@ -102,7 +102,12 @@ void collide_seed(unsigned t)
    last counted up (its carry running up through them) */
 unsigned collide_rand(void)
 {
-    unsigned *s = g_collide.random, a = s[5], cf = 0;
+    return collide_rand_with(g_collide.random);
+}
+
+unsigned collide_rand_with(unsigned *s)
+{
+    unsigned a = s[5], cf = 0;
     unsigned long long t;
     int k;
 
@@ -122,7 +127,12 @@ unsigned collide_rand(void)
 /* 0x52580: 0 .. n - 1 */
 int collide_below(int n)
 {
-    return (int)((collide_rand() & 0xffff) * (unsigned)n) >> 16;
+    return collide_below_with(g_collide.random, n);
+}
+
+int collide_below_with(unsigned *s, int n)
+{
+    return (int)((collide_rand_with(s) & 0xffff) * (unsigned)n) >> 16;
 }
 
 /* ---- two boxes ----------------------------------------------------------------------- */

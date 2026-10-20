@@ -25,7 +25,15 @@ int smoke_load(crash_smoke *s)
         smoke_free();
         return 0;
     }
-    /* (the dust's pictures "smo1".."smo4", "dir1".."dir4" are found too: not used yet) */
+    /* the tyres' dust (0xf6db8, 0xf6dc8) */
+    for (i = 0; i < 4; i++) {
+        char name[5];
+
+        snprintf(name, sizeof name, "smo%d", i + 1);
+        fsh_find(&g_smoke.file, name, &g_smoke.dust[i]);
+        snprintf(name, sizeof name, "dir%d", i + 1);
+        fsh_find(&g_smoke.file, name, &g_smoke.dirt[i]);
+    }
     pal_tint(0, 0x100, (unsigned char *)pal.head + 0x10);
     pal_queue_remap(g_smoke.file.d, pal.head + 0x10);
     for (i = 0; i < SMOKE_PUFFS; i++) {
@@ -40,6 +48,8 @@ void smoke_free(void)
 {
     fsh_free(&g_smoke.file);
     memset(&g_smoke.puff, 0, sizeof g_smoke.puff);
+    memset(g_smoke.dust, 0, sizeof g_smoke.dust);
+    memset(g_smoke.dirt, 0, sizeof g_smoke.dirt);
 }
 
 void smoke_table(void)
@@ -85,12 +95,13 @@ static int half(int v)
 
 /* 0x96aa8: the picture stretched over w x h pixels from (x, y) (w < 0 mirrored, h < 0
    upside down), cut to the window; the source's pixels picked by steps in 16.16 from half
-   a step in */
-static void stretch_box(int w, int h, const shape *sh, int x, int y)
+   a step in, each added to the screen's (0x9498d) or, solid, put on it unless 0xff
+   (0x97038's 0x9473e) */
+static void stretch_box(int w, int h, const shape *sh, int x, int y, int solid)
 {
     int x0, y0, x1, y1, du, dv, u, v, i, cols[640];
 
-    if (!w || !h)
+    if (!w || !h || !sh->pixels)
         return;
     raster_clip(&x0, &y0, &x1, &y1);
     if (x >= x1 || y >= y1 || x + (w > 0 ? w : -w) <= x0 || y + (h > 0 ? h : -h) <= y0)
@@ -129,12 +140,17 @@ static void stretch_box(int w, int h, const shape *sh, int x, int y)
         const unsigned char *src = sh->pixels + (v >> 16) * sh->w;
         unsigned char *dst = raster_row(y) + x;
 
-        for (i = 0; i < w; i++)
-            dst[i] = g_smoke.add[src[cols[i]]][dst[i]];
+        if (solid) {
+            for (i = 0; i < w; i++)
+                if (src[cols[i]] != 0xff)
+                    dst[i] = src[cols[i]];
+        } else
+            for (i = 0; i < w; i++)
+                dst[i] = g_smoke.add[src[cols[i]]][dst[i]];
     }
 }
 
-void smoke_stretch(int scale, const shape *sh, int x, int y)
+static void stretch(int scale, const shape *sh, int x, int y, int solid)
 {
     int a = scale < 0 ? -scale : scale;
     int w = (int)((unsigned)scale * (unsigned)sh->w) >> 16;
@@ -144,7 +160,17 @@ void smoke_stretch(int scale, const shape *sh, int x, int y)
         x -= mulr(scale, sh->cx);
     else
         x += mulr(scale, sh->w - sh->cx);
-    stretch_box(w, h, sh, x, y - mulr(a, sh->cy));
+    stretch_box(w, h, sh, x, y - mulr(a, sh->cy), solid);
+}
+
+void smoke_stretch(int scale, const shape *sh, int x, int y)
+{
+    stretch(scale, sh, x, y, 0);
+}
+
+void smoke_stretch_solid(int scale, const shape *sh, int x, int y)
+{
+    stretch(scale, sh, x, y, 1);
 }
 
 void smoke_draw(crash_smoke *s, int dx, int dy)

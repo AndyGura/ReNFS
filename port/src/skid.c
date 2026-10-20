@@ -1,6 +1,7 @@
 /* The tyres' marks on the road (NOTES §4.10's end). */
 #include "skid.h"
 #include "cardraw.h"
+#include "collide.h"
 #include "config.h"
 #include "drive.h"
 #include "exe.h"
@@ -8,12 +9,23 @@
 #include "race.h"
 #include "racekeys.h"
 #include "roaddraw.h"
+#include "smoke.h"
 #include "track.h"
 #include "view.h"
 #include <string.h>
 
 skid_state g_skid;
 void (*g_skid_line)(int x0, int y0, int x1, int y1, int w) = skid_line;
+
+static void puff(int dirt, int pick, int size, int x, int y)
+{
+    if (dirt)
+        smoke_stretch_solid(size, &g_smoke.dirt[pick], x, y);
+    else
+        smoke_stretch(size, &g_smoke.dust[pick], x, y);
+}
+
+void (*g_skid_puff)(int dirt, int pick, int size, int x, int y) = puff;
 
 skid_record *skid_at(int i)
 {
@@ -55,6 +67,7 @@ void skid_reset(void)
         skid_at(i)->front = skid_at(i)->rear = 0;
     }
     g_skid.at = 0;
+    memcpy(g_skid.random, g_collide.random, sizeof g_skid.random);
 }
 
 /* 0x14e5f3 + d: the rows' marks, and past their 15 the loading pictures' used flags
@@ -279,4 +292,70 @@ void skid_record_car(const race_car *c, const vec3 *along, const vec3 *across,
     g_skid.front = front;
     g_skid.rear = rear;
     g_skid.at = at;
+}
+
+/* 0x663e0: a tyre's dust at its last four records (from 0xf6e2c - 1 back) that left its
+   pair's mark less than 48 steps ago and are on the screen, size going up by `amount`
+   each one older; on the road (0x64714) the smoke's smo1 or smo3, elsewhere (0x64768)
+   dir1..dir3 at most 1:1, both halved at 320x200 */
+static void wheel_dust(int wheel, int amount)
+{
+    int i = back(g_skid.at), size = amount, n;
+
+    for (n = 0; n < 4; n++, i = back(i), size += amount) {
+        const skid_record *r = skid_at(i);
+        int age = g_road_steps - r->step, x = r->screen[wheel].x, y = r->screen[wheel].y, s;
+
+        if (!(wheel < 2 ? r->front : r->rear) || age >= 0x30 || age <= 0 || x == (int)0x80000000)
+            continue;
+        if (r->kind == 1) {
+            int pick = 2 * collide_below_with(g_skid.random, 2);
+            g_skid_puff(0, pick, H(size / 2, size), x, y);
+        } else {
+            int pick = collide_below_with(g_skid.random, 3);
+            s = H(size / 2, size);
+            g_skid_puff(1, pick, s > 0x10000 ? 0x10000 : s, x, y);
+        }
+    }
+}
+
+/* a pair's dust's step: its slide times 2..5 (EA's random) >> 18 towards 0, 1 .. 0x180 */
+static int dust_step(int slide, int base)
+{
+    int k = (int)((unsigned)slide * (unsigned)(collide_below_with(g_skid.random, 4) + 2)) / 0x40000;
+
+    if (k > 0x180)
+        k = 0x180;
+    if (k < 1)
+        k = 1;
+    return base / 256 * k;
+}
+
+void skid_dust(const race_car *c, int behind)
+{
+    int a, base, amount;
+
+    if (!c->tyres[0] && !c->tyres[1])
+        return;
+    if (!c->slide_front && !c->slide_rear)
+        return;
+    a = car_seen_angle(c);
+    if (c->far)
+        return;
+    base = behind && !exe_i32(0xf6b8c) ? 0x8000 : 0x10000;
+    base = base / 256 * (0x38400 / c->seen.z);
+    if (c->slide_front) {
+        amount = dust_step(c->slide_front, base);
+        if (behind || (a > 0xc0000 && a < 0x740000))
+            wheel_dust(0, amount);
+        if (behind || (a < -0xc0000 && a > -0x740000))
+            wheel_dust(1, amount);
+    }
+    if (c->slide_rear) {
+        amount = dust_step(c->slide_rear, base);
+        if (behind || (a > 0xc0000 && a < 0x740000))
+            wheel_dust(2, amount);
+        if (behind || (a < -0xc0000 && a > -0x740000))
+            wheel_dust(3, amount);
+    }
 }

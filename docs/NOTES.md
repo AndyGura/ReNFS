@@ -2278,6 +2278,31 @@ in less detail, `0x12d9d7`).
   (x1 + u/2, y1 + v/2), (x1 − (u − u/2), ..), (x0 − .., ..), darkened as a shadow
   (`0x8a094`).
 
+**The tyres' dust (2026-10-21; `skid.c`'s `skid_dust`, checked by `tools/skid_emu.py`: 600
+cases, 520 puffs, the random numbers after each, and the dirt's stretch on pixels, all
+equal).** `0x664bc(car, behind)` for the player's near model only: after its points are
+placed (`0x66a18`, behind = 1) and after its groups are painted (`0x66b3d`, 0).
+- None when both tyres' bytes +0x425/+0x426 are 0, both slides +0x405/+0x409 are 0, or the
+  car is drawn far (+0x78e). a = `0x662e0` (the camera's angle round the car, as the
+  front wheels'). base = 0x8000 behind (with `0xf6b8c` 0: only replays write it, always 0)
+  else 0x10000; base = base / 256 · (0x38400 / seen z +0x399).
+- A sliding pair: k = slide · (`0x52580(4)` + 2) / 2^18 (towards 0), 1 .. 0x180; amount =
+  base / 256 · k. The left tyre (0 front, 2 rear) behind or with 0xc0000 < a < 0x740000,
+  the right (1, 3) behind or with −0x740000 < a < −0xc0000.
+- **`0x663e0(tyre, amount)`**: the records from `0xf6e2c` − 1 back, four of them, size =
+  amount, + amount each: one whose pair's mark is set, less than 0x30 steps old (and more
+  than 0), its screen point not 0x80000000: kind 1 `0x64714` (smo1 or smo3 by
+  `0x52580(2)`·2, halved at 320x200, `0x96f70` = `0x96e40`: added as the crash's smoke),
+  else `0x64768` (dir1..dir3 by `0x52580(3)`, halved at 320x200, at most 0x10000,
+  `0x97500` → `0x973d0` → `0x97038`: `0x96aa8`'s copy whose rows `0x9473e` put the
+  picture's pixels on the screen, 0xff see-through). The pictures: SMOKE.QFS's names at
+  `0xf6db8` / `0xf6dc8` into `0x1464bc` / `0x1460ac` (`0x645bc`).
+- **Its random numbers are the collisions' (`0x52580` → `0x91e04`)**: in the original how
+  many frames are drawn changes how cars hit each other later. The port's dust draws from
+  its own copy of the generator (taken from the race's at `skid_reset`), so the race stays
+  the same whatever the frame rate (60 a second with smooth motion). The check seeds both
+  equal.
+
 ### 4.11 The dashboard and the HUD (2026-10-19)
 
 **The frame** (`race_draw_frame` `0x5bc40`): the 3D view is painted into an off-screen
@@ -3774,7 +3799,7 @@ and `H(lo, hi)` (`view.h`); `RENFS_RES=320|640` overrides the settings for tests
   `0x143e30` too.
 - **The status bar** (`0x30d8c`): digits at y 6, step 0x13; the accelerations at 0x14f /
   0x1cc / 0x234; the start lights a 640x32 band, lights 0x82 apart at y 1 (their beeps
-  `0x5257c` not ported at either resolution).
+  `0x5257c`: an empty routine, nothing to port).
 - **The map `0x31cb4`**: corner (2, 2) (320: (1, 1)); node shift 19 (20); the road's centre
   (+0x38, +0x45) (320: +0x1c, +0x1c), the dots' (+0x38, +0x46) (+0x1c, +0x19); the frame
   drawn twice, (ox−1..ox+0x70, oy−1..oy+0x8a) then (ox−2..ox+0x71, oy−2..oy+0x8b); clip
@@ -3812,13 +3837,13 @@ and `H(lo, hi)` (`view.h`); `RENFS_RES=320|640` overrides the settings for tests
 - **Not ported at either resolution** (found on the way; h7 shows the first: 1,201 pixels
   of the player's own car from outside):
   - ~~the player's wheels~~: done 2026-10-21, §4.10's end ("The player's car's wheels");
-  - the tyres' dust and smoke `0x664bc` → `0x663e0` → `0x64714`/`0x64768` (`smo1..4`,
-    `dir1..4`, `0x1464bc`/`0x1460ac`; half the scale at 320x200; EA's random `0x52580`);
+  - ~~the tyres' dust~~: done 2026-10-21, §4.10's end ("The tyres' dust");
   - ~~the skid marks~~: done 2026-10-21, §4.10's end ("The tyres' marks on the road");
   - the bar while racing but watching another car, stopped or in a replay from the race
     `0x7ef14` → `0x7f1d8`/`0x7f310`/`0x7f998`, `0x7f010`/`0x7f470` (`0x5c636`: running and
     (`0x15d13a` or the car watched not the player's or stopped `0x145c90`));
-  - the start lights' beeps `0x5257c`.
+  - ~~the start lights' beeps `0x5257c`~~: nothing to port, `0x5257c` is a bare `ret` (the
+    calls stay, the sound was taken out of this build).
 
 ### 4.25 Smooth motion, 60 frames a second (2026-10-21; the port's own, `port/src/smooth.c`)
 

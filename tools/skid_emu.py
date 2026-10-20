@@ -8,10 +8,14 @@ snapshots of a race (their camera, view, track and tables), with random rings of
     last slides and centre, and the lines its painting drew (0x679ec by record);
   - the rows' marks 0x67784, then the road's rows 0x679ec(-999) one by one with random
     edges: the table, the lines and every record's points seen and on the screen;
-  - the line 0x989a0 itself: random lines and widths painted on the snapshot's screen.
+  - the line 0x989a0 itself: random lines and widths painted on the snapshot's screen;
+  - the dust 0x664bc behind and in front of the car: random slides, tyres, distances,
+    angles round the car, records' ages and places: the puffs (which picture, size,
+    place) and EA's random numbers after (the port's dust keeps its own: seeded equal);
+  - the dirt's stretch 0x973d0 (see-through) with the snapshot's own dir pictures.
 
-The original's lines are caught at 0x989a0 (its arguments read, the call stepped over);
-the port's through g_skid_line.
+The original's lines are caught at 0x989a0 (its arguments read, the call stepped over),
+its puffs at 0x96f70 and 0x97500; the port's through g_skid_line and g_skid_puff.
 
     build/venv/bin/python tools/skid_emu.py [--n=300] [snapshot ..]   (default: h7, e3)
 """
@@ -59,7 +63,7 @@ class Check:
         self.player = s.u32(0x13c24c + 4 * s.i32(0x12dd58))
         s.write(0x12d9d7, b"\0")
         # the original's lines caught
-        self.lines, self.catching, self.nlines = [], True, 0
+        self.lines, self.catching, self.nlines, self.npuffs = [], True, 0, 0
 
         def on_line(mu, addr, size, _):
             if not self.catching:
@@ -70,6 +74,23 @@ class Check:
             mu.reg_write(UC_X86_REG_EIP, v[0])
             mu.reg_write(UC_X86_REG_ESP, sp + 4)
         s.mu.hook_add(UC_HOOK_CODE, on_line, None, begin=game(0x989a0), end=game(0x989a0))
+        # .. and its puffs: (dirt, which picture, size, x, y)
+        self.puffs = []
+        dust = [s.u32(0x1464bc + 4 * k) for k in range(4)]
+        dirt = [s.u32(0x1460ac + 4 * k) for k in range(4)]
+
+        def on_puff(mu, addr, size, dirty):
+            if not self.catching:
+                return
+            sp = mu.reg_read(UC_X86_REG_ESP)
+            v = struct.unpack("<IiIii", bytes(mu.mem_read(sp, 20)))
+            pics = dirt if dirty else dust
+            self.puffs.append((dirty, pics.index(v[2]) if v[2] in pics else -1, v[1], v[3], v[4]))
+            mu.reg_write(UC_X86_REG_EIP, v[0])
+            mu.reg_write(UC_X86_REG_ESP, sp + 4)
+        s.mu.hook_add(UC_HOOK_CODE, on_puff, 0, begin=game(0x96f70), end=game(0x96f70))
+        s.mu.hook_add(UC_HOOK_CODE, on_puff, 1, begin=game(0x97500), end=game(0x97500))
+        self.dirt_shapes = dirt
         recip = struct.unpack("<1024i", s.raw(s.u32(0xf7a14), 4096))
         L.skid_test_view(ints(*self.pos), ints(*self.m), s.i32(0xf7a28), s.i32(0xf7a2c),
                          s.i32(0xf7938), (I * 1024)(*recip))
@@ -171,7 +192,86 @@ class Check:
         n = self.L.skid_test_lines(out, 4096)
         return [tuple(out[5 * k:5 * k + 5]) for k in range(min(n, 4096))]
 
+    def port_puffs(self):
+        out = (I * (5 * 256))()
+        n = self.L.skid_test_puffs(out, 256)
+        return [tuple(out[5 * k:5 * k + 5]) for k in range(min(n, 256))]
+
     # --- the cases
+
+    def dust(self):
+        rng, s, L = self.rng, self.s, self.L
+        self.random_ring()
+        self.world()
+        steps = s.i32(0x145c94)
+        # the newest records young, their screen points on the screen or not projected
+        for i in range(125):
+            b = RING + REC * i
+            age = rng.choice([0, rng.randint(1, 0x2f), 0x30, rng.randint(-5, 200)])
+            s.write(b + 0x98, struct.pack("<i", steps - age))
+            pts = [rng.randint(-50, R.W + 50) if j % 2 == 0 else rng.randint(-50, R.H + 50) for j in range(8)]
+            if rng.random() < 0.1:
+                pts[2 * rng.randrange(4)] = -0x80000000
+            s.write(b + 0x6c, struct.pack("<8i", *pts))
+        g = ctypes.addressof(ctypes.c_char.in_dll(L, "g_skid"))
+        ctypes.memmove(g, s.read(BEFORE, RING_BYTES), RING_BYTES)
+        seed = [rng.getrandbits(32) for _ in range(6)]
+        s.write(0xf8a8c, struct.pack("<6I", *seed))
+        L.skid_test_random((ctypes.c_uint * 6)(*seed))
+        car = self.player
+        slide = lambda: rng.choice([0, rng.randint(1, 0x3c0000), rng.randint(0x3c0000, 0x4000000), -rng.randint(1, 0x400000)])
+        sf, sr = slide(), slide()
+        tf, tr = rng.choice([0, 0, 1, 2, 3]), rng.choice([0, 0, 1, 2, 3])
+        far = 1 if rng.random() < 0.1 else 0
+        z = rng.choice([0x20, rng.randint(0x20, 0x200), rng.randint(0x200, 0x1900)])
+        yaw = rng.randint(0, 0xffffff)
+        pos = [self.pos[0] + rng.randint(-0x200000, 0x200000), self.pos[1], self.pos[2] + rng.randint(-0x200000, 0x200000)]
+        behind = rng.randrange(2)
+        s.mu.mem_write(car, struct.pack("<3i", *pos))
+        s.mu.mem_write(car + 0x351, struct.pack("<i", yaw))
+        s.mu.mem_write(car + 0x399, struct.pack("<i", z))
+        s.mu.mem_write(car + 0x405, struct.pack("<2i", sf, sr))
+        s.mu.mem_write(car + 0x425, bytes([tf, tr]))
+        s.mu.mem_write(car + 0x78e, struct.pack("<i", far))
+        self.puffs = []
+        L.skid_test_catch(1)
+        s.call(0x664bc, eax=car, edx=behind)
+        L.skid_test_dust(sf, sr, tf, tr, far, z, ints(*pos), yaw, behind)
+        mine = self.port_puffs()
+        rnd = (ctypes.c_uint * 6)()
+        L.skid_test_random_get(rnd)
+        bad = []
+        self.npuffs += len(mine)
+        if mine != self.puffs:
+            bad.append("puffs: original %d %s, port %d %s" % (len(self.puffs), self.puffs[:3], len(mine), mine[:3]))
+        if list(rnd) != list(struct.unpack("<6I", s.read(0xf8a8c, 24))):
+            bad.append("random numbers")
+        if bad:
+            print("%s dust: %s" % (self.tag, "; ".join(bad)))
+        return not bad
+
+    def dirt(self):
+        """0x973d0 painting a dir picture, the screen compared"""
+        rng, s, L = self.rng, self.s, self.L
+        W, H = R.W, R.H
+        pix = bytes(rng.getrandbits(8) for _ in range(W * H))
+        s.mu.mem_write(R.SCREEN, pix)
+        fbuf = (U8 * (W * H)).from_buffer_copy(pix)
+        L.raster_window(fbuf, W, *R.CLIP)
+        a = self.dirt_shapes[rng.randrange(4)]
+        w, h, cx, cy = struct.unpack("<4h", s.raw(a + 4, 8))
+        data = (U8 * (w * h)).from_buffer_copy(s.raw(a + 0x10, w * h))
+        scale = rng.choice([rng.randint(0x1000, 0x10000), rng.randint(0x10000, 0x40000), -rng.randint(0x1000, 0x20000)])
+        x, y = rng.randint(-60, W + 60), rng.randint(-60, H + 60)
+        self.catching = False
+        s.call(0x973d0, scale, a, x, y)
+        self.catching = True
+        L.skid_test_solid(scale, w, h, cx, cy, data, x, y)
+        want = bytes(s.mu.mem_read(R.SCREEN, W * H))
+        d = sum(1 for p, q in zip(want, bytes(fbuf)) if p != q)
+        if d:
+            print("%s dirt %dx%d scale %x at (%d,%d): %d pixels differ" % (self.tag, w, h, scale, x, y, d))
+        return not d
 
     def record(self):
         rng, s, L = self.rng, self.s, self.L
@@ -268,7 +368,7 @@ def main():
     L.files_init(b"NFSSE", None)
     if not L.exe_load():
         sys.exit("no NFS_DOS.EXE")
-    total = {"record": [0, 0], "rows": [0, 0], "line": [0, 0]}
+    total = {"record": [0, 0], "rows": [0, 0], "line": [0, 0], "dust": [0, 0], "dirt": [0, 0]}
     for p in snaps:
         rng = random.Random(p)
         c = Check(p, L, rng)
@@ -278,14 +378,15 @@ def main():
         c.s.write(0xf88c4, struct.pack("<II", R.ROWS, 0))
         c.s.write(0xf88a4, struct.pack("<4i", *R.CLIP))
         for k in range(n):
-            for what in ("record", "rows", "line"):
+            for what in ("record", "rows", "line", "dust", "dirt"):
                 if what == "rows" and k % 5:
                     continue
                 c.slide = rng.randrange(-1, 7)
                 ok = getattr(c, what)()
                 total[what][0] += 1
                 total[what][1] += ok
-        print("%s: %d lines compared; the ring moved on by %s" % (c.tag, c.nlines, sorted(c.moved.items())))
+        print("%s: %d lines and %d puffs compared; the ring moved on by %s" % (c.tag, c.nlines, c.npuffs,
+                                                                              sorted(c.moved.items())))
     print("; ".join("%s %d of %d equal" % (w, t[1], t[0]) for w, t in total.items()))
 
 

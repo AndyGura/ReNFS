@@ -24,6 +24,9 @@ void collide_seed(unsigned t);
 unsigned collide_rand(void);
 /* 0x52580: one of them scaled to 0 .. n - 1 */
 int collide_below(int n);
+/* the same on another state of six words (the tyres' dust keeps its own) */
+unsigned collide_rand_with(unsigned *s);
+int collide_below_with(unsigned *s, int n);
 /* 0x1c878's loop: the police's catch (0x1c800), each car against those just ahead */
 void collide_world(void);
 

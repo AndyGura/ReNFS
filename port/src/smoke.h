@@ -12,6 +12,8 @@ typedef struct {
     shape puff;                /* 0xf6db0: "smok", 64 x 64 */
     unsigned char add[256][256]; /* 0x1464cc: a smoke colour (row) over a screen colour:
                                   three quarters of its red, green and blue added */
+    shape dust[4];             /* 0x1464bc: "smo1".."smo4", the road's dust */
+    shape dirt[4];             /* 0x1460ac: "dir1".."dir4", the other surfaces' */
 } smoke_art;
 
 extern smoke_art g_smoke;
@@ -30,5 +32,8 @@ void smoke_draw(crash_smoke *s, int dx, int dy);
 /* 0x96e40: a picture stretched by scale (16.16; < 0 mirrored) with its centre at (x, y),
    each pixel through add[picture][screen] (0x9498d) */
 void smoke_stretch(int scale, const shape *sh, int x, int y);
+/* 0x973d0: the same with the picture's pixels put on the screen, 0xff see-through
+   (0x97038, 0x9473e) */
+void smoke_stretch_solid(int scale, const shape *sh, int x, int y);
 
 #endif

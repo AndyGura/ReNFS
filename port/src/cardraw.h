@@ -46,6 +46,10 @@ extern const int *g_camera_m;                /* 0x143df8: the matrix being drawn
    with its own (+0x385) */
 void car_road_plane(race_car *c, int yaw, vec3 *centre);
 
+/* 0x662e0: the camera's angle round the car from its yaw drawn, 0x1000000 a turn,
+   -0x800000 .. 0x800000: 0 seen from behind */
+int car_seen_angle(const race_car *c);
+
 /* the cars on the road as the race's step lists them (0x51f8f): each drawn at its own
    node, with its angles */
 void cars_list(void);

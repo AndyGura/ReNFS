@@ -31,6 +31,7 @@ typedef struct {
     int front, rear;    /* 0xf6ff4, 0xf6ff8: the last frame's slides */
     vec3 last;          /* 0x14e620: the centre where the last record began */
     unsigned char rows[15];     /* 0x14e5f3: road nodes from the camera's less 2 with marks */
+    unsigned random[6];         /* the dust's own EA random numbers (skid_dust) */
 } skid_state;
 
 extern skid_state g_skid;
@@ -44,7 +45,13 @@ extern void (*g_skid_line)(int x0, int y0, int x1, int y1, int w);
 /* record i of the ring, -1 the one before it, SKID_RECORDS the one after */
 skid_record *skid_at(int i);
 
-/* the ring emptied (0x65094: the race's start, a replay's jump) */
+/* a puff of the tyres' dust: the road's (smo1 or smo3, added as the smoke) or the other
+   surfaces' (dir1..dir3, solid), pick of them, size 16.16, at the screen's (x, y)
+   (0x64714, 0x64768; smoke_stretch / smoke_stretch_solid unless a test catches it) */
+extern void (*g_skid_puff)(int dirt, int pick, int size, int x, int y);
+
+/* the ring emptied (0x65094: the race's start, a replay's jump); the dust's random
+   numbers from the race's */
 void skid_reset(void);
 /* the frame's rows with marks (0x67784), before the road is painted */
 void skid_rows(int cam_node);
@@ -55,5 +62,11 @@ void skid_record_car(const race_car *c, const vec3 *along, const vec3 *across,
 /* the road's painter at a row (0x679ec with -999): the marks within 2 nodes of it whose
    ends are not both before the row's edge a -> b */
 void skid_paint_row(int cam_node, int row_node, const scr2 *a, const scr2 *b);
+/* the player's car's tyres' dust (0x664bc), from its near model: as it is placed (behind
+   it: every sliding tyre, half the size) and once it is painted (in front: the sliding
+   tyres on the camera's side); puffs at each tyre's last four marks of the last 48 steps,
+   bigger the older. EA's random numbers are its own: the original's are the race's, so
+   that the frames drawn would change how cars hit each other */
+void skid_dust(const race_car *c, int behind);
 
 #endif
