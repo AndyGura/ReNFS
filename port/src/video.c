@@ -280,6 +280,10 @@ static void write_shot(void)
     printf("%s: frame %lu\n", g_shot, g_retraces);
 }
 
+/* (the port's) a pad's Start held: Esc, which the original's joystick has not (the pause
+   menu in a race, back in the menus) */
+static int g_pad_esc;
+
 static void poll(void)
 {
     SDL_Event e;
@@ -302,6 +306,13 @@ static void poll(void)
                 g_mouse_buttons |= bit;
             else
                 g_mouse_buttons &= ~bit;
+        } else if ((e.type == SDL_CONTROLLERBUTTONDOWN || e.type == SDL_CONTROLLERBUTTONUP)
+                   && e.cbutton.button == SDL_CONTROLLER_BUTTON_START) {
+            g_pad_esc = e.type == SDL_CONTROLLERBUTTONDOWN;
+            if (g_pad_esc) {
+                scan_put(1);
+                key_put(0x1b);
+            }
         } else if (e.type == SDL_KEYDOWN) {
             for (int k = 1; k < 0x59; k++)
                 if (e.key.keysym.scancode == g_pc_keys[k][0] || (g_pc_keys[k][1]
@@ -504,7 +515,7 @@ int key_down(int scan)
     const Uint8 *k = SDL_GetKeyboardState(0);
     if (scan <= 0 || scan >= 0x59)
         return 0;
-    if (g_script_held[scan])
+    if (g_script_held[scan] || (scan == 1 && g_pad_esc))
         return 1;
     for (int i = 0; i < 2; i++)
         if (g_pc_keys[scan][i] && k[g_pc_keys[scan][i]])

@@ -3680,6 +3680,10 @@ fast to the last step recorded − 8 and race on (state `0xf6b78` = 1 after).
   them as keys: full past half way), and a pad's right / left shoulder (a joystick's
   fifth / sixth button) are a gear up / down whatever the kinds. Only the control word
   changes, so replays and the race record stay the original's.
+  A pad's Start is Esc (held for `key_down(1)` and typed): the pause menu in a race, back
+  in the menus; the original's joystick has no Esc. The analogue steering and pedals
+  (`car_steer_2` `0x4853c`, `car_pedals_2` `0x48a80`) come only with the Joystick kinds,
+  as in the original: the keys' kinds' routines know full or nothing.
 
 ## 5. The original in DOSBox (2026-10-19)
 
