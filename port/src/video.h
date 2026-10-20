@@ -26,6 +26,8 @@ void video_retrace(void);
 
 /* the system clock, 100 a second (the game's timer, NOTES §4.3) */
 unsigned clock_ticks(void);
+/* the same clock between its ticks (the port's: a frame drawn between race steps) */
+double clock_fine(void);
 unsigned long timer_counter(void);           /* 0xed0fc, the timer's free count */
 void timer_counter_set(unsigned long v);
 /* settimeout 0x8136b / timedout 0x81389: a wait of n hundredths */

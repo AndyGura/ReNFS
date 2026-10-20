@@ -15,6 +15,17 @@ Settings, records, saved tournaments, replays and the joystick's calibration go 
 `~/.config/renfs` (or `-home <folder>`), never in the game's folder. `renfs --help`
 lists the options.
 
+## Smooth motion (60 frames a second)
+
+The original moves the cars 33 times a second. ReNFS draws the race at every refresh of
+the screen (60 a second at 640x480, 70 at 320x200) and shows the cars and the camera
+between those moves, so the motion is smooth. The race itself is unchanged: the same steps,
+the same physics, the same replays. **F11 in a race** switches it off (a new picture only
+at each step, as the original) and on again; the choice is kept in `renfs.cfg`.
+
+Races are at 640x480 by default, as the original's own setting;
+Options → Graphics → the first row gives 320x200.
+
 ## Controls
 
 The keyboard as in the original; every driving key can be changed in Options → Controls.

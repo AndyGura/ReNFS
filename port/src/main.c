@@ -7,6 +7,7 @@
 #include "fe.h"
 #include "files.h"
 #include "race.h"
+#include "smooth.h"
 #include "video.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -39,8 +40,14 @@ static const char usage[] =
     "  RENFS_LAPS=n     n laps of a circuit (tr1 ..; else the race length's, 8 by default)\n"
     "  RENFS_VIEW=n     a test: the race watched from camera n (2..5, 8..12 outside)\n"
     "  RENFS_RES=n      a test: races at 640 (640x480) or 320 (320x200), whatever the\n"
-    "                   graphics screen says\n"    "\n"
+    "                   graphics screen says\n"
+    "  RENFS_SMOOTH=0|1 a test: the race's motion smoothed between its steps or not,\n"
+    "                   whatever F11 last left (not kept)\n"
+    "\n"
     "Keys: Space, Enter or Esc pass a movie or the title.\n"
+    "In a race, F11: the motion smoothed between the race's steps (drawn at every\n"
+    "retrace, 60 a second at 640x480; the port's own, on at first) or a new picture\n"
+    "only at each step, as the original; kept in the home folder's renfs.cfg.\n"
     "\n"
     "A pad or joystick: calibrated the first time (or Options, Controls, Calibrate\n"
     "joystick). It drives even with the controls on Keyboard, but all or nothing; for\n"
@@ -79,6 +86,7 @@ int main(int argc, char **argv)
                         "Give the folder with the CD's files: renfs -data <folder>\n");
         return 1;
     }
+    smooth_load();             /* (the port's own setting: smooth.c) */
     if (!exe_load())           /* the game's tables, the built-in settings among them */
         return 1;
     collide_init();            /* EA's random numbers as the program starts */

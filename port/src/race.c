@@ -30,6 +30,7 @@
 #include "roaddraw.h"
 #include "session.h"
 #include "sky.h"
+#include "smooth.h"
 #include "standings.h"
 #include "timing.h"
 #include "track.h"
@@ -109,6 +110,18 @@ static int race_clock(unsigned long t)
 
     return (int)(t / per * 3 + (t % per >= a) + (t % per >= 2 * a));
 }
+
+/* the tick the race clock reaches n at (race_clock's other way round) */
+static double race_due(unsigned n)
+{
+    unsigned a = g_drive.options & 8 ? 2 : 3, per = 2 * a + 3;
+
+    return (double)(n / 3 * per + n % 3 * a);
+}
+
+/* the port's smoothing (smooth.c): the clock's count the last step was made at, and the
+   counts until the next (more in a replay played slower) */
+static unsigned g_step_at, g_step_span = 1;
 
 /* 0x5d690, 0x5ee14: a replay begun while racing (the pause menu's) keeps the race's
    clock and its steps done; racing on after it they are as they were (the time watched
@@ -245,6 +258,10 @@ static void race_step(race_car *player, race_camera *cam, int done)
     unsigned w = g_drive.gave_up[g_player] ? 0x87a0
                : g_drive.state == 1 ? drive_keyboard(g_road_mirror) : 0;
 
+    smooth_keep(cam);
+    g_step_at = (unsigned)done;
+    g_step_span = g_drive.state == 2 && g_replay.speed > 0 && g_replay.speed < 4
+                  && g_replay.wait > 1 ? (unsigned)g_replay.wait : 1;
     g_drive.flags = (st & 1 ? 0 : 1) | (st & 3 ? 0 : 4) | (st & 7 ? 0 : 0x10);
     /* (the keyboard read for the recording: played back, the controls are the ring's) */
     if (g_drive.state == 1) {
@@ -607,6 +624,7 @@ int race_run(void)
     replay_start();
     replay_race_begins();
     g_replay.cam = &cam;
+    smooth_reset();
 
     while (!g_quit && !g_pause.quit && !g_timing.result && !g_replay.end) {
         const int *m;
@@ -637,10 +655,17 @@ int race_run(void)
                 replay_clocks(&done, start, &cam);
             }
         }
+        /* the port's: this frame drawn between the last two steps, by the time since
+           the last (smooth.c; F11) */
+        smooth_keys();
+        smooth_apply(&cam, (int)((clock_fine() - start - g_pause.held_ticks
+                                  - race_due(g_step_at + 1)) * 65536.0
+                                 / (race_due(g_step_at + 1 + g_step_span)
+                                    - race_due(g_step_at + 1))));
         /* the dials the player's car's, the status bar's numbers the car watched's
            (Alt+Ctrl and a number) */
-        driver.steer = cars[0].steer;
-        driver.rpm = cars[0].rpm;
+        driver.steer = smooth_steer(cars[0].steer);
+        driver.rpm = smooth_rpm(cars[0].rpm);
         {
             const race_car *v = g_cars[g_drive.viewed];
 
@@ -751,6 +776,7 @@ int race_run(void)
         } else
             hud_outside_frame(&driver, redraw, cam.ahead->current);
         in_seat = seat;
+        smooth_restore(&cam);
         /* F9 (0x2f644): the driver's view with the dashboard or without, mode 0's view
            (0xe80f0) and the camera's mode taken up again, the screen round it redrawn */
         if (g_hud.view_changed) {

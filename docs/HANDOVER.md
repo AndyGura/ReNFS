@@ -480,9 +480,14 @@ races 320x200 / 320x240; commit locally as the work goes.
    snapshots h1 h6 h7 (`tools/checks.sh` runs them too). Found on the way, not ported at
    either resolution: the player's wheels turning and its tyre pictures, the tyres' dust,
    the skid marks, the bar while watching after the finish, the start lights' beeps
-   (NOTES §4.24's end). **Next: the 60 fps mode** (Danik: the engine stepping faster, or
-   the motion interpolated, whichever is cheaper), then those gaps, the showcase and the
-   records, then the MiSTer.
+   (NOTES §4.24's end). **Smooth motion, 60 frames a second (2026-10-21, NOTES §4.25):
+   done**, the port's own: the race's steps stay the original's 33.3 a second, each
+   retrace's frame drawn with the cars, the camera and the dials between the last two
+   steps (`smooth.c`), on at first, F11 in a race off and on (kept in `renfs.cfg`). The
+   race underneath unchanged (the same REPLAY.RPL byte for byte off and on; the CD's
+   replays equal to their snapshots). **Next: the rest of the PC game** (Danik's order):
+   the gaps above, the cars' showcase (`fe_showcase` `0x17724`), the track records from
+   Control Central; then the MiSTer.
    (`0x136618`, the sections drawn: the settings' +0x85 and F3, NOTES §4.19.)
    Open: the race's sound reaches full scale at the hits and the horn (0.2 to 0.7 % of
    the samples in `build/snd_port/`): how EA's mixer sums the voices is still to compare. Model polygons of one colour (`0xaa990`) are not ported (none met so far).

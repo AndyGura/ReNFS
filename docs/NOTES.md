@@ -3746,6 +3746,42 @@ and `H(lo, hi)` (`view.h`); `RENFS_RES=320|640` overrides the settings for tests
     (`0x15d13a` or the car watched not the player's or stopped `0x145c90`));
   - the start lights' beeps `0x5257c`.
 
+### 4.25 Smooth motion, 60 frames a second (2026-10-21; the port's own, `port/src/smooth.c`)
+
+Danik asked (2026-10-20) for a 60 fps mode: the engine stepping twice as fast, or the
+motion smoothed between the steps, whichever is cheaper.
+
+- **Stepping faster is not the way.** The original's own faster clocks (`0x12dd0c` 2..5,
+  37.5 to 60 steps a second; TURBO is setting 3) make the whole game faster: every step's
+  sums assume their 1/30 s (`+0x506` dt, `+0x50a` rate), the gearbox and sounds every
+  2nd step, the traffic and police every 4th, the replay a word every 2nd step. Faster
+  steps would mean new physics, other replays and no checks against the original.
+- **So the steps stay the original's, and only the picture is in between.** Before each
+  step (`race_step`) the port keeps what a frame is drawn from: every car's place, pitch,
+  yaw, roll, drawn yaw (`+0x351`), body lean and nod (`+0x365`, `+0x369`), its own matrix
+  (`+0x20`, `+0x24`), the camera's place and angles, and the player's revs and steering for
+  the dials. Before the frame, all of it is set between the kept values and the step's by
+  t = (the fine clock − the tick the last step was due) / the ticks to the next (3, or
+  2 2 3 with TURBO; a replay played slower: its wait); after the frame it is put back as
+  the step left it. Angles go the short way round (0x1000000 a turn); a matrix element by
+  element (a car tumbling 0.07 turn a step shrinks by 2 % at most in between).
+- **Not smoothed (a jump, drawn as the step left it):** a car put more than 16 m, an
+  eighth of a turn or a quarter of a matrix's unit away in one step (put back on the
+  road, the traffic placed ahead, a replay's jump), one whose own matrix came or went, and
+  the camera on another car or in another mode. The nodes (the road drawn from, the cars'
+  places in the road's order) stay the step's: no gap showed at the view's bottom from
+  inside or outside at 180 km/h.
+- The frame is shown every retrace (60 a second at 640x480, 70 at 320x200), as before; t
+  lags the step by at most one step (30 ms), as any smoothing between known states.
+- **The race underneath is unchanged**: the same race driven with it off and on leaves
+  the same REPLAY.RPL byte for byte, and the CD's four replays still match every one of
+  their snapshots with it on (`RENFS_REPLAYCHECK=1`). Without it 2 frames of 5 repeat at
+  640x480 (33.3 steps on 60 retraces); with it each frame is new and the camera moves
+  evenly (62,437 to 63,137 units a frame while speeding up).
+- **F11 in a race** turns it on and off, kept in the home folder's `renfs.cfg` (`smooth 1`,
+  the port's file); on at first. The original reads no F10, F11 or F12 (no access to
+  `0xf7b0c`, `0xf7b1f`, `0xf7b20`). `RENFS_SMOOTH=0|1` for tests (not kept).
+
 ## 5. The original in DOSBox (2026-10-19)
 
 - The game for DOSBox is a COPY of the installed game in `~/dosgames/nfs` (`NFSSE/` +

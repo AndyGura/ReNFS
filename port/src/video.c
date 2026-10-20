@@ -27,6 +27,7 @@ static int g_shot_at;
 static unsigned long g_retraces;        /* counted, for the headless clock */
 static unsigned long g_virtual_ms;      /* the headless clock, in ms x 70 x 60 */
 static unsigned g_start_ms;
+static Uint64 g_start_pc;           /* the same moment on the fine counter */
 
 static int g_keys[16], g_nkeys;  /* the keys typed, as the BIOS gives them (0x84304) */
 
@@ -84,7 +85,7 @@ static const struct { const char *name; int scan; } g_script_keys[] = {
     { "left", 0x4b }, { "right", 0x4d }, { "tab", 0x0f }, { "y", 0x15 }, { "n", 0x31 },
     { "j", 0x24 }, { "f1", 0x3b }, { "f2", 0x3c }, { "f3", 0x3d }, { "f4", 0x3e },
     { "bksp", 0x0e }, { "del", 0x53 }, { "f5", 0x3f }, { "f6", 0x40 }, { "f7", 0x41 },
-    { "f8", 0x42 }, { "f9", 0x43 }, { "ctrl", 0x1d }, { "alt", 0x38 }, { "lshift", 0x2a }, { "rshift", 0x36 }, { "end", 0x4f },
+    { "f8", 0x42 }, { "f9", 0x43 }, { "f10", 0x44 }, { "f11", 0x57 }, { "f12", 0x58 }, { "ctrl", 0x1d }, { "alt", 0x38 }, { "lshift", 0x2a }, { "rshift", 0x36 }, { "end", 0x4f },
 };
 
 static const SDL_Scancode g_pc_keys[0x59][2];
@@ -196,6 +197,7 @@ int video_init(const char *shot, int shot_frames)
     video_mode(640, 480);
     script_parse(getenv("RENFS_INPUT"));
     g_start_ms = SDL_GetTicks();
+    g_start_pc = SDL_GetPerformanceCounter();
     return 1;
 }
 
@@ -417,6 +419,14 @@ unsigned clock_ticks(void)
     if (g_shot)            /* g_virtual_ms counts 1/4200 s: 100 a second = 42 */
         return (unsigned)(g_virtual_ms / 42);
     return (SDL_GetTicks() - g_start_ms) / 10;
+}
+
+double clock_fine(void)
+{
+    if (g_shot)
+        return g_virtual_ms / 42.0;
+    return (double)(SDL_GetPerformanceCounter() - g_start_pc) * 100.0
+           / (double)SDL_GetPerformanceFrequency();
 }
 
 /* 0xed0fc: one more at every tick of the 100 Hz timer (race_timer_tick 0x4c454), set to 0

@@ -201,6 +201,9 @@ A pad drives on the Keyboard kinds too (all or nothing; the shoulders shift, Sta
 **analogue steering and pedals need Joystick chosen in Options → Controls**, as the original
 (Danik, 2026-10-20: no automatic switch). The player's controls: `README.md`.
 `tools/checks.sh`: every check in one command (logs `build/logs/chk`).
+Smooth motion (NOTES §4.25, the port's own, `smooth.c`): the steps stay the original's 33.3 a second;
+each retrace's frame is drawn with the cars, camera and dials between the last two steps, then put back
+(F11, `renfs.cfg`); stepping faster (`0x12dd0c`) would make the game faster, not smoother.
 
 ## File formats (details in `docs/NOTES.md`, "Formats")
 
@@ -258,6 +261,7 @@ once; for `--shot` tests);
 `RENFS_PLACE=s:a,c,v`: the opponent put a m ahead and c m beside at v m/s at race step s;
 `RENFS_VIEW=n`: the race watched from camera n (outside: 2..5, 8..12);
 `RENFS_RES=320|640`: races at that size whatever the settings say;
+`RENFS_SMOOTH=0|1`: the motion smoothed between steps or not (F11's setting, `renfs.cfg`, untouched);
 `RENFS_LAPS=n`: n laps of a circuit in `--race` (else the settings' race length, as Control Central `0x437fc`: 8 on TR1 by default);
 `RENFS_CONFIG=f`: a CONFIG.DAT for the test (the original's, `nfsdos.py mem:156c14:5f52:f`).
 `RENFS_SEED=n`: the race's random numbers seeded with n (else the time, as the original).
@@ -272,7 +276,7 @@ queued), the pictures timed by the sound heard, as the original with sound on.
 and `movie.c` (the movies), `fe.c` (front end screens), `mainmenu.c` (Control Central), `options.c` (the options screen, the race menus' Game options), `menu.c` (what the menus share:
 keys, mouse, text styles, the yes/no dialog), `font.c` (FFN, letters blended pixel by
 pixel, `nearest_colour`, the inverse table), `sound.c` (the front end's sound bank and
-music, the race's music `0x63d88` and speech `0x722b4`), `audioopt.c` (the audio screen), `gfxopt.c` (the graphics screen `0x32d08`), `ctrlopt.c` (the controls screen `0x22bd0`: kinds, keys redefined, conflicts; the race's keys from them, `drive_keys_from_config` `0x36a0c`), `joystick.c` (the joystick: found, calibrated, `joystick.cfg` in the home folder, read in races and menus), `credits.c` (the credits `0x25600`: five pages of CREDITS.FSH, 20 s each by the timer's count `0xed0fc`), `loadsave.c` (load and save `0x3c0c8`/`0x3d4c4`, the file list `0x3aacc`: tournaments as `<name>.sav` in the home folder, replays saved, played, deleted; a game on `0x15d134`), `config.c` (CONFIG.DAT; the built-in defaults, equal byte for byte,
+music, the race's music `0x63d88` and speech `0x722b4`), `audioopt.c` (the audio screen), `gfxopt.c` (the graphics screen `0x32d08`), `ctrlopt.c` (the controls screen `0x22bd0`: kinds, keys redefined, conflicts; the race's keys from them, `drive_keys_from_config` `0x36a0c`), `joystick.c` (the joystick: found, calibrated, `joystick.cfg` in the home folder, read in races and menus), `smooth.c` (the port's smooth motion between the race's steps, F11), `credits.c` (the credits `0x25600`: five pages of CREDITS.FSH, 20 s each by the timer's count `0xed0fc`), `loadsave.c` (load and save `0x3c0c8`/`0x3d4c4`, the file list `0x3aacc`: tournaments as `<name>.sav` in the home folder, replays saved, played, deleted; a game on `0x15d134`), `config.c` (CONFIG.DAT; the built-in defaults, equal byte for byte,
 `tools/config_emu.py`), `main.c`.
 The race so far: `raster.c` (the quad and triangle painters), `poly.c` (projection, quad cutting),
 `road.c` (the frame's points, into the view; the mirror's five sections behind), `roaddraw.c` (the road painted far to near,
