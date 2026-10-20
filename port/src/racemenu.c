@@ -1,4 +1,5 @@
-/* The menus between and after the races (NOTES §4.21): race_menu_checkpoint 0x1a5d8. */
+/* The menus between and after the races (NOTES §4.21): race_menu_checkpoint 0x1a5d8,
+   race_menu_finish 0x1b6a0. */
 #include "racemenu.h"
 #include "cardraw.h"
 #include "config.h"
@@ -8,6 +9,7 @@
 #include "fe.h"
 #include "files.h"
 #include "fsh.h"
+#include "mainmenu.h"
 #include "menu.h"
 #include "sound.h"
 #include "standings.h"
@@ -34,11 +36,11 @@ static void place(int sel)
     fe_mouse_save();
 }
 
-static int load(unsigned char *pal)
+static int load(unsigned char *pal, const char *name)
 {
     char path[256];
 
-    snprintf(path, sizeof path, "%s/CHECK/CHKMENU.QFS", art_dir());
+    snprintf(path, sizeof path, "%s/CHECK/%s", art_dir(), name);
     if (!fsh_load(&g_art, path) || !fsh_palette(&g_art, 0, pal)) {
         fprintf(stderr, "renfs: %s is missing\n", path);
         fsh_free(&g_art);
@@ -57,7 +59,7 @@ int race_menu_checkpoint(void)
     unsigned held = 0;
 
     place(CONTINUE);
-    if (!load(pal))
+    if (!load(pal, "CHKMENU.QFS"))
         return 1;
 
     while (!done) {
@@ -95,6 +97,8 @@ int race_menu_checkpoint(void)
             art(dark[old]);
             art(lit[sel]);
             changed = 0;
+            redraw = 1;                    /* (all drawn again next time, the pointer
+                                              shown again) */
         }
 
         if (!ready) {
@@ -182,6 +186,131 @@ int race_menu_checkpoint(void)
     return answer;
 }
 
+int race_menu_finish(void)
+{
+    static const char *const lit[6] = { "conl", "repl", "higl", "gmol", "gmsl", "chal" };
+    static const char *const dark[6] = { "cond", "repd", "higd", "gmod", "gmsd", "chad" };
+    unsigned char pal[768];
+    int sel = CONTINUE, old = CONTINUE, redraw = 1, first = 1, changed = 0, done = 0;
+    int ready = 1, released = 1, k;
+    unsigned held = 0;
+
+    place(CONTINUE);
+    if (!load(pal, "FINMENU.QFS"))
+        return 1;
+
+    while (!done) {
+        int mx, my;
+
+        /* the mouse picks a row by its height (the chat only in a network race, where
+           the replay and the highlights are not offered) */
+        mouse_read(&mx, &my);
+        k = my >= 0 && my <= 0x91 ? CONTINUE : my >= 0x9c && my <= 0xbe ? REPLAY
+            : my >= 0xcb && my <= 0xec ? HIGHLIGHTS : my >= 0xf7 && my <= 0x11b ? OPTIONS
+            : my >= 0x125 && my <= 0x149 ? STANDINGS : NONE;
+        if (k != NONE && k != sel) {
+            old = sel;
+            sel = k;
+            changed = 1;
+        }
+
+        if (redraw) {
+            art("bgnd");
+            art(lit[sel]);
+            mouse_show(1);
+            if (first) {
+                fe_mouse_save();
+                if (g_mouse_active)
+                    fe_mouse_read();
+                pal_fade_up(pal, 0, 256);
+                fe_styles_init();
+                first = 0;
+            }
+            settimeout(12000);
+            redraw = changed = 0;
+        }
+        if (changed) {
+            fe_play_sound(0x47);
+            art(dark[old]);
+            art(lit[sel]);
+            changed = 0;
+            redraw = 1;                    /* (all drawn again next time, the pointer
+                                              shown again) */
+        }
+
+        if (!ready) {
+            held += ticksince();
+            if (held > 25)
+                ready = 1;
+        }
+        if (g_mouse_active)
+            fe_mouse_read();
+        if (!g_mouse_buttons)
+            released = 1;
+        fe_mouse_moved();
+        k = fe_read_keys();
+        if (k == 0x20 || k == 0x0d || (g_mouse_buttons == 1 && released)) {
+            fe_mouse_press();
+            if (ready) {
+                fe_play_sound(0x48);
+                switch (sel) {
+                case CONTINUE:
+                    done = 1;
+                    break;
+                case REPLAY:               /* the race again from REPLAY.RPL (+0xaf 1, 2
+                                              the highlights), the menu's music and art
+                                              after it: not yet */
+                case HIGHLIGHTS:
+                case OPTIONS:              /* 0x195d8: the game's options: not yet */
+                    fprintf(stderr, "renfs: that screen is not written yet\n");
+                    break;
+                case STANDINGS:
+                    /* the standings again, as after a race not finished */
+                    pal_fade_down(0, 256);
+                    standings_after(0, 1);
+                    place(sel);
+                    first = redraw = 1;
+                    break;
+                }
+                settimeout(12000);
+            }
+            released = ready = 0;
+            held = 0;
+            ticksince();
+        } else if (k && ready) {
+            if (k == 0x1b) {               /* Esc: as Continue */
+                fe_play_sound(0x48);
+                done = 1;
+            } else if (k == 0x4800 || k == 0x5000) {
+                /* up and down, round, past the chat */
+                fe_mouse_hide();
+                old = sel;
+                sel = k == 0x4800 ? (sel == CONTINUE ? CHAT : sel - 1) : (sel + 1) % 6;
+                if (sel == CHAT)
+                    sel = k == 0x4800 ? STANDINGS : CONTINUE;
+                place(sel);
+                changed = 1;
+            }
+            ready = 0;
+            held = 0;
+            ticksince();
+        } else if (!k)
+            ready = 1;
+        video_retrace();
+        /* two minutes, or the right button, end it too */
+        if (!first && (timedout() || (g_mouse_buttons == 2 && released)))
+            done = 1;
+        if (g_quit)
+            done = 1;
+    }
+    /* (the menu's music goes on into Control Central) */
+    fsh_free(&g_art);
+    fe_sound_bank_free();
+    pal_fade_down(0, 256);
+    fe_mouse_save();
+    return 1;
+}
+
 /* 0x74aec: Watcom's random numbers seeded from the clock's seconds (srand 0x91df4), the
    first (rand 0x91dd0) / 0x2aaa: 0, 1 or 2 (3 counts as 0) */
 static int film_number(void)
@@ -238,7 +367,7 @@ void race_film_winner(void)
             g_session.won[track] = 1;
         for (i = n = 0; i < 9; i++)
             n += g_session.won[i];
-        if ((n == 9 && g_session.all_tracks) || (n == 8 && !g_session.all_tracks))
+        if ((n == 9 && g_vegas_ok) || (n == 8 && !g_vegas_ok))
             film("WIN#7.TGV");
         else
             film(track == 0 ? "WIN#2.TGV" : track == 1 ? "WIN#4.TGV" : track == 2 ? "WIN#6.TGV"

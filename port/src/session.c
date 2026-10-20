@@ -11,13 +11,10 @@
 
 race_session g_session;
 
-void session_new(void)
+void session_clear_results(void)
 {
     int i;
 
-    memcpy(g_session.kept_keys, g_config + 0x5f36, sizeof g_session.kept_keys);
-    /* tourn_clear_records 0x745f4: everything a racer's but the name, the flags, and
-       the segment back to the first */
     for (i = 0; i < SESSION_RACERS; i++) {
         session_racer *r = &g_session.racer[i];
         char name[9];
@@ -28,6 +25,14 @@ void session_new(void)
         g_session.gave_up[i] = 0;
     }
     config_set_word(CFG_SEGMENT, 0);
+}
+
+void session_new(void)
+{
+    int i;
+
+    memcpy(g_session.kept_keys, g_config + 0x5f36, sizeof g_session.kept_keys);
+    session_clear_results();
     memset(g_session.points, 0, sizeof g_session.points);
     memset(g_session.raced, 0, sizeof g_session.raced);
     memset(g_session.won, 0, sizeof g_session.won);
@@ -174,21 +179,79 @@ int session_segment(void)
     return s == 0 ? 2 : s - 1;
 }
 
+void session_points(void)
+{
+    int order[8], i, again = 1;
+
+    /* the racers by their totals, the least first (a total of 0 too) */
+    for (i = 0; i < 8; i++)
+        order[i] = i;
+    while (again) {
+        again = 0;
+        for (i = 0; i < 7; i++)
+            if (g_session.racer[order[i + 1]].total < g_session.racer[order[i]].total) {
+                int t = order[i];
+
+                order[i] = order[i + 1];
+                order[i + 1] = t;
+                again = 1;
+            }
+    }
+    for (i = 0; i < 8; i++) {
+        const unsigned char *p = exe_at(0xf6ffc + 4 * i, 2);
+        short points = p ? (short)(p[0] | p[1] << 8) : 0;
+
+        if (g_session.gave_up[order[i]])
+            g_session.race_points[order[i]] = 0;
+        else {
+            g_session.points[order[i]] += points;
+            g_session.race_points[order[i]] = points;
+        }
+    }
+}
+
+void session_order_by_totals(int order[8])
+{
+    int total[8], i, j, best;
+
+    for (i = 0; i < 8; i++)
+        total[i] = g_session.racer[i].total;
+    for (i = 0; i < 8; i++) {
+        best = 0;
+        for (j = 0; j < 8; j++)
+            if (total[j] < total[best])
+                best = j;
+        order[i] = best;
+        total[best] = 0xfffffff;
+    }
+}
+
+int session_player_leads(void)
+{
+    int i;
+
+    for (i = 1; i < 8; i++)
+        if (g_session.points[0] < g_session.points[i])
+            return 0;
+    return 1;
+}
+
 /* a record's place in the settings */
 static int record_at(int track, int i)
 {
     return CFG_RECORDS + track * CFG_TRACK_RECORDS + i * CFG_RECORD;
 }
 
-/* the player's name, time and top speed, car, gearbox and race type into a record */
-static void record_take(int at)
+/* the player's name, a time and a top speed, the car, gearbox and race type into a
+   record */
+static void record_take(int at, int time, int top)
 {
     const session_racer *r = &g_session.racer[g_player];
     const unsigned char *k = g_session.kept - 9;   /* (CONFIG.DAT's places) */
 
     memcpy(g_config + at, r->name, strlen(r->name) + 1);
-    config_set_long(at + 0x1b, r->time);
-    config_set_long(at + 0x1f, r->top);
+    config_set_long(at + 0x1b, time);
+    config_set_long(at + 0x1f, top);
     config_set_long(at + 0xf, (short)(k[0x9b] | k[0x9c] << 8));
     config_set_long(at + 0x13, (short)(k[0x97] | k[0x98] << 8));
     config_set_long(at + 0x23, (short)(k[0x6d] | k[0x6e] << 8));
@@ -204,15 +267,58 @@ int session_records_segment(void)
         return 0;
     at = record_at(track, seg);
     if (r->time < config_long(at + 0x1b) && r->time > 0) {
-        record_take(at);
+        record_take(at, r->time, r->top);
         took = 1;
     }
     at = record_at(track, seg + 3);
     if (config_long(at + 0x1f) < r->top) {
-        record_take(at);
+        record_take(at, r->time, r->top);
         took += 2;
     }
     return took;
+}
+
+int session_top_ten(void)
+{
+    const session_racer *r = &g_session.racer[g_player];
+    int track = config_word(CFG_TRACK), first, i, j;
+
+    if (config_word(CFG_CAR) == 11)
+        return 20;
+    first = track > 2 ? SESSION_TOP_TEN + config_word(CFG_RACE_LENGTH) * 10 : SESSION_TOP_TEN;
+    for (i = 0; i < 10; i++) {
+        int at = record_at(track, first + i);
+
+        if (r->total < config_long(at + 0x1b) && r->total > 0) {
+            /* the ones below moved down a place, the last lost */
+            for (j = 8; j >= i; j--)
+                memcpy(g_config + record_at(track, first + j + 1),
+                       g_config + record_at(track, first + j), CFG_RECORD);
+            record_take(at, r->total, r->best_top);
+            /* an open road's: the player's totals and top speeds segment by segment, the
+               time trial's to race against (+0x658, +0x664) */
+            if (track < 3)
+                for (j = 0; j < 3; j++) {
+                    config_set_long(0x658 + track * CFG_TRACK_RECORDS + 4 * j,
+                                    g_session.seg_total[j]);
+                    config_set_long(0x664 + track * CFG_TRACK_RECORDS + 4 * j,
+                                    g_session.seg_top[j]);
+                }
+            return i;
+        }
+    }
+    return 20;
+}
+
+int session_records_top_speed(void)
+{
+    const session_racer *r = &g_session.racer[g_player];
+    int at = record_at(config_word(CFG_TRACK), SESSION_TOP_SPEED);
+
+    if (config_word(CFG_CAR) == 11 || config_long(at + 0x1f) >= r->best_top)
+        return 0;
+    record_take(at, r->total, r->best_top);
+    return 1;
 }
 
 void fmt_time(char *s, int t)

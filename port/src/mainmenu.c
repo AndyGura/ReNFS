@@ -39,9 +39,10 @@ static const int tournament_car[10] = { 0, 3, 6, 0, 3, 3, 6, 6, 7, 3 };
 
 /* What stays from one visit to the next, and what the typed codes unlock */
 static int g_mirror, g_rally;           /* 0x12dd28, 0x12dd2c: the track's versions */
-static int g_mirror_ok, g_rally_ok;     /* 0xec454, 0xec458 */
-static int g_vegas_ok, g_vegas_typed;   /* 0xec460 (track 8 offered), 0xec464 */
-static int g_warrior_ok;                /* 0xf7494 */
+int g_mirror_ok, g_rally_ok;            /* 0xec454, 0xec458 */
+int g_vegas_ok;                         /* 0xec460 (track 8 offered) */
+static int g_vegas_typed;               /* 0xec464 */
+int g_warrior_ok;                       /* 0xf7494 */
 static int g_no_mercy;                  /* 0xf7492: End held on head to head */
 static int g_explode, g_nitro;          /* 0xf74a4, 0x12cca0 (used in the race) */
 static int g_letter;                    /* 0x12ccaa: a letter held */
@@ -704,4 +705,16 @@ int fe_main_menu(void)
     pal_fade_down(0, 256);
     pictures_free();
     return result;
+}
+
+void fe_unlock(void)
+{
+    int level = config_word(CFG_UNLOCKED);
+
+    if (!g_vegas_ok)
+        g_vegas_ok = level;
+    if (level > 0)
+        g_warrior_ok = g_mirror_ok = 1;
+    if (level > 1)
+        g_rally_ok = 1;
 }

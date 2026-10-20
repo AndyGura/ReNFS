@@ -7,6 +7,11 @@
    highlights and the game's options not yet */
 int race_menu_checkpoint(void);
 
+/* race_menu_finish 0x1b6a0: after a race's last segment, a circuit, or a race not
+   finished (check/finmenu.qfs): Continue (or Esc, or two minutes) back to Control
+   Central; the standings again; the replay, the highlights and the options not yet */
+int race_menu_finish(void);
+
 /* fe_cop_ticket_movie 0x3823c: arrested, one of the police's three films (COP1..3,
    German GCOP1..3) */
 void race_film_police(void);

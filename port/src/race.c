@@ -15,6 +15,7 @@
 #include "fe.h"
 #include "files.h"
 #include "fsh.h"
+#include "mainmenu.h"
 #include "racemenu.h"
 #include "racepal.h"
 #include "smoke.h"
@@ -711,20 +712,17 @@ void race_from_menu(void)
             fe_sound_bank_load();
             music_random();
             if (track < 3 && seg < 3) {
-                /* between the segments: the standings, then the checkpoint's menu (a
-                   race's and a tournament's standings so far, 0x6f070: not yet) */
-                standings_segment(1);
+                /* between the segments: the standings, then the checkpoint's menu */
+                standings_after(1, 0);
                 if (!race_menu_checkpoint()) {
                     config_set_word(CFG_SEGMENT, 0);
                     over = 1;
                 }
             } else {
-                /* the last segment or a circuit: the standings (the track's ten best,
-                   a circuit's laps, a race's and a tournament's: 0x6b938, 0x6cb24,
-                   0x6f070, not yet), then the finish menu (0x1b6a0, not yet) */
-                if (track < 3)
-                    standings_segment(1);
-                fe_sound_bank_free();
+                /* the last segment or a circuit: the standings (a tournament's points
+                   given), then the finish menu */
+                standings_after(1, 1);
+                race_menu_finish();
                 over = 1;
             }
         } else {
@@ -732,15 +730,38 @@ void race_from_menu(void)
                next race from the first segment */
             music_random();
             fe_sound_bank_load();
-            if (track < 3)
-                standings_segment(1);
-            fe_sound_bank_free();
+            standings_after(0, track > 2 || seg > 2);
+            race_menu_finish();
             config_set_word(CFG_SEGMENT, 0);
             over = 1;
         }
     }
-    /* (a tournament's end: its winner, the unlocked tracks; 0x689b0, 0x42a84) then a
-       new session */
+    if (g_quit)
+        return;
+    /* a tournament goes on from race to race (the racers' results cleared, the points
+       and the tracks raced kept) until every track is raced: then, won (the player's
+       points the most), +0x5f50 opens Lost Vegas, the Warrior and the mirrored tracks
+       (eight tracks), the rally too (nine) (0x689b0, 0x42a84) */
+    if (g_session.race_type == 3) {
+        int raced = 0, i;
+
+        session_clear_results();
+        for (i = 0; i < 9; i++)
+            raced += g_session.raced[i];
+        if (g_vegas_ok && raced == 9) {
+            if (session_player_leads()) {
+                config_set_word(CFG_UNLOCKED, 2);
+                fe_unlock();
+            }
+        } else if (!g_vegas_ok && raced == 8) {
+            if (session_player_leads()) {
+                if (config_word(CFG_UNLOCKED) < 2)
+                    config_set_word(CFG_UNLOCKED, 1);
+                fe_unlock();
+            }
+        } else
+            return;
+    }
     session_new();
 }
 
