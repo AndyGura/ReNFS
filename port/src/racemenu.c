@@ -384,13 +384,12 @@ static int film_number(void)
     return n > 2 ? 0 : n;
 }
 
-/* 0x341a4: a film between the screens, at 320x240 from black to black, the keys typed
-   before it thrown away (with the films off, 0x15d120, a picture instead: never here) */
-static void film(const char *name)
+void fe_film(const char *name)
 {
     static const unsigned char black[768];
 
     fe_flush_keys();
+    mouse_show(0);                         /* (the film draws over the pointer) */
     video_palette(black, 0, 256);
     movie_play(name);
     video_palette(black, 0, 256);
@@ -403,7 +402,7 @@ void race_film_police(void)
     char name[16];
 
     snprintf(name, sizeof name, g_german ? "GCOP%d.TGV" : "COP%d.TGV", film_number() + 1);
-    film(name);
+    fe_film(name);
 }
 
 void race_film_winner(void)
@@ -431,9 +430,9 @@ void race_film_winner(void)
         for (i = n = 0; i < 9; i++)
             n += g_session.won[i];
         if ((n == 9 && g_vegas_ok) || (n == 8 && !g_vegas_ok))
-            film("WIN#7.TGV");
+            fe_film("WIN#7.TGV");
         else
-            film(track == 0 ? "WIN#2.TGV" : track == 1 ? "WIN#4.TGV" : track == 2 ? "WIN#6.TGV"
+            fe_film(track == 0 ? "WIN#2.TGV" : track == 1 ? "WIN#4.TGV" : track == 2 ? "WIN#6.TGV"
                  : track == 3 ? "WIN#1.TGV" : track == 4 || track == 5 ? "WIN#3.TGV"
                  : "WIN#5.TGV");
         return;
@@ -446,5 +445,5 @@ void race_film_winner(void)
     while (n == 2);
     car = config_word(CFG_CAR);
     snprintf(name, sizeof name, "WIN#%d.TGV", car < 3 ? n + 1 : car < 6 ? n + 3 : n + 5);
-    film(name);
+    fe_film(name);
 }

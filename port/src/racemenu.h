@@ -20,4 +20,9 @@ void race_film_police(void);
    a tournament's by the track, its last WIN#7; the track marked raced (and won) */
 void race_film_winner(void);
 
+/* 0x341a4: a film between the screens (FRONTEND/MOVIE), at 320x240 from black to black,
+   the keys typed before it thrown away (with the films off, 0x15d120, a picture instead:
+   never here), the menus' mode again */
+void fe_film(const char *name);
+
 #endif

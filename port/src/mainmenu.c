@@ -12,6 +12,7 @@
 #include "options.h"
 #include "race.h"
 #include "session.h"
+#include "showcase.h"
 #include "sound.h"
 #include "video.h"
 #include <stdio.h>
@@ -86,6 +87,31 @@ static void picture(int which, const char *name, int k0, int k1, int k2)
     }
     if (g_pic[which].loaded && fsh_find(&g_pic[which].f, "0000", &s))
         fe_draw_shape(&s, 0);
+}
+
+/* the showcase from a car's picture (0x45189, 0x4545c; not with the Warrior): the menu's
+   music faded out, the showcase's. The opponent's car is shown as the player's for its
+   time (the traffic's as the RX-7), and the car it ends on is the opponent's after */
+static void showcase(int opponent)
+{
+    int car = cw(CFG_CAR), opp = cw(CFG_OPPONENT);
+
+    music_fade_out();
+    pal_fade_down(0, 256);
+    music_wait_end();
+    music_start("showcase.asf");
+    if (g_pic[PIC_OPPONENT].loaded) {      /* (0xec4fc = 0x14: loaded again) */
+        fsh_free(&g_pic[PIC_OPPONENT].f);
+        g_pic[PIC_OPPONENT].loaded = 0;
+    }
+    if (opponent)
+        cset(CFG_CAR, opp == 8 ? 0 : opp);
+    fe_showcase();
+    music_random();                        /* 0x63e2c */
+    if (opponent) {
+        cset(CFG_OPPONENT, cw(CFG_CAR));
+        cset(CFG_CAR, car);
+    }
 }
 
 /* 0x424c0: the pictures let go */
@@ -553,14 +579,22 @@ int fe_main_menu(void)
                         opponent_step(1), redraw = 1;
                     else if (in_rect(0x155, 0x16a, 0x91, 0xa8))
                         opponent_step(0), redraw = 1;
-                    /* else the car's showcase (fe_showcase 0x17724): to come */
+                    else if (cw(CFG_CAR) != 11) {
+                        showcase(1);
+                        place_mouse(sel);
+                        redraw = first = 1;
+                    }
                     break;
                 case PLAYER:
                     if (in_rect(0x136, 0x149, 0xba, 0xd1))
                         car_step(1), redraw = 1;
                     else if (in_rect(0x15, 0x28, 0xba, 0xd1))
                         car_step(0), redraw = 1;
-                    /* else the showcase: to come */
+                    else if (cw(CFG_CAR) != 11) {
+                        showcase(0);
+                        place_mouse(sel);
+                        redraw = first = 1;
+                    }
                     break;
                 case LOCATION:
                     if (in_rect(0x20f, 0x224, 0x131, 0x14e))

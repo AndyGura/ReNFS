@@ -498,7 +498,13 @@ races 320x200 / 320x240; commit locally as the work goes.
    nothing to port. **The watching bar (2026-10-21): done** (Alt+Ctrl+a number while
    racing: the cars 1..8, before / after, the camera, the driver's name; NOTES §4.22;
    `tools/watch_emu.py`: 2,000 random steps and drawings on six snapshots, all equal).
-   Next: the cars' showcase, the track records from Control Central.
+   **The cars' showcase (2026-10-21): done** (`showcase.c`, NOTES §4.2: Enter or a click
+   on a car's picture in Control Central; the main page, History, General with its slides,
+   Performance, Mechanical, the film, the next and previous cars, the commentary; every
+   page tried equal to the original by palette entry; the opponent's showcase leaves the
+   car it ends on as the opponent, as the original). The front end's spoken words were cut
+   after 4 s (fixed: the commentaries last a minute). Next: the track records from Control
+   Central (`fe_track_select_tournament` `0x76380`), then the MiSTer.
    (`0x136618`, the sections drawn: the settings' +0x85 and F3, NOTES §4.19.)
    Open: the race's sound reaches full scale at the hits and the horn (0.2 to 0.7 % of
    the samples in `build/snd_port/`): how EA's mixer sums the voices is still to compare. Model polygons of one colour (`0xaa990`): ported 2026-10-21 (the 512TR's rear bumper).

@@ -318,7 +318,7 @@ static int g_speech = -1;
 
 void speech_say(const char *name)
 {
-    static short out[65536];
+    short *out;
     char path[256];
     unsigned char *d;
     long len;
@@ -333,9 +333,10 @@ void speech_say(const char *name)
         fprintf(stderr, "renfs: %s is missing\n", path);
         return;
     }
-    if (eacs_header(&h, d, len) && h.data > 0 && h.data < len) {
-        n = eacs_sound(&h, d + h.data, len - h.data, out,
-                       65536 / h.channels);
+    /* all of it (the showcase's commentaries last a minute) */
+    if (eacs_header(&h, d, len) && h.data > 0 && h.data < len && h.samples > 0 &&
+        (out = malloc(sizeof *out * (size_t)h.samples * (size_t)h.channels))) {
+        n = eacs_sound(&h, d + h.data, len - h.data, out, (int)h.samples);
         /* (0x98f66 empties the queue) the sounds' volume and a half, 127 at most */
         audio_stream_close(g_speech);
         g_speech = audio_stream_open(h.rate, h.channels);
@@ -344,6 +345,7 @@ void speech_say(const char *name)
             audio_stream_volume(g_speech, v > 127 ? 127 : v);
             audio_stream_put(g_speech, out, n);
         }
+        free(out);
     }
     free(d);
 }

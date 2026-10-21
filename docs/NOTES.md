@@ -1045,6 +1045,63 @@ libraries `0x80000`..`0x94000` and `0x95000`..`0xb0000`, Watcom's runtime `0x940
   `music_choose` `0x63ed0` takes the song from it (in the port `timer_counter`; before it
   never moved and the song was always the first of the set). In this DOSBox both it and
   the system clock `0xf7980` count about 70 a second, so the credits' 2000 take 28 s there.
+- **The cars' showcase `fe_showcase` `0x17724`** (2026-10-21; `port/src/showcase.c`; every
+  page tried equal to the original by palette entry, DOSBox's near-black noise only: the
+  main page, History, General and its next cars, Performance and its slides, Mechanical
+  and its slides, back to Control Central).
+  - From Control Central (`0x45189` the opponent's picture, `0x4545c` the player's; not
+    with the player's car 11, the Warrior, nor with `0x15d142` from NFS.CFG, nor the
+    player's in a network game `0x15d136`): `music_fade_out`, `pal_fade_down`,
+    `music_wait_end`, `music_start("showcase.asf")`, `0xec4fc` = 0x14 (the opponent's
+    picture loaded again). **The opponent's showcase shows the opponent's car as the
+    player's** (+0x9b = +0x91, the traffic's 8 as car 0), and after it the car it ended on
+    is the opponent's and the player's car is put back. After: `0x63e2c` (a menu song),
+    the menu's palette, the pointer on the panel, the screen drawn and faded up.
+  - Files: `FRONTEND/SHOW/` (GSHOW in German, `0x1565b4`) `<car>.qfs` the main page
+    (names `0x14fb8`: rx7 nsx supra 911 vette viper 512tr diablo, by +0x9b),
+    `<car3><kind>.qfs` the others (`0x14f2c` = `0x14eb8`: rx7 nsx sup 911 zr1 vip 512 dia;
+    kinds his gen per mec), the film `FRONTEND/MOVIE/<car>.tgv` (`0x341a4`), the
+    commentary `<car3><kind>16.eas` from `FRONTEND/SPEECH` (`0x72370` = `0x722b4` with the
+    speech folder `0x1560b4` put in front; 8-bit 16 kHz, **up to a minute long**: the
+    port's speech had room for 4 s and was cut).
+  - The main page: choices 0 History, 1 Video, 2 General, 3 Performance, 4 Mechanical,
+    5 next car, 6 previous car, 7 Done, 8 none; the keys' moves (shorts) up `0x14f4c`
+    (3 3 3 5 2 1 4 4 7), down `0x14f5e` (5 4 4 1 6 3 2 2 7), left `0x14f70`
+    (1 2 0 2 0 6 7 5 7), right `0x14f82` (4 0 1 0 1 7 5 6 7), the pointer's places x
+    `0x14f94`, y `0x14fa6`. Mouse areas in the order tried: Video (0x134..0x1bc,
+    0xd1..0x141), History (0x1c3..0x267, 0xf6..0x16e), General (0x86..0x12c,
+    0xa4..0x119), Performance (0x134..0x212, 0x4e..0xcb), Mechanical (0x52..0x14f,
+    0x146..0x19c), previous (200..0x104, 0x1ae..0x1e0), next (0x168..0x1a4), Done
+    (0..0x82). Start: lit 1 (Video), the pointer there unless the mouse was used; the
+    screen cleared (`0x72600`), the page's palette set at once (`0x83fe4`), the inverse
+    table, the styles. A drawing: `bgnd`, the lit choice (`hisl vidl genl perl engl`
+    see-through, `nexl prel donl` not; `vidl` only with the films `0x15d120`); the first
+    after a load with the palette black (`0x84080`) then faded up, the inverse table, the
+    styles. A new choice: sound 0x47, one retrace, the old one dark and the new lit (into
+    the hidden screen: drawn over by the redraw that follows, so never seen). Enter on
+    History / General / Performance / Mechanical: the file freed, faded down, the page,
+    the file again, the pointer on the choice; Video: the music faded out, the film, the
+    music again; next / previous car: `car_setup` `0x73a80`, faded down, the new car's
+    file (no pointer move); Done or Esc (sound 0x48). Two minutes untouched or the right
+    button: as Done. **In a tournament the cars go round inside the track's class** (+0x95:
+    0 or 3 → cars 0..2; 1, 4, 5 → 3..5; else 6..7), else round all eight.
+  - `fe_showcase_history` `0x16290` ("his": the text is the background's; "gen": the
+    figures and two frames of five slides, `f2s0..4` small at the top, `f1s0..4` large,
+    each with arrows): choices 0 frame 2, 1 frame 1, 2 Done, 3 previous, 4 next, 5 none;
+    starts on frame 2 ("gen") or Done ("his", or no mouse: the pointer put there). Up /
+    down (`0x14f14` 3 0 1 1 1 2, `0x14f20` 1 3 0 0 0 2) only on General, and from none to
+    Done; left / right on a frame turn its slides (sound 0x48), else along Done → previous
+    → next, round; over a frame the pointer on its arrows lights them (`f2lf f2rt f1lf
+    f1rt`) and Enter or a click there turns the slides. The pointer's places `0x14efc`,
+    `0x14f08`. In a tournament its next and previous cars go round the classes 0 or 3, 1
+    or 4, else (track 5 with the last: unlike the main page's). The commentary starts as
+    the page first fades up and stops as it is left or the car changes (`0x72454`,
+    `0x72490`). The flag at `[esp+0x380]` that would light the arrows alone is never set.
+  - `fe_showcase_specs` `0x15008` ("per": `acc1 bra1 han1` with their figures `accl brak
+    hand`, German two of them, the slides turned with `^ 1`; "mec": `engn driv chas`):
+    choices 0 the frame, 1 Done, 2 previous, 3 next, 4 none; up and down both `0x14ea4` =
+    `0x14eae` (2 0 0 0 1); the pointer's places `0x14e90`, `0x14e9a`; Performance's Done
+    area is narrower (0..0x69). Otherwise as the photo pages.
 
 ### 4.3 The race
 
