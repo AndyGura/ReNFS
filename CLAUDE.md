@@ -189,6 +189,8 @@ message `0x74dcc`; a game on `0x15d134` (Quit tournament ?, Track already comple
 **A store to `[esp+N]` after a `push` is the frame's `N-4`** (`tools/espdepth.py`).
 The cars' showcase `0x17724` (NOTES §4.2, `showcase.c`): pages `0x16290` (his/gen) and `0x15008` (per/mec),
 the opponent's leaves its last car as the opponent; the commentary `0x72370` up to a minute long.
+The track's screen `0x76380` (NOTES §4.2, `trackrec.c`): segments, lengths, laps, the time of day
+`0x12dd30` (the race record's end: the family `0x12c340`, `_T01`), Best Times `0x75288`.
 Credits `0x25600` (CREDITS.FSH, credits.asf); `0xed0fc` counts every timer tick, screens zero it to time
 things, the menu music's choice reads it (`timer_counter` in the port).
 The controls screen `0x22bd0` (NOTES §4.2): +0x5f36.. kinds and keys (menu key codes), conflicts `0x7390c`,
@@ -272,6 +274,8 @@ once; for `--shot` tests);
 `RENFS_VIEW=n`: the race watched from camera n (outside: 2..5, 8..12);
 `RENFS_RES=320|640`: races at that size whatever the settings say;
 `RENFS_SMOOTH=0|1`: the motion smoothed between steps or not (F11's setting, `renfs.cfg`, untouched);
+`RENFS_TOD=n`: the track's time of day in `--race` (0 morning, 1 midday, 2 evening);
+`RENFS_MIRROR=1`, `RENFS_RALLY=1`: the mirrored track or the rally in `--race`;
 `RENFS_LAPS=n`: n laps of a circuit in `--race` (else the settings' race length, as Control Central `0x437fc`: 8 on TR1 by default);
 `RENFS_CONFIG=f`: a CONFIG.DAT for the test (the original's, `nfsdos.py mem:156c14:5f52:f`).
 `RENFS_SEED=n`: the race's random numbers seeded with n (else the time, as the original).
@@ -286,7 +290,7 @@ queued), the pictures timed by the sound heard, as the original with sound on.
 and `movie.c` (the movies), `fe.c` (front end screens), `mainmenu.c` (Control Central), `options.c` (the options screen, the race menus' Game options), `menu.c` (what the menus share:
 keys, mouse, text styles, the yes/no dialog), `font.c` (FFN, letters blended pixel by
 pixel, `nearest_colour`, the inverse table), `sound.c` (the front end's sound bank and
-music, the race's music `0x63d88` and speech `0x722b4`), `audioopt.c` (the audio screen), `gfxopt.c` (the graphics screen `0x32d08`), `ctrlopt.c` (the controls screen `0x22bd0`: kinds, keys redefined, conflicts; the race's keys from them, `drive_keys_from_config` `0x36a0c`), `joystick.c` (the joystick: found, calibrated, `joystick.cfg` in the home folder, read in races and menus), `smooth.c` (the port's smooth motion between the race's steps, F11), `skid.c` (the tyres' marks: the ring `0x671dc`, the painter `0x679ec`, the line `0x989a0`; their dust `0x664bc`; equal, `tools/skid_emu.py`), `showcase.c` (the cars' showcase `0x17724`: its pages, film and commentary), `credits.c` (the credits `0x25600`: five pages of CREDITS.FSH, 20 s each by the timer's count `0xed0fc`), `loadsave.c` (load and save `0x3c0c8`/`0x3d4c4`, the file list `0x3aacc`: tournaments as `<name>.sav` in the home folder, replays saved, played, deleted; a game on `0x15d134`), `config.c` (CONFIG.DAT; the built-in defaults, equal byte for byte,
+music, the race's music `0x63d88` and speech `0x722b4`), `audioopt.c` (the audio screen), `gfxopt.c` (the graphics screen `0x32d08`), `ctrlopt.c` (the controls screen `0x22bd0`: kinds, keys redefined, conflicts; the race's keys from them, `drive_keys_from_config` `0x36a0c`), `joystick.c` (the joystick: found, calibrated, `joystick.cfg` in the home folder, read in races and menus), `smooth.c` (the port's smooth motion between the race's steps, F11), `skid.c` (the tyres' marks: the ring `0x671dc`, the painter `0x679ec`, the line `0x989a0`; their dust `0x664bc`; equal, `tools/skid_emu.py`), `showcase.c` (the cars' showcase `0x17724`: its pages, film and commentary), `trackrec.c` (the track's screen `0x76380` and its Best Times `0x75288`), `credits.c` (the credits `0x25600`: five pages of CREDITS.FSH, 20 s each by the timer's count `0xed0fc`), `loadsave.c` (load and save `0x3c0c8`/`0x3d4c4`, the file list `0x3aacc`: tournaments as `<name>.sav` in the home folder, replays saved, played, deleted; a game on `0x15d134`), `config.c` (CONFIG.DAT; the built-in defaults, equal byte for byte,
 `tools/config_emu.py`), `main.c`.
 The race so far: `raster.c` (the quad and triangle painters), `poly.c` (projection, quad cutting),
 `road.c` (the frame's points, into the view; the mirror's five sections behind), `roaddraw.c` (the road painted far to near,

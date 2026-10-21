@@ -33,7 +33,7 @@ add_executable(renfs
   src/config.c
   src/font.c
   src/menu.c
-  src/mainmenu.c src/showcase.c
+  src/mainmenu.c src/showcase.c src/trackrec.c
   src/options.c src/audioopt.c src/gfxopt.c src/ctrlopt.c src/loadsave.c src/credits.c src/joystick.c src/smooth.c
   src/raster.c
   src/poly.c

@@ -342,7 +342,7 @@ int race_run(void)
     hud_car driver;
     hud_map_state map;
     unsigned start, now;
-    int mirror_skip = 0, redraw, in_seat = 1, seat, settle = 0;
+    int mirror_skip = 0, redraw, in_seat = 1, seat, settle = 0, family, fam_kind;
     unsigned done = 0;
     const char *car;
 
@@ -419,7 +419,12 @@ int race_run(void)
 
     /* race_main 0x6356c: the loading picture, then the loading */
     race_slide(player);
-    if (!track_load(name) || !trackinfo_load(name, 1, 0) || !trackfam_load(name, 1, 0)) {
+    /* the family (0x12c340, race_run 0x374ed): the mirrored and the rally's 1, else the
+       track's time of day chosen on its screen (0x12dd30) */
+    family = g_road_mirror || g_drive.rally ? 1 : rec_get(REC_TOD + 4 * g_drive.kind);
+    fam_kind = g_road_mirror ? 2 : g_drive.rally && g_drive.kind != 3 ? 3 : 0;
+    if (!track_load(name) || !trackinfo_load(name, family, 0)
+        || !trackfam_load(name, family, fam_kind)) {
         fprintf(stderr, "renfs: the track %s could not be loaded\n", name);
         return 0;
     }
@@ -972,6 +977,8 @@ int race_test(const char *name)
        rally; a circuit's laps by the race length (+0xb3) as Control Central sets them
        (0x437fc): 4, 8 or 16, or 2, 6 or 12 on tracks 4..7 */
     memset(&g_race_codes, 0, sizeof g_race_codes);
+    g_race_codes.mirror = getenv("RENFS_MIRROR") != 0;
+    g_race_codes.rally = getenv("RENFS_RALLY") != 0;
     if (!strncasecmp(name, "tr5", 3)) {
         i = 3;
         g_race_codes.rally = 1;
@@ -985,6 +992,8 @@ int race_test(const char *name)
         }
     }
     config_set_word(CFG_TRACK, i);
+    if (getenv("RENFS_TOD"))   /* the time of day as the track's screen sets it */
+        rec_put(REC_TOD + 4 * i, atoi(getenv("RENFS_TOD")));
     config_set_word(CFG_SEGMENT, i < 3 && name[2] >= '1' && name[2] <= '3' ? name[2] - '1' : 0);
     len = config_word(CFG_RACE_LENGTH);
     len = len < 0 || len > 2 ? 2 : len;

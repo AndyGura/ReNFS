@@ -11,6 +11,8 @@ void fe_car_setup(void);
 /* what the codes and the tournaments have opened: the mirrored tracks (0xec454), the
    rally (0xec458), Lost Vegas offered (0xec460), the Warrior (0xf7494) */
 extern int g_mirror_ok, g_rally_ok, g_vegas_ok, g_warrior_ok;
+/* the track's version chosen: mirrored (0x12dd28), the rally (0x12dd2c) */
+extern int g_mirror, g_rally;
 /* 0x42a84: after a tournament won, what CONFIG.DAT's +0x5f50 opens (1 Lost Vegas, the
    Warrior and the mirrored tracks; 2 the rally too) */
 void fe_unlock(void);

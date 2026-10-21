@@ -24,7 +24,8 @@ typedef struct {
 extern track_fam g_fam;
 
 /* the family of track `name` ("cy1"): family 1 = SIMDATA/ETRACKFM/<name>_001.FAM (G.. in
-   German), else NTRACKFM's _T01 (or _M01, _R01 by the race's kind: 2, 3); its textures
+   German), or NTRACKFM's _M01 mirrored (kind 2), _R01 the rally (kind 3); any other
+   family (the time of day, 0x12dd30) NTRACKFM's _T01; its textures
    found and the re-colouring queued (racepal.h), the 3D objects made drawable (turned
    over on a mirrored track, g_road_mirror). 0 if missing */
 int trackfam_load(const char *name, int family, int kind);

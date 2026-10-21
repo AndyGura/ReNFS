@@ -43,6 +43,7 @@
 #define REC_TABLE 0x318        /* 0x12dd24: the race length's table */
 #define REC_MIRROR 0x31c       /* 0x12dd28 */
 #define REC_RALLY 0x320        /* 0x12dd2c */
+#define REC_TOD 0x324          /* 0x12dd30: each track's time of day (9; main sets them 1) */
 
 extern unsigned char g_rec[REC_SIZE];
 

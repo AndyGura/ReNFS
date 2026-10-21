@@ -7,6 +7,7 @@
 #include "fe.h"
 #include "files.h"
 #include "race.h"
+#include "replay.h"
 #include "smooth.h"
 #include "video.h"
 #include <stdio.h>
@@ -38,6 +39,8 @@ static const char usage[] =
     "  RENFS_PLACE=s:a,c,v  a test: at race step s the opponent put a m ahead of the\n"
     "                   car and c m to the side, at v m/s\n"
     "  RENFS_LAPS=n     n laps of a circuit (tr1 ..; else the race length's, 8 by default)\n"
+    "  RENFS_TOD=n      the track's time of day in --race: 0 morning, 1 midday, 2 evening\n"
+    "  RENFS_MIRROR=1, RENFS_RALLY=1  the mirrored track or the rally in --race\n"
     "  RENFS_VIEW=n     a test: the race watched from camera n (2..5, 8..12 outside)\n"
     "  RENFS_RES=n      a test: races at 640 (640x480) or 320 (320x200), whatever the\n"
     "                   graphics screen says\n"
@@ -90,6 +93,8 @@ int main(int argc, char **argv)
     if (!exe_load())           /* the game's tables, the built-in settings among them */
         return 1;
     collide_init();            /* EA's random numbers as the program starts */
+    for (int i = 0; i < 9; i++)    /* every track's time of day midday (main 0x471b5) */
+        rec_put(REC_TOD + 4 * i, 1);
     if (!video_init(shot, shot_frames))
         return 1;
 

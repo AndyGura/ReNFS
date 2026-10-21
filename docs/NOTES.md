@@ -1102,6 +1102,60 @@ libraries `0x80000`..`0x94000` and `0x95000`..`0xb0000`, Watcom's runtime `0x940
     choices 0 the frame, 1 Done, 2 previous, 3 next, 4 none; up and down both `0x14ea4` =
     `0x14eae` (2 0 0 0 1); the pointer's places `0x14e90`, `0x14e9a`; Performance's Done
     area is narrower (0..0x69). Otherwise as the photo pages.
+- **The track's screen `fe_track_screen` `0x76380`** (2026-10-21; `port/src/trackrec.c`;
+  every page tried equal to the original's screenshots by palette entry, at most 50
+  pixels of DOSBox's near-black, English and German). From Control Central's track
+  picture (`0x456af`; not over a link, not track 9): the menu's music faded, showcase.asf,
+  the opponent's picture let go (`0xec4fc` = 0x14), afterwards `0x63e2c` and Control
+  Central's palette and inverse table again. `ART/TRACKSEL/<name>.QFS` by the names
+  `0x750cc` (citysel coastsel alpsel rustsel autsel brunsel vertsel tropsel lostsel), its
+  `.INV` (rebuilt by the fade anyway), the description `0x750f0` (city.eas coastal.eas
+  alpine.eas loop1.eas loop2.eas goldrash.eas loop3.eas industri.eas loopx.eas) said by
+  `0x72370` as it first fades up, stopped (`0x72454`, `0x72490`) on leaving or another
+  track. Esc puts back the 0x2b dwords of CONFIG.DAT from +9 copied at the start.
+  - Choices (the mouse areas, `mouse_in_rect` `0x71a1c`(x0, x1, y0, y1)): 0 Done (0..0x82,
+    y 0x1b3..0x1e0), 1 previous track (200..0xfa), 2 next (0x172..0x1a4), 3 Best Times
+    (0x1e0..0x280, y ..0x1df), 4..6 an open road's segment maps (x `0x75234`[t] ..
+    `0x75246`[t], y `0x751c8`[3t+k] .. `0x751fe`[3t+k]; the circuits' are at y 500), 7 a
+    circuit's laps (0..0x140, 0x15e..0x183; track > 2), 8 none, 9 the time of day (0..0x140,
+    0x184..0x1a0; not on track 8 nor mirrored nor the rally). Keys: open roads up `0x75054`,
+    down `0x75068`, left `0x7507c`, right `0x75090`; circuits `0x75004`, `0x75018`,
+    `0x7502c`, `0x75040`; up or down onto 9 where there is no time of day → 7 / 4, or 0;
+    the pointer's places `0x750a4`, `0x750b8` (placed at the start without a mouse).
+  - Drawn: `bgnd`; the time of day `0x74ff8` (mord midd eved, see-through); style 0; a
+    circuit's length `0x75168`[t−3] (kilometres `0x751b0` with `0x15d140`, German) at
+    (0xc8, 0x153) and its laps +0xb1 "%d" at (0xdc, 0x16b) (style 1 when lit); an open
+    road's segment length `0x75114`[4t + seg] and the road's `[4t]` (km `0x75180`) at
+    (0xc8, 0x153), (0xaf, 0x16a), the segment's `bsg%d`, `ssg%d` (the segment a local,
+    1..3, starting at 1); the lit one see-through: donl prel nexl besl ssg1..3 lapl, or
+    `timl` + `0x74fec` (morl midl evel). A change of the lit choice: sound 0x47, the old
+    one dark and the new lit drawn to the back screen and the whole page drawn again at
+    the next pass (so only the sound shows; the dark laps' "%d" is formatted and never
+    drawn).
+  - Enter (sound 0x48): previous/next track (0..7, 8 with `0xec460`; a tournament: the
+    car `0xec440`[t], opponent 10, `car_setup` `0x73a80`; the laps by +0xb3 again: 4 8 16,
+    2 6 12 on tracks 4..7), the page loaded again; Best Times; a segment; the laps (not
+    in a tournament: +0xb3 + 1 mod 3, the laps again); the time of day: 1 → `0x75144`[t]
+    (0 2 2 2 0 2 2 2 2), else 1. Two minutes or the right button: leave.
+  - **The time of day `0x12dd30`** (9 ints, main fills them with 1 by `0x89897`, a dword
+    fill) is the race record's end (`0x12da0c` + 0x324): REPLAY.RPL keeps it, the CD's
+    four have all 1. `race_run` `0x374ed`: the family switch `0x12c340` = 1 with the
+    mirror or the rally, else `0x12dd30`[track] (below, `load_track_fam`).
+  - **Best Times `fe_track_best` `0x75288`** (`ART/TRACKSEL/<name>BST.QFS`, names
+    `0x74fa8`): the ten best totals of the track (+0xb5 + 0xa6b t + 0xea, a circuit's
+    + 0x186 · race length), each name cut to 0x10e at (8, 0x73 + 0x16 i), time
+    `fmt_time` at 0x118, car `0x74fcc`[+0xf] (RX-7 .. DIABLO: a car past 7 reads past the
+    table) at 0x1e0, kind +0x23 at 0x24e (t.t. h.h., German "  z" "  d"); the top speed
+    (record 36, when its +0x17 is not 0) at y 0x17c, `fmt_speed`. The page whole only at
+    its first drawing; then only the lit choice (donl larl rarl desl, drawn whole), a
+    change drawing the old one dark (dond lard rard, desd see-through) and the new lit
+    (desl see-through). Choices 0 Done (returns 1: the track's screen leaves too, the
+    music faded), 1/2 the previous/next track (as above, no speech), 3 Description
+    (returns 0: the track's screen again), 4 none; left `0x74f80`, right `0x74f8a`, up or
+    down from none → Done; the pointer `0x74f94`, `0x74f9e` (on Description at the start).
+  - A trap for DOSBox tests: CONFIG.DAT is at `0x156c14`, so +0x7f (the races' 640x480 or
+    320x200) is `0x156c93` and the segment +0x93 is `0x156ca7`: `poke:156c93:0100` runs
+    the race at 320x200 (seen as a "different" rally status bar, 2026-10-21).
 
 ### 4.3 The race
 
@@ -2041,9 +2095,13 @@ is read again. **Ported (`port/src/trackinfo.c`), equal on the snapshots; the fi
 equal to `tools/trackinfo.py` on all 16 tracks.**
 **The family switch `0x12c340`**: 1 if `0x12dd2c` or `0x12dd28`, else `0x12dd30[track]`
 (main sets all nine to 1; the track screen `0x77254` toggles one between 1 and another
-value). 1: `simdata\etrackfm\<track>_001.fam` (`0x156334`; `g..` in German); else
-`simdata\ntrackfm\<track>_T01.fam`, `_M01` with `0x12dd28`, `_R01` with `0x12dd2c` (not
-track 3) (`load_track_fam` `0x60078`).
+value). 1: `simdata\ntrackfm\<track>_M01.fam` with `0x12dd28`, `_R01` with `0x12dd2c` (not
+track 3, whose rally is TR5's own `_001`), else `simdata\etrackfm\<track>_001.fam`
+(`0x156334`; `g..` in German); any other family `simdata\ntrackfm\<track>_T01.fam`
+(`load_track_fam` `0x60078`). The trackinfo's tint is the family's (0 morning, 2 evening).
+**Ported**: the port had loaded `_001` for the mirrored and rally tracks too (fixed
+2026-10-21; checked by eye against the original's mirrored City and rally Alpine, and
+evening Alpine).
 **`load_track_textures` `0x5b34c`** (entries: 0 the texture banks, 1 the roadside pictures,
 2 the horizon): clears `0x140cd8` (144 × 8). One bank: `0x5b270` (see-through marks), the
 palette its `!pal` (or `01A0`'s next block), texture 3t + k = "tt" + 'A'+k + '0'..'7' for

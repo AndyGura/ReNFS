@@ -13,6 +13,7 @@
 #include "race.h"
 #include "session.h"
 #include "showcase.h"
+#include "trackrec.h"
 #include "sound.h"
 #include "video.h"
 #include <stdio.h>
@@ -40,7 +41,7 @@ static const char *const race_type_pic[5] = { "watch1", "headhead", "single", "t
 static const int tournament_car[10] = { 0, 3, 6, 0, 3, 3, 6, 6, 7, 3 };
 
 /* What stays from one visit to the next, and what the typed codes unlock */
-static int g_mirror, g_rally;           /* 0x12dd28, 0x12dd2c: the track's versions */
+int g_mirror, g_rally;                  /* 0x12dd28, 0x12dd2c: the track's versions */
 int g_mirror_ok, g_rally_ok;            /* 0xec454, 0xec458 */
 int g_vegas_ok;                         /* 0xec460 (track 8 offered) */
 static int g_vegas_typed;               /* 0xec464 */
@@ -112,6 +113,22 @@ static void showcase(int opponent)
         cset(CFG_OPPONENT, cw(CFG_CAR));
         cset(CFG_CAR, car);
     }
+}
+
+/* the track's screen from its picture (0x456af; not over a link): the menu's music
+   faded out, the showcase's */
+static void track_screen(void)
+{
+    music_fade_out();
+    pal_fade_down(0, 256);
+    music_wait_end();
+    music_start("showcase.asf");
+    if (g_pic[PIC_OPPONENT].loaded) {      /* (0xec4fc = 0x14: loaded again) */
+        fsh_free(&g_pic[PIC_OPPONENT].f);
+        g_pic[PIC_OPPONENT].loaded = 0;
+    }
+    fe_track_screen();
+    music_random();                        /* 0x63e2c */
 }
 
 /* 0x424c0: the pictures let go */
@@ -601,7 +618,11 @@ int fe_main_menu(void)
                         track_next(), redraw = 1;
                     else if (in_rect(0x155, 0x168, 0x131, 0x14e))
                         track_previous(), redraw = 1;
-                    /* else the track's records (fe_track_select_tournament 0x76380): to come */
+                    else if (cw(CFG_TRACK) != 9) {
+                        track_screen();
+                        place_mouse(sel);
+                        redraw = first = 1;
+                    }
                     break;
                 case RACE_TYPE:
                     if (in_rect(0x136, 0x145, 0x154, 0x16d))

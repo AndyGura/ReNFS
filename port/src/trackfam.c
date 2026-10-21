@@ -118,13 +118,13 @@ int trackfam_load(const char *name, int family, int kind)
     int count, i, k, q;
 
     trackfam_free();
-    /* 0x60078 */
-    if (family == 1)
+    /* 0x60078: the mirrored and the rally's families are family 1's */
+    if (family == 1 && kind != 2 && kind != 3)
         snprintf(path, sizeof path, "SIMDATA/%s/%s_001.fam",
                  g_german ? "GTRACKFM" : "ETRACKFM", name);
     else
         snprintf(path, sizeof path, "SIMDATA/NTRACKFM/%s_%c01.fam", name,
-                 kind == 2 ? 'M' : kind == 3 ? 'R' : 'T');
+                 family != 1 ? 'T' : kind == 2 ? 'M' : 'R');
     f->file = file_load(path, &f->len);
     if (!f->file || ww_count(f->file) < 3) {
         fprintf(stderr, "renfs: %s is missing or not a track family\n", path);
