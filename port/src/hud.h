@@ -77,6 +77,11 @@ typedef struct {
     int player;                /* +0x47d: its place in the race's tables */
     int lap;                   /* +0x50 */
     int node;                  /* +0x48 */
+    /* the gear lever, of the dashboard's car (0x2e4f0) */
+    int lever_shown;           /* +0x421: counts down after a shift */
+    int lever_before;          /* +0x41d: the gear before it */
+    int lever_gear;            /* +0x3ed: the gear now */
+    int lever_wait;            /* +0x3bd: steps until the clutch bites */
 } hud_car;
 
 extern hud_status g_hud;

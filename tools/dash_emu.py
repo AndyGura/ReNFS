@@ -8,7 +8,8 @@ driver's seat (0x31684 against hud_frame) with the wheel turned several ways, on
 snapshot's view, mirror and map pictures, the routines not yet ported left out on both
 sides (LEFT_OUT); then frames after the start with the status bar's numbers (0x30d8c: the
 speed, gear, place, time, split, laps or miles) as NUMBERS changes the race. Writes build/shots/dash_<snap>_{orig,port,diff}.png and
-dash_<snap>_frame<k>_{orig,port}.png.
+dash_<snap>_frame<k>_{orig,port}.png; then
+the gear lever (0x2e4f0) with the map off through a shift (GATES).
 
     build/venv/bin/python tools/dash_emu.py cy1 build/snap/e3.bin [...]
 """
@@ -62,6 +63,21 @@ NUMBERS = [
     {"steps": 9001, "new best": 1}, {"steps": 9002, "node": 900, "race type": 0, "split": 9},
     {"steps": 9003, "split": -9}, {"steps": 9004, "race type": 2},
     {"steps": 9005, "speed": 0x7fffff}, {"steps": 99999, "speed": 0}]
+# then the gear lever (0x2e4f0) with the map off: the steps since the shift (+0x421), the
+# gear before (+0x41d) and now (+0x3ed), the clutch's wait (+0x3bd); the map back on, off
+# again; the last leaves the lever as at the start (none shown)
+GATES = [
+    {"map": 0, "shown": 0, "gear": 0, "before": -1, "wait": 0},
+    {"shown": 16, "wait": 3}, {"shown": 15}, {"shown": 14}, {"shown": 13, "wait": 2},
+    {"shown": 12}, {"wait": 0}, {"shown": 11}, {"shown": 10}, {"shown": 3}, {"shown": 0},
+    {"shown": 0}, {"shown": 16, "before": 1, "gear": 2}, {"shown": 13}, {"shown": 12},
+    {"shown": 5}, {"shown": 16, "before": -1, "gear": -2}, {"shown": 12, "wait": 4},
+    {"shown": 1, "wait": 0}, {"map": 1, "shown": 16, "before": 4, "gear": 5},
+    {"map": 0, "shown": 14}, {"shown": 13}, {"shown": 11}, {"shown": 9, "before": 5, "gear": 6},
+    {"shown": 16, "before": 0, "gear": 1}, {"shown": 0}]
+GATE_AT = {"shown": 0x421, "before": 0x41d, "gear": 0x3ed, "wait": 0x3bd}
+GATE_PORT = {"shown": "lever_shown", "before": "lever_before", "gear": "lever_gear",
+             "wait": "lever_wait"}
 
 I = ctypes.c_int
 U8 = ctypes.c_ubyte
@@ -93,7 +109,8 @@ class MapState(ctypes.Structure):
 class HudCar(ctypes.Structure):
     _fields_ = [("steer", I), ("number", I), ("rpm", I), ("redline", I), ("speed", I),
                 ("viewed", I), ("human", I), ("road_speed", I), ("gear", I), ("player", I),
-                ("lap", I), ("node", I)]
+                ("lap", I), ("node", I), ("lever_shown", I), ("lever_before", I),
+                ("lever_gear", I), ("lever_wait", I)]
 
 
 REC = 0x1d2
@@ -213,6 +230,7 @@ def original_frames(path):
     car = player(s)
     scr_start(s)
     s.write(0x12b8d4, struct.pack("<I", 1))
+    s.write(0xea99c, struct.pack("<i", 0))     # (the lever as last drawn: none, as the port)
     got = []
     for k in range(len(STEERS)):
         for at, v in ((0x18, STEERS[k]), (0x3c1, RPMS[k]), (0x68, SPEEDS[k])):
@@ -227,6 +245,14 @@ def original_frames(path):
     for change in NUMBERS:
         for k, v in change.items():
             number_change(s, car, k, v)
+        s.call(0x31684, eax=car)
+        got.append(scr_read(s))
+    for change in GATES:
+        for k, v in change.items():
+            if k == "map":
+                s.write(0x12b988, struct.pack("<i", v))
+            else:
+                s.mu.mem_write(car + GATE_AT[k], struct.pack("<i", v))
         s.call(0x31684, eax=car)
         got.append(scr_read(s))
     return got
@@ -248,7 +274,7 @@ def port_frames(s, L):
     viewed = s.i32(0x12dd54)
     car = HudCar(g(a, 0x18), g(a, 0x48a), g(a, 0x3c1), g(g(a, 0x479), 0xac), g(a, 0x68),
                  viewed, int(viewed < s.i32(0x12da30)), g(a, 0x15c), g(a, 0x3ed), g(a, 0x47d),
-                 g(a, 0x50), g(a, 0x48))
+                 g(a, 0x50), g(a, 0x48), g(a, 0x421), g(a, 0x41d), g(a, 0x3ed), g(a, 0x3bd))
     got = []
     for k in range(len(STEERS)):
         for f, v in (("steer", STEERS[k]), ("rpm", RPMS[k]), ("speed", SPEEDS[k])):
@@ -263,6 +289,16 @@ def port_frames(s, L):
     for change in NUMBERS:
         for k, v in change.items():
             number_port(L, st, car, k, v)
+        L.hud_frame(ctypes.byref(car))
+        got.append(ctypes.string_at(scr.pix, W * H))
+    for change in GATES:
+        for k, v in change.items():
+            if k == "map":
+                st.map = v
+                continue
+            setattr(car, GATE_PORT[k], v)
+            if k == "gear":     # (the status bar's gear the same field)
+                number_port(L, st, car, "gear", v)
         L.hud_frame(ctypes.byref(car))
         got.append(ctypes.string_at(scr.pix, W * H))
     return got
@@ -440,7 +476,7 @@ def port_outside(s, L):
     viewed = s.i32(0x12dd54)
     car = HudCar(g(a, 0x18), g(a, 0x48a), g(a, 0x3c1), g(g(a, 0x479), 0xac), g(a, 0x68),
                  viewed, int(viewed < s.i32(0x12da30)), g(a, 0x15c), g(a, 0x3ed), g(a, 0x47d),
-                 g(a, 0x50), g(a, 0x48))
+                 g(a, 0x50), g(a, 0x48), g(a, 0x421), g(a, 0x41d), g(a, 0x3ed), g(a, 0x3bd))
     box = (I * 4)(*[struct.unpack("<i", s.read(0xe8b10 + 0x16c * HIRES + 52 * LAYOUT + 0x24 + 4 * i, 4))[0]
                     for i in range(4)])
     L.hud_outside_screen(box)
@@ -496,7 +532,10 @@ def main():
             R.png("build/shots/dash_%s_frame%d_port.png" % (tag, k), b, pal, W, H)
             what = ("wheel %s, rpm %s, speed %s, step %s, radar %s" % (
                 STEERS[k], RPMS[k], SPEEDS[k], STEPS[k], RADARS[k]) if k < len(STEERS)
-                else ", ".join("%s %s" % kv for kv in NUMBERS[k - len(STEERS)].items()))
+                else ", ".join("%s %s" % kv for kv in NUMBERS[k - len(STEERS)].items())
+                if k < len(STEERS) + len(NUMBERS)
+                else "lever: " + ", ".join("%s %s" % kv for kv in
+                                           GATES[k - len(STEERS) - len(NUMBERS)].items()))
             print("  frame %d (%s): %d pixels differ%s" % (
                 k, what, len(d), " (first %d, %d)" % (d[0] % W, d[0] // W) if d else ""))
 

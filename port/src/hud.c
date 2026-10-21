@@ -41,6 +41,8 @@ static int g_redraw;                 /* 0x12b8d4: the whole dashboard is due */
 static int g_wheel_shown;            /* 0x12b8d0: the wheel's picture on the screen (0x63
                                         none), turned left < 0 */
 static int g_radar_shown;            /* 0x12b938: the radar's level on the screen */
+static int g_lever_shown;            /* 0xea99c: the lever's place as last drawn (kept from
+                                        race to race, as the original's) */
 static int g_bar_at;                 /* 0x12b944: the status bar drawn again after this
                                         step */
 static int g_bar_black;              /* 0x12b94c: its strip to be blacked first */
@@ -1269,6 +1271,60 @@ static void lines_clear(const unsigned char *list)
     g_hud.clear = 0;
 }
 
+/* 0x2e4f0: with the map off, in its box, the gear lever for a while after each shift
+   (+0x421 counting down from 16): at the gear before (16 .. 14), at its place across
+   from neutral (13), the new gear's (12, until the clutch bites), the new gear (11 ..
+   1); then the gate without it (0). Drawn again only when its place changes: the gate,
+   then the knob by its middle, or with the stick's four parts the stick from neutral
+   towards it, a quarter of the way further each part (lth1, lth2, lth3, nob1) */
+static void gear_lever(const hud_car *c)
+{
+    int s = c->lever_shown, wait = c->lever_wait, at = 0, x = 0, y = 0, i;
+    int before = c->lever_before + 2, now = c->lever_gear + 2;
+    const int (*pt)[2] = g_dash.gate_pt;
+
+    if (g_hud.map)
+        return;
+    redraw_clip();             /* 0x2d314 */
+    if (s <= 0) {              /* (0xea800, 0 and read by nothing, would keep it shown) */
+        if (g_lever_shown)
+            blit_own(g_dash.gate_back, COPY);
+        g_lever_shown = 0;
+        return;
+    }
+    if (before < 0 || before > 8 || now < 0 || now > 8)
+        return;
+    if (s < 11 && wait < 1) {
+        at = 1;
+        x = pt[now][0], y = pt[now][1];
+    } else if (s >= 14) {
+        at = 2;
+        x = pt[before][0], y = pt[before][1];
+    } else if (s == 13) {
+        at = 3;
+        x = pt[before][0], y = pt[1][1];
+    } else if (s == 12) {
+        at = 4;
+        x = pt[now][0], y = pt[1][1];
+    } else if (s == 11 && wait < 1) {
+        at = 5;
+        x = pt[now][0], y = pt[now][1];
+    }
+    if (at == g_lever_shown)
+        return;
+    g_lever_shown = at;
+    blit_own(g_dash.gate, COPY);
+    if (g_dash.knob_n == 4 && g_dash.knob[3]) {
+        int dx = (x - pt[1][0]) / 4, dy = (y - pt[1][1]) / 4, ox = 0, oy = 0;
+
+        for (i = 3; i >= 0; i--, ox += dx, oy += dy)
+            blit(g_dash.knob[i], pt[1][0] - s16(g_dash.knob[i] + 4) / 2 + ox,
+                 pt[1][1] - s16(g_dash.knob[i] + 6) / 2 + oy, SEE_THROUGH);
+    } else
+        blit(g_dash.knob[0], x - s16(g_dash.knob[0] + 4) / 2, y - s16(g_dash.knob[0] + 6) / 2,
+             SEE_THROUGH);
+}
+
 void hud_frame(const hud_car *c)
 {
     int turn = wheel_turn(c->steer), shown = c->steer < 0 ? -turn : turn;
@@ -1306,7 +1362,7 @@ void hud_frame(const hud_car *c)
     blit_pixels(g_hud_view.pix, g_hud_view.w, g_hud_view.h, 0, 0, COPY);
 
     window_set(&g_hud_screen);
-    /* (0x2e4f0: the gear lever's gate, in the map's box when the map is off: not yet) */
+    gear_lever(c);
     radar();
     hud_keys();
     bar_numbers(c);

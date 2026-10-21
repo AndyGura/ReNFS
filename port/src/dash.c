@@ -115,6 +115,22 @@ static int dash_places(const char *car, int number, int hires)
                     : table_named(k ? 0xea8a0 : 0xea870, last[k]);
             }
     }
+    /* the gear lever's pictures (0x2ed90) */
+    g_dash.gate = named("gate");
+    g_dash.gate_back = named("gbak");
+    if (!g_dash.gate || !g_dash.gate_back)
+        return 0;
+    for (i = 0; i < 4; i++) {
+        shape s;
+
+        g_dash.knob_n = i + 1;
+        if (!fsh_find(&g_dash.file, (const char *)exe_at((unsigned)exe_i32(0xea98c + 4 * i), 4), &s))
+            break;
+        g_dash.knob[i] = s.head;
+    }
+    if (!g_dash.knob[0])
+        return 0;
+
     g_dash.digital = number == 3 || number == 0xb;
     if (g_dash.digital)
         for (i = 0; i < 11; i++)
@@ -141,6 +157,9 @@ static int dash_places(const char *car, int number, int hires)
     /* the needles' points, round each gauge from its box's corner */
     g_dash.tach_n = points(g_dash.tach, g_dash.tach_box[0], g_dash.tach_box[1], g_dash.tach_pt, -30);
     g_dash.sped_n = points(g_dash.sped, g_dash.sped_box[0], g_dash.sped_box[1], g_dash.sped_pt, -30);
+    /* the gate's nine points, from its corner (0x2f123) */
+    if (points(g_dash.gate, s16(g_dash.gate + 0xc), s16(g_dash.gate + 0xe), g_dash.gate_pt, 9) < 9)
+        return 0;
     /* the speedometer's point 12 half way between 11 and 13 */
     for (k = 0; k < 2; k++)
             g_dash.sped_pt[12][k] = (g_dash.sped_pt[11][k] + g_dash.sped_pt[13][k]) / 2;

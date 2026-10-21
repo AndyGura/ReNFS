@@ -25,6 +25,13 @@ typedef struct {
     int tach_n, sped_n;        /* 0x12b5f8, 0x12b5fc */
     int tach_pt[30][2];        /* 0x12b65c: the needle's ends, the last its centre */
     int sped_pt[30][2];        /* 0x12b74c */
+    /* the gear lever (0x2e4f0): its gate, the gate without it, the knob "nob1" and the
+       stick's parts "lth3" .. "lth1" (0xea98c), how many were looked for until one was
+       missing or all four found (0x12b5e8: 4, the stick drawn in parts), the gate's nine
+       points (0x12b83c: reverse, neutral, the gears) */
+    const unsigned char *gate, *gate_back, *knob[4];  /* 0x12b5c0, 0x12b5c4, 0x12b5c8 */
+    int knob_n;
+    int gate_pt[9][2];
 } dash_state;
 
 extern dash_state g_dash;

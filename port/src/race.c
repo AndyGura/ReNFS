@@ -627,6 +627,7 @@ int race_run(void)
     for (i = 0; i < field; i++)
         map.places[i] = (unsigned char)(i + 1);
     map.driver = 1;
+    memset(&driver, 0, sizeof driver);
     driver.steer = 0;
     driver.number = cars[0].number;
     driver.rpm = 700;
@@ -686,6 +687,10 @@ int race_run(void)
            (Alt+Ctrl and a number) */
         driver.steer = smooth_steer(cars[0].steer);
         driver.rpm = smooth_rpm(cars[0].rpm);
+        driver.lever_shown = cars[0].gear_shown;
+        driver.lever_before = cars[0].gear_before;
+        driver.lever_gear = cars[0].gear;
+        driver.lever_wait = cars[0].shift_wait;
         {
             const race_car *v = g_cars[g_drive.viewed];
 
