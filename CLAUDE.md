@@ -231,7 +231,7 @@ each retrace's frame is drawn with the cars, camera and dials between the last t
 | `.CFM` `.FAM` | `wwww` containers of `ORIP` 3D models (1/128 units) + `SHPI` textures: cars, track families | read (`tools/orip.py`) |
 | `.TRI` | track: road nodes (x y z, heading, lanes), speeds a section, objects, the road's 3D points | read (`tools/tri.py`) |
 | `xxxINFO` | a track's sky and horizon settings, text | read (`tools/trackinfo.py`) |
-| `.PBS` `.PDN` | car physics (torque, gears, ABS/TCS), Huffman-packed `30FB` | first reading (`tools/carspec.py`) |
+| `.PBS` `.PDN` | car physics (torque, gears, ABS/TCS), Huffman-packed `30FB` | read, every field the game uses (`tools/carspec.py`, NOTES §3.10) |
 | `xxFB` | EA's packers: RefPack `10FB`, Huffman `30FB`/`32FB`/`34FB`, pairs `46FB` | read (`tools/unpack.py`, equal to the game's own on all 527) |
 | `.EAS` `.ASF` `.AS4` | EA sound/music (`EACS`, `1SNh` streams): PCM or IMA ADPCM | read (`tools/eacs.py`) |
 | `.BNK` | EA sound bank (engines, collisions): 128 offsets, `EACS` records | read (`tools/eacs.py`) |

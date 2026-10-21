@@ -304,32 +304,58 @@ track records, the rally maps, the police screens); it now uses `unpack.py`.
   code again (`0xb0630`, recursive). A byte that is no code is itself; escape + 0 ends,
   escape + b is b.
 
-### 3.10 Car physics: PBS and PDN — first reading (`tools/carspec.py`, 2026-10-19)
+### 3.10 Car physics: PBS and PDN (`tools/carspec.py`; every field the game reads, 2026-10-21)
 
-Both Huffman-packed, all i32, mostly 16.16; the fields' meaning settles when the physics
-is written (`car_physics_player`, `0x3fb90`, `0x3ed68` ..). `build/cars/torque.png`.
+Both Huffman-packed, all i32, mostly 16.16. Read first from the files (2026-10-19), then
+field by field from the code that uses them as the driving was ported (`port/src/drive.c`,
+equal to the original step for step, NOTES §4.6). `build/cars/torque.png`.
 - **`.PBS`** (CARSPECS: the 8 player cars and TRAFFC; 1912 bytes), `load_car_pbs` `0x50c24`:
   used in place (the car's `+0x479`). **A checksum**: the sum of bytes 0..0x757 = u32
   `+0x774`, otherwise `+0x3c` is set to 0 (an edited file gives a car without power).
-  `+0x3c` a power factor (0.5..0.84; ×248/256 with the automatic gearbox, `0x18990`;
-  TRAFFC 2.0), `+0x88` the torque points, from `+0xb4` (rpm, torque) pairs every 200 rpm
-  from 1000 (in N·m it seems: the NSX peaks at 286 at 5600; `0x18990` makes them 16.16).
-  `+0x334` ABS, `+0x338` traction control (1.0 = the car has it: the NSX, ZR-1, Supra both,
-  512TR, RX-7, 911 ABS only, Viper and Diablo neither; on only with the player's own
-  setting, `0x12da5f` / `0x12da5b` in the player's 0x4b-byte record → car `+0x492` /
-  `+0x48e`). `+0x2e4`, `+0x2e8` → car `+0x78`, `+0x7c`. When `0x12dd2c` is set the loader
-  halves `+0x320`, `+0x328` (and stores 1/x at `+0x324`, `+0x32c`), `+0x2dc`, `+0x2e0`,
-  `+0x28`, `+0x2c`, multiplies `+0x24` by 1.5, copies `+0x374..` 0x200 bytes to `+0x574..`,
-  and scales `+0x3c` by 0x14c/256 (`0x12da12` = 3) or 0x133/256: a game mode still to name.
+  Every field the game reads (names from what the code does with them):
+  - mass: `+0x0`, `+0x4` the front and rear shares, × `+0x14` the mass; `+0x34` a
+    resistance (× the mass at loading); `+0x24` × `+0x44` the weight thrown forward and
+    back; `+0x40` the wheelbase (the turn's and the yaw's damping, `0x324` · it²).
+  - the engine: `+0x3c` a power factor (0.5..0.84; ×248/256 with the automatic gearbox,
+    `0x18990`; TRAFFC 2.0); the torque curve `+0x88` points from `+0xb4` rpm every 200 rpm,
+    `+0xb8 + 8i` each (in N·m it seems: the NSX peaks at 286 at 5600), made 16.16 at loading
+    with `+0x5c`, `+0x64`, `+0x14`; `+0xac` the red line, `+0xb0` the idle; the revs' rise
+    `+0x35c`, fall `+0x360`, rise in neutral `+0x364` (× the gear's `0xec270`), drop on
+    letting go `+0x358`; `+0x368` how hard the engine and the wheels pull each other's revs.
+  - the gearbox: `+0x58` the gears + 3, `+0x54` the final drive, `+0x70 + 4g` each gear's
+    ratio, `+0x2b8 + 4g` each gear's force factor, the automatic's shift points down
+    `+0x290 + 4g` and up `+0x294 + 4g`, `+0x298` the revs for a spinning start, `+0x354` a
+    shift's time in steps.
+  - the drive and brakes: `+0x18` the front's share of the drive (0 = rear-wheel drive),
+    `+0x1c` the front's share of the braking, `+0x28` / `+0x2c` the front's and rear's limits,
+    `+0x38` the top speed (not for traffic), `+0x33c` / `+0x340` how fast the throttle opens
+    and closes; `+0x334` ABS, `+0x338` traction control (1.0 = the car has it: the NSX, ZR-1,
+    Supra both, 512TR, RX-7, 911 ABS only, Viper and Diablo neither; on only with the
+    player's setting, `0x12da5f` / `0x12da5b` → car `+0x492` / `+0x48e`).
+  - the tyres: `+0x2dc` / `+0x2e0` the front's and rear's grip, `+0x31c` the grip across's
+    limit, `+0x320` / `+0x328` with their inverses `+0x324` / `+0x32c` the engine's and the
+    brakes' strength, `+0xa4` the slip's limit, and **the grip by slip angle, 512 bytes an
+    axle: `+0x374` the front, `+0x574` the rear**.
+  - the steering's speed: `+0x2ec`, `+0x300`, `+0x30c`, `+0x310` (less with speed),
+    `+0x314` / `+0x318` its shifts.
+  - the body: `+0x2d4` / `+0x2d8` how far it leans and nods; `+0x2e4`, `+0x2e8` → car
+    `+0x78`, `+0x7c`; `+0x36c` the driver's eyes' height, `+0x370` the horizon in the view.
+  - **The rally (EARALLYE, `0x12dd2c`)**: the loader copies the front's grip curve over the
+    rear's, halves `+0x320`, `+0x328` (their inverses again), `+0x2dc`, `+0x2e0`, `+0x28`,
+    `+0x2c`, makes `+0x24` 1.5 times, and `+0x3c` × 0x14c/256 (`0x12da12` = 3) or 0x133/256.
   (`By_R&T`, a 4-byte file beside them, is opened for writing in a debug case: not needed.)
 - **`.PDN`** (CARFAMS: all 22 cars; 460 bytes), loaded in `load_car_cfm` `0x65874` into
-  `0x1493a4[car]`, applied by `0x1e9cc`: `+0xc`, `+0x10` → `0x2c920` with the car's body
-  (`+0xc0`); `+0x14` → car `+0x168` and 1/x `+0x16c` (10, 15, 16; 255 for traffic);
-  `+0x18` → `+0x170`; 93 values from `+0x1c` → car `+0x178..` (a falling curve, a value a
-  speed step?); six from `+0x1ac` → `+0x308..` with 1/x at `+0x320..`: the gears' top
-  speeds in m/s (NSX 20, 35.6, 50.2, 63.5, 74.7 = 269 km/h; Diablo 323, 512TR 307: the real
-  cars'); `+0x1c4` the rev limit (NSX 8000) → `+0x338`; `+0x1c8` → `+0x469` (5 for the
-  player cars: the gears?). Traffic cars have 0 in the head, gears and rev limit.
+  `0x1493a4[car]`, applied by `car_apply_pdn` `0x1e9cc` (`crash.c`, `opponent.c`): `+0x0`,
+  `+0x4`, `+0x8` the car's size (half its width 2 · `+0x0`, half its length 2 · `+0x8`;
+  `car_setup_body` `0x512e8`, §4.6); `+0xc`, `+0x10` the inertia and
+  mass of the body that tumbles (`0x2c920`, `+0xc0`); `+0x14` → car `+0x168` and 1/x `+0x16c`
+  (10, 15, 16; 255 for traffic): how much a bend slows a computer's car; `+0x18` → `+0x170`:
+  the computer's top speed on its driver's plan (× the driver's record `+0x55`); 93 values from
+  `+0x1c` → car `+0x178..`: the speed a computer's car gains a step at each speed; six from
+  `+0x1ac` → `+0x308..` with 1/x at `+0x320..`: the gears' top speeds in m/s (NSX 20, 35.6,
+  50.2, 63.5, 74.7 = 269 km/h; Diablo 323, 512TR 307: the real cars'), for a computer's
+  revs; `+0x1c4` the rev limit (NSX 8000) → `+0x338`; `+0x1c8` → `+0x469` the horn's sound.
+  Traffic cars have 0 in the head, gears and rev limit (sized from their model instead).
 
 ### 3.11 Track INFO (sky and horizon) — read (`tools/trackinfo.py`, 2026-10-19)
 
@@ -536,8 +562,10 @@ three settings in its entry). The attract mode (`fe_attract_mode` `0x34284`) put
 
 ### 3.4 Still to read
 
-Every file type on the CD has a reader now. Open within them: the PBS/PDN fields the
-physics will name, the 0x9a4-byte block of a replay, the menus' choices word by word.
+Every file type on the CD has a reader, and every field the game reads is used by the
+port and checked: the PBS/PDN (§3.10, the driving equal step for step), the replay's
+block (§4.22, the CD's four replays equal at every snapshot), CONFIG.DAT (`config.c`, the
+defaults equal byte for byte). Nothing open.
 
 ## 4. Map of the program (2026-10-19)
 
@@ -548,6 +576,20 @@ Tools: `tools/strmap.py` (the strings each function uses; the full lists
 here) unless said otherwise. Layout of the code object: game `0x10000`..`0x80000`, EA's
 libraries `0x80000`..`0x94000` and `0x95000`..`0xb0000`, Watcom's runtime `0x94000`.. and
 `0xa9000`.. (mixed; not separated yet).
+
+**What is left unnamed (counted 2026-10-21)**: of the game's 810 routines (`0x10000` ..
+`0x80000`, 428 KB), 142 (22.6 KB, 5 %) are neither in `tools/names.txt` nor named by address
+in these notes or the port; with EA's network library (`0x80000` .. `0x88000`, 108 of 191)
+and the runtime the rest. Gone through one by one (their callers, callees and texts): the
+network race, its modem and serial screens, phone book and chat (`0x1f168` .. `0x20d04`,
+`0x54c80` .. `0x5575c`, `0x602b0` .. `0x60e5c`, `0x70d70`, `0x714b4`, the race's sync
+`0x37000`, `0x496e8` .., `0x51498`), the I-Force driver's serial side and the serial port
+(`0x4b3bc` .. `0x4c2dc`, `0x60930` .. `0x60bf4`: the port plays its commands on SDL, §4.26),
+`joyopt.cfg`'s remapping (`0x4dcc0`, `0x4de9c`, §4.23), the debug `.vis` recorder (`0x35118` ..
+`0x351c0` → `0x58870`), routines nothing calls (`0x5985c` under `0x5a0a8`, whose switch
+`0x58c88` has no caller; EA's filler's mode 1, §4.10), and small helpers inside routines
+ported (memory freed at a race's end, the INFO file's line readers `0x38c40` .., a file's
+writing `0x74ef4`, empty routines of one byte). None is a part of the game the port lacks.
 
 ### 4.1 Start-up and the outer loop
 
@@ -1445,7 +1487,7 @@ into the walls, the handbrake, the manual box, reverse, the joystick) all equal.
 - **The car's size** (`car_setup_body` `0x512e8`): half its length 2 · PDN word 8, half
   its width 2 · word 0, when words 0, 4, 8 are all set (SIMDATA/CARFAMS/<name>.PDN, the
   name from `0xf6b10` / `0xf6ca0` / `0xf6e70`, no M); else the CFM model's extents
-  (+0x64a / +0x64e; not ported, every racer's PDN has them).
+  (+0x64a / +0x64e: the traffic's, whose PDN has none; ported, `crash.h`).
 - `0x8bb7c` is EA's arctangent: atan(x = the first stack argument, y = the second), 1024
   a turn from the y axis (`ea_atan_1024`, `exe.c`).
 - **Not yet**: a circuit's laps counted (CY1 is open); the acceleration test's
