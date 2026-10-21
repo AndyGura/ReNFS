@@ -168,6 +168,7 @@ static void menu(void)
     pal_fade_down(0, 256);
     if (!g_view_res)
         video_mode(640, 480);
+    mouse_limits(0, 0, 640, 480);          /* (0x56d45: a replay's bar rows taken off) */
     place(CONTINUE);
     fe_font_load();
     fe_mouse_load();
