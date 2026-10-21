@@ -906,6 +906,7 @@ void race_from_menu(void)
         video_palette(black, 0, 256);
         video_mode(640, 480);
         video_palette(black, 0, 256);
+        mouse_limits(0, 0, 640, 480);          /* (0x37941: the replay bar's taken off) */
         if (g_quit)
             break;
         /* one segment on in the copy; the player's total and top speed for it; the
