@@ -180,7 +180,7 @@ int fe_game_mode_screen(void)
         mouse_read(&mx, &my);
         {
             int over = my <= 0xcd ? 0 : my <= 0x118 ? 1 : 2;
-            if (over != sel) {
+            if (over != sel && over != 1) {     /* (the modem game: never chosen) */
                 prev = sel;
                 sel = over;
                 changed = 1;
@@ -188,6 +188,11 @@ int fe_game_mode_screen(void)
         }
         if (redraw) {
             draw_picture(&bg);
+            /* (the port's own: the modem game greyed out, never chosen: no network in
+               the port. The file's "modm", that button dimmed, which the program never
+               shows) */
+            if (fsh_find(&f, "modm", &sh) || fsh_find(&f, dark[1], &sh))
+                draw_picture(&sh);
             if (fsh_find(&f, lit[sel], &sh))
                 draw_picture(&sh);
             video_retrace();
@@ -205,7 +210,7 @@ int fe_game_mode_screen(void)
             redraw = 1;
             if (prev != sel)
                 fe_play_sound(0x47);
-            if (fsh_find(&f, dark[prev], &sh))
+            if (prev != 1 && fsh_find(&f, dark[prev], &sh))
                 draw_picture(&sh);
             if (fsh_find(&f, lit[sel], &sh))
                 draw_picture(&sh);
@@ -241,7 +246,8 @@ int fe_game_mode_screen(void)
                         done = 1;
                         result = 1;
                     }
-                    /* sel 1, the modem game: not in the port (no network) */
+                    /* (sel 1, the modem game: greyed out, never chosen; no network in
+                       the port) */
                 }
                 ticksince();
                 released = ready = held = 0;
@@ -259,6 +265,8 @@ int fe_game_mode_screen(void)
                 } else if (k == 0x4800 || k == 0x5000) {
                     prev = sel;
                     sel = k == 0x4800 ? (sel + 2) % 3 : (sel + 1) % 3;
+                    if (sel == 1)          /* (the modem game skipped) */
+                        sel = k == 0x4800 ? 0 : 2;
                     mouse_place(button_x[sel], button_y[sel]);
                     fe_mouse_save();
                     changed = 1;
