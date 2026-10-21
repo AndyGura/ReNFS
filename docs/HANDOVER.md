@@ -394,6 +394,12 @@ Ghidra project and `build/decomp`, one command). The git history was started aga
   `0x14ea7c` + racer · 0x1d2 + lap · 4 on both sides: look at the check's set-up of the
   second car's lap first).
 
+**Two bugs Danik found (fixed 2026-10-21)**: from outside, his car always pointed where it
+stood on the grid (the heading drawn, `+0x351`, now copied from the heading every step as
+`0x51fa3` does); after an arrest, the next race drawn in the previous race's colours (the
+ticket still up as the race ended: `hud_free` now lets it go, as `0x31bf4`). Both in NOTES
+(§4.10 `0x68258`, the six colours after a race).
+
 **Progress page for Danik**: https://claude.ai/artifact/VZdxTpYC3oLXYeBVJpoDoM (every step,
 its percent done and weight). Update its steps file after each finished step.
 

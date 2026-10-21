@@ -2149,6 +2149,14 @@ whose `+0x341` ≠ node. The player's car in camera mode 0 goes to `0x6829c` (no
 Any other: `0x68258` then `0x66d08(car, 0)`.
 - `0x68258`: with its own matrix (`+0x20`, the physics' `+0x24`) `+0x351` = `ea_atan2(m[6],
   m[8]) << 8`; then `0x67f1c(car, 0)` and, if seen, the shadow `0x8a094(4, [0x14e594])`.
+- **Without its own matrix `+0x351` is the heading the step left**: `race_update_cars`
+  (`0x51fa3`..`0x51ffc`), each step after the driving, for every car in the order list
+  that races (`+0x51a` & 4, `+0x50e` ≠ 0): `+0x341` = `+0x345` = its node (`+0x48`),
+  `+0x349` = `+0x39d`, and pitch, yaw, roll (`+0xc`..`+0x14`) copied to `+0x34d`..`+0x355`.
+  The player's car has no own matrix but in a crash's tumble, so this is what turns its
+  body as it steers and slides. The port set `+0x351` only on the grid and while paused
+  until 2026-10-21 (Danik: from outside the car "does not face where it's going", turning
+  only in crashes).
 - `0x67f1c`: `+0x391` = rotate((car − camera) >> 9, the matrix `[0x143df8]`); seen if
   0x20 ≤ z ≤ 0x1900 and |x| ≤ z. Then `0x38548(car, 1)` (the shadow's centre `+0x359`, its
   axes `+0x36d`, `+0x379`) and the shadow's four corners (−a+b, −a−b, a−b, a+b, each axis
@@ -3645,6 +3653,13 @@ the steps since into +0x1a0 / +0x1a4. Shown at once by `0x2d71c`/`0x2d778` (HUD 
 **After a race the menus get six colours back**: `0x31bf4` (race_main's end, the HUD
 freed) allows 0x5e, 0x5f, 0xfa..0xfd again; 0x47 and the racers' marks stay out of the
 nearest colours (the blending of white letters picks other entries otherwise).
+It also lets go of the dashboard's mask (`0x12b5f0`), the needles' table (`0x12b5f4`) and
+**the ticket's picture (`0x12b4d0`)**: an arrest ends the race with the ticket still up
+(`0x306e8` is not reached once the race is over). The port forgot the ticket until
+2026-10-21 (Danik: Alpine evening, arrested, then Alpine midday "all the textures looked
+corrupt", a restart or the replay right): the next race's first frame found the ticket
+still on, let it go and set back the palette saved under it, the previous race's (evening
+colours on midday pictures). `hud_free` now lets it go as `0x31bf4` does.
 
 **Ported** (`session.c`, `standings.c`, `racemenu.c`, `race.c`, `drive.c`): all of the
 above but the finish and checkpoint menus' Replay, Highlights and Options and the

@@ -333,11 +333,19 @@ int hud_load(void)
     return g_hud_map_back.pix && g_hud_view.pix && g_hud_map.pix && g_hud_mirror.pix;
 }
 
+/* the police's ticket or warning shown (0x12b4d0), below */
+static fsh_file g_ticket;
+static int g_ticket_on;
+static unsigned char g_ticket_saved[768];      /* 0x12ba30: the race's palette */
+
 void hud_free(void)
 {
     int i;
 
     fsh_free(&g_mask);
+    /* (0x31bf4) the ticket too: an arrest ends the race with it still up */
+    fsh_free(&g_ticket);
+    g_ticket_on = 0;
     free(g_hud_map_back.pix);
     free(g_hud_view.pix);
     free(g_hud_map.pix);
@@ -579,10 +587,6 @@ void hud_paused(void)
 }
 
 /* ---- the police's ticket or warning (0x30424, 0x306e8) -------------------------------- */
-
-static fsh_file g_ticket;
-static int g_ticket_on;
-static unsigned char g_ticket_saved[768];      /* 0x12ba30: the race's palette */
 
 int hud_ticket(int ticket, int warning, int over)
 {

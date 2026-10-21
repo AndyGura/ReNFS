@@ -322,6 +322,15 @@ static void race_step(race_car *player, race_camera *cam, int done)
        end freed first, as the mixer frees them) */
     snd_time(clock_ticks());
     rsnd_step();
+    /* the cars to draw (0x51fa3): each one's heading as drawn its heading now (its pitch
+       and roll too, read by nothing); those turned by their own matrix take it from that
+       as they are drawn */
+    for (i = 0; i < g_ncars; i++) {
+        race_car *c = g_cars[g_timing.by_road[i]];
+
+        if ((c->part & 4) && c->state)
+            c->yaw_drawn = c->yaw;
+    }
     if (g_replay.hold > 0)
         g_replay.hold--;
     g_drive.steps = st + 2;

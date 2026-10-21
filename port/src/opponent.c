@@ -244,9 +244,9 @@ static int grid_place(int k)
 /* 0x7cf04: how fast the car may slide across at speed s, towards es's side */
 static int slide_limit(const race_car *c, int es, int s)
 {
-    const unsigned char *r = g_opp.rec[c->player];
-    int lim = RACER(c) ? rec32(r, 0x65) : 0x33333;
-    int f = RACER(c) ? rec32(r, 0x69) : 0x4000;
+    const unsigned char *r = RACER(c) ? g_opp.rec[c->player] : 0;
+    int lim = r ? rec32(r, 0x65) : 0x33333;
+    int f = r ? rec32(r, 0x69) : 0x4000;
     int v = mulr(f, s);
 
     if (v < lim)
