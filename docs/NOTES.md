@@ -2185,7 +2185,7 @@ flags & 0x500, (area > 0) must equal !(flags & 0x200); texture (flags >> 16) & 0
 0x80 and a picture: routine bits 3..6 = 1 see-through; 3 corners → triangle, the picture's
 points in whole pixels (`0x905e0`/`0x8fad0`); flags & 0x1000 → quad, points << 16
 (`0x91360`/`0x90b30`); else the whole picture (0,0)..(w·65536 − 1, h·65536 − 1)
-(`0x91bf0`/`0x91b90`). No picture: one colour (`0xaa990`, not ported: none in these races).
+(`0x91bf0`/`0x91b90`). No picture: one colour (`0xaa990`, ported since, §4.10's player's wheels).
 0x800: the polygon after the corners follows. The turns `0x98860`/`0x988c8`/`0x98930` are
 the transpose of the port's `mat_turn`, `fix_sin`/`fix_cos` of (a & 0x3ff) without steps
 between. Groups: names of 8 letters, any case; 28 bytes, +0x10 the first index into the
@@ -2251,8 +2251,11 @@ Cut: above/below first (whole rows; the shallow kinds by dividing by the slope, 
 then the x ends again, then left and right (rows outside counted, filled with x0 / x0 − 1
 or x1 / x1 − 1 so they are empty unless the other side widens them). **Ported
 (`port/src/polyfill.c`), equal to the original on 7,300 random convex polygons from a
-pixel to 2,000 wide, most crossing the window (`tools/polyfill_emu.py`).** Not ported:
-mode 1, the halving of coordinates past 31 bits (`0xa6b39`).
+pixel to 2,000 wide, most crossing the window (`tools/polyfill_emu.py`).** Not ported,
+as the game never uses them: mode 1 (its two entries `0x8a077` and `0x8a0b1` have no
+callers and no pointer in the relocation records names them: EA's library's, dead in this
+program), and the halving of coordinates past 31 bits (`0xa6b39`; the projection's
+polygons never come near).
 **Lines** `0x8bb3c(x0, y0, x1, y1, colour)`: the edge made cut (`0xa632b`; its ends taken
 top first, swapped when y0 > y1), drawn by `0xa6c38` only if it returns 0 and its count
 > 0. A flat edge (y0 = y1, `0xa6a79`): kind 1, 9 if x0 = x1 (a point), 0 if x0 > x1 (the
