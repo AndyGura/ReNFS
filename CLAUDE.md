@@ -199,7 +199,8 @@ The controls screen `0x22bd0` (NOTES §4.2): +0x5f36.. kinds and keys (menu key 
 the key `0x733a0`; the race's scan codes `0x36a0c` (`0x36758` German → US, `key_scancode` `0x91d60`, table `0xf7b74`).
 `tools/fecompare.py`: a port menu picture against DOSBox's, by palette entry.
 Races at 640x480 (NOTES §4.24): the default (+0x7f 0, `0x12c308` 1), `H(lo, hi)` in the port; detail 3
-every other line (`0x12d9da` the clear); the start beeps `0x5257c` are an empty routine.
+every other line (`0x12d9da` the clear); the start beeps `0x5257c` are an empty routine; the circuits'
+sky ring unshrunk at 640x480 (`0x5b984` before `load_track_info`).
 The watching bar (NOTES §4.22): another car watched or the player stopped, drawn `0x7ef14` (`hud.c`
 `watch_draw`), read `0x7f010` (`replay.c` `watch_step`): the cars 1..8, < >, the camera, the driver's name.
 Skid marks (NOTES §4.10's end, `skid.c`): 125 records `0x149574` written as the player's car is drawn

@@ -438,7 +438,7 @@ int race_run(void)
        track's time of day chosen on its screen (0x12dd30) */
     family = g_road_mirror || g_drive.rally ? 1 : rec_get(REC_TOD + 4 * g_drive.kind);
     fam_kind = g_road_mirror ? 2 : g_drive.rally && g_drive.kind != 3 ? 3 : 0;
-    if (!track_load(name) || !trackinfo_load(name, family, 0)
+    if (!track_load(name) || !trackinfo_load(name, family, g_view_res)
         || !trackfam_load(name, family, fam_kind)) {
         fprintf(stderr, "renfs: the track %s could not be loaded\n", name);
         return 0;

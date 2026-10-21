@@ -2133,7 +2133,11 @@ Its decimals (`0x41b68`): spaces, '-', the whole part by atoi, the fraction's di
 counted, its zeros skipped and four digits kept after them, (atoi << 16) / 10^digits
 unsigned. A line starting `#`, LF or CR is skipped; at the end of the file the last line
 is read again. **Ported (`port/src/trackinfo.c`), equal on the snapshots; the file path
-equal to `tools/trackinfo.py` on all 16 tracks.**
+equal to `tools/trackinfo.py` on all 16 tracks.** `0x143e2c` is the race's resolution by
+then: race_main `0x6356c` calls `0x5b984([0x12c308])` at `0x63664`, just before
+`load_track_info` at `0x6366e`, so at 640x480 the ring keeps the file's numbers. (Until
+2026-10-21 the port shrank them at 640x480 too: the circuits' horizon there sat low and
+flat; the snapshots, all 320x200, could not show it.)
 **The family switch `0x12c340`**: 1 if `0x12dd2c` or `0x12dd28`, else `0x12dd30[track]`
 (main sets all nine to 1; the track screen `0x77254` toggles one between 1 and another
 value). 1: `simdata\ntrackfm\<track>_M01.fam` with `0x12dd28`, `_R01` with `0x12dd2c` (not
