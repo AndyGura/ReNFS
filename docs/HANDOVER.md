@@ -418,6 +418,15 @@ haptics (a wheel: untried) or a pad's two motors; `renfs.cfg` `forcefeedback 0..
 `RENFS_FFLOG`. For the MiSTer: the hybrid's SDL (`~/MiSTer-ReNFS/hybrid/sdl2/build.sh`) has
 `-DSDL_HAPTIC=OFF`, so only the rumble works there until it is built with haptics on. Next: the MiSTer (memory `order-of-work`), once Danik has tried the PC game.
 
+**The PC release** (Danik 2026-10-21): `github.com/ItsDanik/ReNFS`, public, GPL-3, version
+0.6.0b (`VERSION`, `tools/version.sh`), a Linux and a Windows package on the releases page
+(`tools/release_linux.sh`, `tools/release_windows.sh`; CLAUDE.md "Repository, version,
+releases"). For it: the Windows build (`files.c`), error messages in a window
+(`files_error`), Alt+Enter full screen, `renfs.cfg` written with every setting explained
+(`files_cfg_*`), `-lang de`, `--version`, no SDL function newer than 2.0.9. The README is
+for players first. Windows tried under wine only (the same pictures as Linux, a replay
+equal at every snapshot): Danik's real Windows is the open check.
+
 **Progress page for Danik**: https://claude.ai/artifact/VZdxTpYC3oLXYeBVJpoDoM (every step,
 its percent done and weight). Update its steps file after each finished step.
 
@@ -429,7 +438,7 @@ its percent done and weight). Update its steps file after each finished step.
   ported and equal byte for byte.)
 
 Decided 2026-10-18: menus 640x480 on the MiSTer (interlaced at 15 kHz),
-races 320x200 / 320x240; commit locally as the work goes.
+races 320x200 / 320x240; commit as the work goes (pushed to GitHub since 2026-10-21).
 
 ## Next, in order
 

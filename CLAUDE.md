@@ -50,14 +50,15 @@ stalls, find the code that reads the field.**
   settings and never needs an installation.
 - **The menus on the MiSTer are 640x480** (interlaced on a 15 kHz screen, progressive with
   *HDMI Only* / VGA); races at 320x200 / 320x240.
-- **Commit locally as the work goes** (each finished step, in `~/renfs` and
-  `~/MiSTer-ReNFS`), never game data or decompiled code; nothing is pushed.
+- **Commit as the work goes** (each finished step, in `~/renfs` and `~/MiSTer-ReNFS`),
+  never game data or decompiled code. Push `~/renfs` when a step is finished and checked.
 - **After the options screen, the race comes next** (Danik, 2026-10-19); the screens
   behind the options, showcase, records and tournament wait.
 - **A first start uses the game's built-in settings and records** (`cfg_defaults`
   `0x38ea8`, as an installed original), never the CD's CONFIG.DAT (Danik, 2026-10-19).
-- GitHub: **local only** until Danik says otherwise. Ask before creating
-  `ItsDanik/renfs` (branch `mister`) or `ItsDanik/ReNFS_MiSTer`.
+- GitHub (Danik, 2026-10-21): **`github.com/ItsDanik/ReNFS`, public, GPL-3**, branch `main`
+  (the local `master` pushed to it). The PC release first (0.6.0b); ask before creating the
+  MiSTer core's repository.
 
 ## Legal
 
@@ -344,6 +345,22 @@ original's screenshots by palette entry (DOSBox Staging changes colours slightly
 **Headless tests set `RENFS_HOME` to a scratch folder** (once the port writes settings).
 
 ---
+
+## Repository, version, releases
+
+`github.com/ItsDanik/ReNFS` (public, GPL-3): `port/`, `tools/`, `docs/`, this file, `README.md`
+(for players first: what it is, the CD, download, keys, settings; then building and the method).
+Version = `VERSION` + one per commit since it changed (`tools/version.sh`, `renfs --version`);
+nobody edits a number to commit; a new series: write e.g. `0.7.0b` into `VERSION`.
+Releases: `tools/release_linux.sh` (the `mister-hybrid-tc` Debian 11 container: glibc 2.14, SDL
+2.0.9: **use no SDL function newer than 2.0.9**, check with `objdump -T`) and
+`tools/release_windows.sh` (MinGW-w64, SDL2.dll beside it; tested under wine: the pictures and
+the replay checks equal to Linux's); packages in `dist/` (ignored), the players' READMEs
+`tools/release_*_readme.txt`; a GitHub pre-release `v<version>` while beta. The port's Windows
+differences are in `files.c` (the program's folder by `SDL_GetBasePath`, home `%APPDATA%\renfs`,
+`_mkdir`); `long` is 32 bits there (lengths only). Errors a player must see go through
+`files_error` (a message window). `renfs.cfg` (`files_cfg_get`/`_set`): smooth, fullscreen
+(Alt+Enter), forcefeedback; `-lang de`.
 
 ## Video
 

@@ -125,12 +125,12 @@ int exe_load(void)
         return 1;
     d = file_load("NFS_DOS.EXE", &len);
     if (!d) {
-        fprintf(stderr, "renfs: NFS_DOS.EXE is missing (the game's program, on the CD)\n");
+        files_error("NFS_DOS.EXE is missing from the game's folder. Copy the whole CD of The Need for Speed SE, every file and folder.");
         return 0;
     }
     le = len > 0x40 ? u32(d + 0x3c) : 0;
     if (d[0] != 'M' || d[1] != 'Z' || le + 0xb0 > (unsigned long)len || d[le] != 'L' || d[le + 1] != 'E') {
-        fprintf(stderr, "renfs: NFS_DOS.EXE is not the game's program\n");
+        files_error("NFS_DOS.EXE in the game's folder is not the game's program.");
         free(d);
         return 0;
     }
@@ -139,7 +139,7 @@ int exe_load(void)
          relocate(d, (unsigned long)len, le, img, page_va, base);
     free(d);
     if (!ok || fnv(img, IMAGE_LEN) != IMAGE_SUM) {
-        fprintf(stderr, "renfs: NFS_DOS.EXE is not the version this port knows\n");
+        files_error("NFS_DOS.EXE in the game's folder is not the version ReNFS knows: it needs the CD of The Need for Speed Special Edition (1996, DOS).");
         free(img);
         return 0;
     }

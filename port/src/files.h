@@ -17,6 +17,17 @@ int file_path(const char *rel, char *out, size_t size);
 /* the whole file, allocated (free it); 0 if it is not there */
 unsigned char *file_load(const char *rel, long *len);
 
+/* renfs.cfg in the home folder, the port's own settings ("<name> <number>" a line, '#'
+   comments): one read (dflt if it has none), one written in place (the other lines kept);
+   files_cfg_init writes the file with every setting explained if there is none */
+int files_cfg_get(const char *name, int dflt);
+void files_cfg_set(const char *name, int value);
+void files_cfg_init(void);
+
+/* a reason the program cannot go on: on the terminal and in a message window (Windows
+   has no terminal; nothing shown without a window, under --shot's dummy driver) */
+void files_error(const char *text);
+
 /* the language's folders: "ART" or "GART" .. (German has a G in front) */
 extern int g_german;
 const char *art_dir(void);         /* FRONTEND/ART or FRONTEND/GART */

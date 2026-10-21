@@ -5,12 +5,16 @@
 #define _GNU_SOURCE
 #endif
 #include "files.h"
+#include <SDL.h>
 #include <dirent.h>
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
 #include <sys/stat.h>
-#include <unistd.h>
+#ifdef _WIN32
+#include <direct.h>
+#define mkdir(d, mode) _mkdir(d)
+#endif
 
 int g_german;
 
@@ -73,7 +77,6 @@ int files_init(const char *data_arg, const char *home_arg)
     const char *tries[4];
     char beside[1024] = "";
     int n = 0;
-    ssize_t len;
 
     /* a folder asked for is that folder or none */
     int asked = data_arg || (getenv("RENFS_DATA") && *getenv("RENFS_DATA"));
@@ -83,12 +86,11 @@ int files_init(const char *data_arg, const char *home_arg)
         tries[n++] = getenv("RENFS_DATA");
     else
         tries[n++] = "NFSSE";
-    len = asked ? -1 : readlink("/proc/self/exe", beside, sizeof beside - 8);
-    if (len > 0) {
-        beside[len] = 0;
-        char *slash = strrchr(beside, '/');
-        if (slash) {
-            strcpy(slash + 1, "NFSSE");
+    if (!asked) {              /* else NFSSE beside the program */
+        char *base = SDL_GetBasePath();
+        if (base) {
+            snprintf(beside, sizeof beside, "%sNFSSE", base);
+            SDL_free(base);
             tries[n++] = beside;
         }
     }
@@ -104,6 +106,10 @@ int files_init(const char *data_arg, const char *home_arg)
         snprintf(g_home, sizeof g_home, "%s", home_arg);
     else if (getenv("RENFS_HOME"))
         snprintf(g_home, sizeof g_home, "%s", getenv("RENFS_HOME"));
+#ifdef _WIN32
+    else if (getenv("APPDATA"))
+        snprintf(g_home, sizeof g_home, "%s/renfs", getenv("APPDATA"));
+#endif
     else if (getenv("HOME"))
         snprintf(g_home, sizeof g_home, "%s/.config/renfs", getenv("HOME"));
     else
@@ -116,7 +122,7 @@ int files_init(const char *data_arg, const char *home_arg)
 
 const char *files_home(void)
 {
-    mkdir(g_home, 0755);           /* ~/.config exists on any desktop; one level is enough */
+    mkdir(g_home, 0755);           /* ~/.config (%APPDATA%) is there already; one level is enough */
     return g_home;
 }
 
@@ -155,6 +161,92 @@ unsigned char *file_load(const char *rel, long *len)
             *len = n;
     }
     return d;
+}
+
+static void cfg_path(char *path, size_t n)
+{
+    snprintf(path, n, "%s/renfs.cfg", files_home());
+}
+
+int files_cfg_get(const char *name, int dflt)
+{
+    char path[1100], line[256], fmt[80];
+    FILE *f;
+    int v = dflt;
+
+    cfg_path(path, sizeof path);
+    if (!(f = fopen(path, "r")))
+        return dflt;
+    snprintf(fmt, sizeof fmt, "%s %%d", name);
+    while (fgets(line, sizeof line, f))
+        sscanf(line, fmt, &v);
+    fclose(f);
+    return v;
+}
+
+void files_cfg_set(const char *name, int value)
+{
+    char path[1100], line[256], all[8192];
+    size_t n = 0, len = strlen(name);
+    int done = 0;
+    FILE *f;
+
+    cfg_path(path, sizeof path);
+    all[0] = 0;
+    if ((f = fopen(path, "r"))) {
+        while (fgets(line, sizeof line, f)) {
+            if (!strncmp(line, name, len) && line[len] == ' ') {
+                if (done)
+                    continue;
+                snprintf(line, sizeof line, "%s %d\n", name, value);
+                done = 1;
+            }
+            if (n + strlen(line) < sizeof all) {
+                strcpy(all + n, line);
+                n += strlen(line);
+            }
+        }
+        fclose(f);
+    }
+    if (!done)
+        snprintf(all + n, sizeof all - n, "%s %d\n", name, value);
+    if ((f = fopen(path, "w"))) {
+        fputs(all, f);
+        fclose(f);
+    }
+}
+
+void files_cfg_init(void)
+{
+    char path[1100];
+    FILE *f;
+
+    cfg_path(path, sizeof path);
+    if ((f = fopen(path, "r"))) {
+        fclose(f);
+        return;
+    }
+    if ((f = fopen(path, "w"))) {
+        fputs("# ReNFS's own settings\n"
+              "# smooth 1: the race drawn at every retrace, its motion between the\n"
+              "# race's steps (F11 in a race); 0: as the original, a new picture a step\n"
+              "smooth 1\n"
+              "# fullscreen 1: the whole screen; 0: a window (Alt+Enter switches)\n"
+              "fullscreen 0\n"
+              "# forcefeedback 0..100: the strength of a pad's rumble and a wheel's\n"
+              "# force feedback; 0 none\n"
+              "forcefeedback 100\n", f);
+        fclose(f);
+    }
+}
+
+void files_error(const char *text)
+{
+    const char *drv = SDL_getenv("SDL_VIDEODRIVER");
+
+    fprintf(stderr, "renfs: %s\n", text);
+    if (!drv || strcmp(drv, "dummy"))
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "ReNFS", text, 0);
 }
 
 const char *art_dir(void)

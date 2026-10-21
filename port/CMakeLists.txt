@@ -48,4 +48,12 @@ add_executable(renfs
 )
 target_include_directories(renfs PRIVATE ${SDL2_INCLUDE_DIRS})
 target_compile_options(renfs PRIVATE ${SDL2_CFLAGS_OTHER})
-target_link_libraries(renfs PRIVATE ${SDL2_LIBRARIES})
+target_link_libraries(renfs PRIVATE ${SDL2_LDFLAGS})
+
+# the version (../VERSION + commits since, see tools/version.sh), looked up at every build
+add_custom_target(renfs_version
+  COMMAND ${CMAKE_COMMAND} -DSRC=${CMAKE_CURRENT_SOURCE_DIR} -DOUT=${CMAKE_CURRENT_BINARY_DIR}/renfs_version.h
+          -P ${CMAKE_CURRENT_SOURCE_DIR}/version.cmake
+  BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/renfs_version.h)
+add_dependencies(renfs renfs_version)
+target_include_directories(renfs PRIVATE ${CMAKE_CURRENT_BINARY_DIR})

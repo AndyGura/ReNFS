@@ -11,20 +11,23 @@
 #include "replay.h"
 #include "smooth.h"
 #include "video.h"
+#include "renfs_version.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
 static const char usage[] =
-    "ReNFS: The Need for Speed SE, for Linux.\n"
+    "ReNFS " RENFS_VERSION ": The Need for Speed SE, for Linux and Windows.\n"
     "\n"
-    "    renfs [-data <folder>] [-home <folder>] [--shot <file.ppm> <frames>]\n"
-    "          [--race <track>] [--replay <file.rpl> [highlights]]\n"
+    "    renfs [-data <folder>] [-home <folder>] [-lang de] [--shot <file.ppm> <frames>]\n"
+    "          [--race <track>] [--replay <file.rpl> [highlights]] [--version]\n"
     "\n"
     "  -data <folder>   the game: the CD's files as they are (else $RENFS_DATA, else\n"
     "                   ./NFSSE, else NFSSE beside the program)\n"
-    "  -home <folder>   the port's own settings (else $RENFS_HOME, else ~/.config/renfs)\n"
+    "  -home <folder>   the port's own settings (else $RENFS_HOME, else ~/.config/renfs;\n"
+    "                   on Windows %APPDATA%\\renfs)\n"
+    "  -lang de         the German game (the CD holds both; else $RENFS_LANG)\n"
     "  --shot <f> <n>   no window: write the picture of retrace n (60 a second) to f\n"
     "  --race <track>   straight into a race on the track (cy1 .. al3, tr1 .. tr7,\n"
     "                   tr5 the rally) with the car, opponent and race type last\n"
@@ -66,7 +69,7 @@ static const char usage[] =
 
 int main(int argc, char **argv)
 {
-    const char *data = 0, *home = 0, *shot = 0, *race = 0, *replay = 0;
+    const char *data = 0, *home = 0, *shot = 0, *race = 0, *replay = 0, *lang = 0;
     int shot_frames = 0, highlights = 0;
 
     for (int i = 1; i < argc; i++) {
@@ -74,6 +77,8 @@ int main(int argc, char **argv)
             data = argv[++i];
         else if (!strcmp(argv[i], "-home") && i + 1 < argc)
             home = argv[++i];
+        else if (!strcmp(argv[i], "-lang") && i + 1 < argc)
+            lang = argv[++i];
         else if (!strcmp(argv[i], "--shot") && i + 2 < argc) {
             shot = argv[++i];
             shot_frames = atoi(argv[++i]);
@@ -84,16 +89,24 @@ int main(int argc, char **argv)
             if (i + 1 < argc && !strcmp(argv[i + 1], "highlights"))
                 highlights = ++i;
         }
-        else {
+        else if (!strcmp(argv[i], "--version")) {
+            puts("ReNFS " RENFS_VERSION);
+            return 0;
+        } else {
             fputs(usage, strcmp(argv[i], "--help") && strcmp(argv[i], "-h") ? stderr : stdout);
             return strcmp(argv[i], "--help") && strcmp(argv[i], "-h") ? 1 : 0;
         }
     }
     if (!files_init(data, home)) {
-        fprintf(stderr, "renfs: the game's files were not found (FRONTEND/ART/TITLE.QFS).\n"
-                        "Give the folder with the CD's files: renfs -data <folder>\n");
+        files_error(data || getenv("RENFS_DATA")
+                    ? "The game's files are not in the folder given (FRONTEND/ART/TITLE.QFS is missing)."
+                    : "The game's files were not found. Copy the whole CD of The Need for Speed SE "
+                      "into a folder named NFSSE next to ReNFS, or name the folder with -data <folder>.");
         return 1;
     }
+    if (lang)                  /* (else $RENFS_LANG, files_init) */
+        g_german = (lang[0] == 'd' || lang[0] == 'D') && (lang[1] == 'e' || lang[1] == 'E');
+    files_cfg_init();          /* renfs.cfg, the port's own settings, explained */
     smooth_load();             /* (the port's own setting: smooth.c) */
     if (!exe_load())           /* the game's tables, the built-in settings among them */
         return 1;

@@ -58,61 +58,17 @@ static int pos_jump(const vec3 *a, const vec3 *b)
     return llabs(dx) > JUMP_POS || llabs(dy) > JUMP_POS || llabs(dz) > JUMP_POS;
 }
 
-static void cfg_path(char *path, size_t n)
-{
-    snprintf(path, n, "%s/renfs.cfg", files_home());
-}
-
 void smooth_load(void)
 {
     const char *e = getenv("RENFS_SMOOTH");
-    char path[1024], line[128];
-    FILE *f;
-    int v;
 
-    if (e) {
-        g_smooth = atoi(e) != 0;
-        return;
-    }
-    cfg_path(path, sizeof path);
-    if (!(f = fopen(path, "r")))
-        return;
-    while (fgets(line, sizeof line, f))
-        if (sscanf(line, "smooth %d", &v) == 1)
-            g_smooth = v != 0;
-    fclose(f);
+    g_smooth = e ? atoi(e) != 0 : files_cfg_get("smooth", 1) != 0;
 }
 
 static void smooth_save(void)
 {
-    char path[1024];
-    FILE *f;
-
-    char keep[4096], line[256];
-    size_t n = 0;
-
-    if (getenv("RENFS_SMOOTH"))
-        return;
-    cfg_path(path, sizeof path);
-    /* the file's other settings kept (forcefeedback, ffdev.c) */
-    keep[0] = 0;
-    if ((f = fopen(path, "r"))) {
-        while (fgets(line, sizeof line, f))
-            if (strncmp(line, "smooth", 6) && strncmp(line, "# smooth", 8)
-                && strncmp(line, "# race's steps", 14) && strncmp(line, "# ReNFS's own", 13)
-                && n + strlen(line) < sizeof keep) {
-                strcpy(keep + n, line);
-                n += strlen(line);
-            }
-        fclose(f);
-    }
-    if ((f = fopen(path, "w"))) {
-        fprintf(f, "# ReNFS's own settings\n%s"
-                   "# smooth 1: the race drawn at every retrace, its motion between the\n"
-                   "# race's steps (F11 in a race); 0: as the original, a new picture a step\n"
-                   "smooth %d\n", keep, g_smooth);
-        fclose(f);
-    }
+    if (!getenv("RENFS_SMOOTH"))
+        files_cfg_set("smooth", g_smooth);
 }
 
 void smooth_keys(void)

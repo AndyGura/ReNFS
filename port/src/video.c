@@ -6,6 +6,7 @@
    retraces counted (70 a second in the 200-line modes, else 60): the n-th retrace's
    picture is written to the file (PPM) and the program ends. */
 #include "video.h"
+#include "files.h"
 #include "ffdev.h"
 #include <SDL.h>
 #include <stdio.h>
@@ -187,6 +188,8 @@ int video_init(const char *shot, int shot_frames)
         fprintf(stderr, "SDL: %s\n", SDL_GetError());
         return 0;
     }
+    if (!shot && files_cfg_get("fullscreen", 0))
+        SDL_SetWindowFullscreen(g_win, SDL_WINDOW_FULLSCREEN_DESKTOP);
     SDL_StartTextInput();                  /* the characters typed, for the names */
     g_ren = SDL_CreateRenderer(g_win, -1, shot ? SDL_RENDERER_SOFTWARE : SDL_RENDERER_PRESENTVSYNC);
     if (!g_ren)
@@ -316,6 +319,15 @@ static void poll(void)
             if (g_pad_esc) {
                 scan_put(1);
                 key_put(0x1b);
+            }
+        } else if (e.type == SDL_KEYDOWN && (e.key.keysym.mod & KMOD_ALT)
+                   && (e.key.keysym.sym == SDLK_RETURN || e.key.keysym.sym == SDLK_KP_ENTER)) {
+            /* (the port's) Alt+Enter: the whole screen or a window, kept in renfs.cfg; the
+               game sees no Enter */
+            int full = !(SDL_GetWindowFlags(g_win) & SDL_WINDOW_FULLSCREEN_DESKTOP);
+            if (!e.key.repeat) {
+                SDL_SetWindowFullscreen(g_win, full ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0);
+                files_cfg_set("fullscreen", full);
             }
         } else if (e.type == SDL_KEYDOWN) {
             for (int k = 1; k < 0x59; k++)
@@ -641,8 +653,12 @@ int joy_device(int count[4], int *buttons)
         mask = 3;
         count[0] = joy_count(SDL_GameControllerGetAxis(g_pad, SDL_CONTROLLER_AXIS_LEFTX));
         count[1] = joy_count(SDL_GameControllerGetAxis(g_pad, SDL_CONTROLLER_AXIS_LEFTY));
-        if (SDL_GameControllerHasAxis(g_pad, SDL_CONTROLLER_AXIS_TRIGGERRIGHT)
-            && SDL_GameControllerHasAxis(g_pad, SDL_CONTROLLER_AXIS_TRIGGERLEFT)) {
+        /* (bound axes asked so, not SDL_GameControllerHasAxis: SDL 2.0.14's, newer than
+           the systems the Linux release is for) */
+        if (SDL_GameControllerGetBindForAxis(g_pad, SDL_CONTROLLER_AXIS_TRIGGERRIGHT).bindType
+                != SDL_CONTROLLER_BINDTYPE_NONE
+            && SDL_GameControllerGetBindForAxis(g_pad, SDL_CONTROLLER_AXIS_TRIGGERLEFT).bindType
+                != SDL_CONTROLLER_BINDTYPE_NONE) {
             /* the pedals: a pedal pressed reads low, as the game port's */
             count[2] = 511 - (SDL_GameControllerGetAxis(g_pad, SDL_CONTROLLER_AXIS_TRIGGERLEFT) >> 6);
             count[3] = 511 - (SDL_GameControllerGetAxis(g_pad, SDL_CONTROLLER_AXIS_TRIGGERRIGHT) >> 6);

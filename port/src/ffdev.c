@@ -40,21 +40,8 @@ static int sbyte(unsigned char b)
 static void strength_load(void)
 {
     const char *e = getenv("RENFS_FF");
-    char path[1024], line[128];
-    FILE *f;
-    int v;
 
-    if (e) {
-        g_strength = atoi(e);
-        return;
-    }
-    snprintf(path, sizeof path, "%s/renfs.cfg", files_home());
-    if (!(f = fopen(path, "r")))
-        return;
-    while (fgets(line, sizeof line, f))
-        if (sscanf(line, "forcefeedback %d", &v) == 1)
-            g_strength = v;
-    fclose(f);
+    g_strength = e ? atoi(e) : files_cfg_get("forcefeedback", 100);
     if (g_strength < 0)
         g_strength = 0;
     if (g_strength > 100)
@@ -111,7 +98,8 @@ int ffdev_open(void)
             g_effect[i] = -1;
         SDL_HapticSetGain(g_hap, 100);
     }
-    if (!g_hap && joy && SDL_JoystickHasRumble(joy))
+    /* (a rumble of nothing tried, not SDL_JoystickHasRumble: SDL 2.0.18's) */
+    if (!g_hap && joy && SDL_JoystickRumble(joy, 0, 0, 0) == 0)
         g_rumble_joy = joy;
     g_open = g_hap || g_rumble_joy || g_log;
     return g_open;

@@ -52,13 +52,13 @@ static unsigned char *refpack(const unsigned char *d, long len, long *out_len)
         } else {                               /* the end, with 0-3 bytes */
             lit = b0 & 3;
             p++;
-            if (o + lit > size || p + lit > len)
+            if (o + (long)lit > size || p + (long)lit > len)
                 break;
             memcpy(out + o, d + p, lit);
             o += lit;
             break;
         }
-        if (o + lit + n > size || p + lit > len || back > (unsigned long)(o + lit))
+        if (o + (long)lit + (long)n > size || p + (long)lit > len || back > (unsigned long)(o + (long)lit))
             break;                             /* a damaged file: stop */
         memcpy(out + o, d + p, lit);
         o += lit;
