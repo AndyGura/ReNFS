@@ -9,6 +9,7 @@ typedef struct {
     int mirror;                /* 0x12dd28: SKCART's mirrored tracks */
     int rally;                 /* 0x12dd2c: EARALLYE's (Rusty Springs' tr5) */
     int nitro;                 /* 0x12cca0: NITRO */
+    int explode;               /* 0xf74a4: EXPLODE (the horn throws the cars near) */
 } race_codes;
 
 extern race_codes g_race_codes;

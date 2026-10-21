@@ -1089,6 +1089,15 @@ static void standings_loop1(int take_records)
     fe_mouse_save();
 }
 
+void standings_checkpoint(void)
+{
+    int type = config_word(CFG_RACE_TYPE);
+
+    standings_segment(0);
+    if (type == 2 || type == 3)
+        standings_final(1);
+}
+
 void standings_after(int finished, int last)
 {
     int type = config_word(CFG_RACE_TYPE), many = type == 2 || type == 3;

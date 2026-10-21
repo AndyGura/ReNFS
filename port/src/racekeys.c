@@ -108,7 +108,7 @@ void race_keys(race_camera *cam)
     if (key_down(K_END) && (key_down(K_LSHIFT) || key_down(K_RSHIFT)) && g_rkeys.race_clock > 100)
         give_up(g_player);
     /* (Alt+M: the camera's node and mode printed, a developer's display (0xf4568);
-       0x12da04, the replay's keys: not yet) */
+       0x12da04, the replay's keys: read only at a moment that does not come, NOTES §4.19) */
     if (key_down(K_CTRL))
         return;
     if (key_down(K_F1)) {

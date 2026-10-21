@@ -1,5 +1,6 @@
 /* The race held (NOTES §4.20). */
 #include "pause.h"
+#include "ff.h"
 #include "audioopt.h"
 #include "gfxopt.h"
 #include "camera.h"
@@ -43,6 +44,7 @@ static void hold(race_camera *cam)
 
     hud_paused();
     rsnd_quiet();
+    ff_forces(0);              /* (0x6312a) */
     wait_key(0);
     wait_key(1);
     hud_redraw_due();
@@ -52,6 +54,7 @@ static void hold(race_camera *cam)
     g_pause.pending = 0;
     g_pause.last = g_drive.steps;
     g_pause.held_ticks += clock_ticks() - from;
+    ff_forces(1);              /* (0x63238) */
 }
 
 /* race_pause_menu 0x56474: the race's pause menu, at 640x480 */
@@ -157,6 +160,7 @@ static void menu(void)
        (0x56b48); the race's palette kept, its sounds stopped, the screen faded down and
        640x480 (a 640x480 race keeps its mode, 0x56ce7) */
     mouse_relative(0);                     /* (a mouse steering: the pointer back) */
+    ff_forces(0);                          /* (0x56572) */
     memcpy(g_config + 9, g_session.kept, sizeof g_session.kept);
     race_keys_to_config();
     video_get_palette(race_pal, 0, 256);
@@ -251,6 +255,7 @@ static void menu(void)
                 case REPLAY:               /* 0x5e4c4(1): the last 600 counts again
                                               (Done: racing on), as Continue */
                     g_replay.mode = 1;
+                    ff_stop();             /* (0x5780e) */
                     done = 1;
                     break;
                 case AUDIO:                /* fe_audio_options 0x105dc(2) */
@@ -327,6 +332,11 @@ static void menu(void)
     inv_build();                           /* (make_inverse_table 0x8227c) */
     hud_redraw_due();
     g_view_redraw = 1;
+    /* (0x58358) the forces on again to race on, or every effect stopped */
+    if (!g_pause.quit)
+        ff_forces(1);
+    else
+        ff_stop();
     if (!g_pause.quit) {
         rsnd_engine_restart();
         music_level_from(-1);

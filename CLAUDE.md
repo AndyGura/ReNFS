@@ -155,7 +155,8 @@ view's pixels by their +0xc rate (`0x8b8f0`); the frame sets the view up again a
 (`0x5bdaa`).
 Main menu `0x42c30` (NOTES §4.2): the choices in CONFIG.DAT (+0x6d type, +0x91 opponent,
 +0x95 track, +0x9b car, +0x5f50 unlocks); typed codes SKCART EARALLYE CASINOVILLE
-CONCEPTCAR ROCKYROAD TURBO NITRO EXPLODE (`0x46e94`), End held = no mercy. Options
+CONCEPTCAR ROCKYROAD TURBO NITRO EXPLODE (`0x46e94`), End held = no mercy. EXPLODE: the horn throws the cars
+near into the air (`0x7ac03` → `0x78370`, NOTES §4.13's traffic). Options
 `0x53a30`: +0x97 gearbox, +0x99 ABS, +0x8f traction (0 on, 1 off, 2 none).
 Driving (`0x10400` controls every 2nd step, `drive_player` `0x382d0`): the automatic
 starts in neutral (gear up = drive); `0x4071c` reads the node's slope +0x12 (NOTES §4.6).
@@ -213,6 +214,10 @@ A pad drives on the Keyboard kinds too (all or nothing; the shoulders shift, Sta
 **analogue steering and pedals need Joystick chosen in Options → Controls**, as the original
 (Danik, 2026-10-20: no automatic switch). The player's controls: `README.md`.
 `tools/checks.sh`: every check in one command (logs `build/logs/chk`).
+Force feedback (NOTES §4.26, `ff.c`/`ffdev.c`): the original's I-Force commands (packets `0x4c258`; kick
+`0x4ba10`, shakes, rumble, steady push), the game's side `0x4d670..0x4dcb6` (walls `0x4d878`, objects `0x4d730`,
+cars `0x4d7a4`, gears `0x4d8c0`, the road `0x4d9a8`, steady `0x4d928`, crash `0x4dc40`); played on SDL haptics or
+a pad's rumble; equal, `tools/ff_emu.py`. The MiSTer's SDL has haptics off: rumble only there for now.
 Smooth motion (NOTES §4.25, the port's own, `smooth.c`): the steps stay the original's 33.3 a second;
 each retrace's frame is drawn with the cars, camera and dials between the last two steps, then put back
 (F11, `renfs.cfg`); stepping faster (`0x12dd0c`) would make the game faster, not smoother.
@@ -273,9 +278,12 @@ once; for `--shot` tests);
 `RENFS_PLACE=s:a,c,v`: the opponent put a m ahead and c m beside at v m/s at race step s;
 `RENFS_VIEW=n`: the race watched from camera n (outside: 2..5, 8..12);
 `RENFS_RES=320|640`: races at that size whatever the settings say;
+`RENFS_FF=0..100`: the force feedback's strength (else `renfs.cfg` `forcefeedback`, 100); `RENFS_FFLOG=f`:
+every force-feedback command written with the race's step;
 `RENFS_SMOOTH=0|1`: the motion smoothed between steps or not (F11's setting, `renfs.cfg`, untouched);
 `RENFS_TOD=n`: the track's time of day in `--race` (0 morning, 1 midday, 2 evening);
 `RENFS_MIRROR=1`, `RENFS_RALLY=1`: the mirrored track or the rally in `--race`;
+`RENFS_EXPLODE=1`: the EXPLODE code in `--race`;
 `RENFS_LAPS=n`: n laps of a circuit in `--race` (else the settings' race length, as Control Central `0x437fc`: 8 on TR1 by default);
 `RENFS_CONFIG=f`: a CONFIG.DAT for the test (the original's, `nfsdos.py mem:156c14:5f52:f`).
 `RENFS_SEED=n`: the race's random numbers seeded with n (else the time, as the original).
@@ -290,7 +298,9 @@ queued), the pictures timed by the sound heard, as the original with sound on.
 and `movie.c` (the movies), `fe.c` (front end screens), `mainmenu.c` (Control Central), `options.c` (the options screen, the race menus' Game options), `menu.c` (what the menus share:
 keys, mouse, text styles, the yes/no dialog), `font.c` (FFN, letters blended pixel by
 pixel, `nearest_colour`, the inverse table), `sound.c` (the front end's sound bank and
-music, the race's music `0x63d88` and speech `0x722b4`), `audioopt.c` (the audio screen), `gfxopt.c` (the graphics screen `0x32d08`), `ctrlopt.c` (the controls screen `0x22bd0`: kinds, keys redefined, conflicts; the race's keys from them, `drive_keys_from_config` `0x36a0c`), `joystick.c` (the joystick: found, calibrated, `joystick.cfg` in the home folder, read in races and menus), `smooth.c` (the port's smooth motion between the race's steps, F11), `skid.c` (the tyres' marks: the ring `0x671dc`, the painter `0x679ec`, the line `0x989a0`; their dust `0x664bc`; equal, `tools/skid_emu.py`), `showcase.c` (the cars' showcase `0x17724`: its pages, film and commentary), `trackrec.c` (the track's screen `0x76380` and its Best Times `0x75288`), `credits.c` (the credits `0x25600`: five pages of CREDITS.FSH, 20 s each by the timer's count `0xed0fc`), `loadsave.c` (load and save `0x3c0c8`/`0x3d4c4`, the file list `0x3aacc`: tournaments as `<name>.sav` in the home folder, replays saved, played, deleted; a game on `0x15d134`), `config.c` (CONFIG.DAT; the built-in defaults, equal byte for byte,
+music, the race's music `0x63d88` and speech `0x722b4`), `audioopt.c` (the audio screen), `gfxopt.c` (the graphics screen `0x32d08`), `ctrlopt.c` (the controls screen `0x22bd0`: kinds, keys redefined, conflicts; the race's keys from them, `drive_keys_from_config` `0x36a0c`), `joystick.c` (the joystick: found, calibrated, `joystick.cfg` in the home folder, read in races and menus), `smooth.c` (the port's smooth motion between the race's steps, F11), `ff.c` (force feedback: the original's
+game side and I-Force commands, equal, `tools/ff_emu.py`) and `ffdev.c` (those commands on SDL's haptics or a
+pad's rumble, or written down), `skid.c` (the tyres' marks: the ring `0x671dc`, the painter `0x679ec`, the line `0x989a0`; their dust `0x664bc`; equal, `tools/skid_emu.py`), `showcase.c` (the cars' showcase `0x17724`: its pages, film and commentary), `trackrec.c` (the track's screen `0x76380` and its Best Times `0x75288`), `credits.c` (the credits `0x25600`: five pages of CREDITS.FSH, 20 s each by the timer's count `0xed0fc`), `loadsave.c` (load and save `0x3c0c8`/`0x3d4c4`, the file list `0x3aacc`: tournaments as `<name>.sav` in the home folder, replays saved, played, deleted; a game on `0x15d134`), `config.c` (CONFIG.DAT; the built-in defaults, equal byte for byte,
 `tools/config_emu.py`), `main.c`.
 The race so far: `raster.c` (the quad and triangle painters), `poly.c` (projection, quad cutting),
 `road.c` (the frame's points, into the view; the mirror's five sections behind), `roaddraw.c` (the road painted far to near,

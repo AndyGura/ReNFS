@@ -3,6 +3,7 @@
    either round towards zero (the compiler's signed division: / here) or down (sar:
    >> here), each as the machine code does. */
 #include "drive.h"
+#include "ff.h"
 #include "config.h"
 #include "replay.h"
 #include "hud.h"
@@ -1135,6 +1136,8 @@ static void road_edges(race_car *c)
             side = -0x100;
             in = w + 0x4ccc - off;
             kind = n[5] >> 4;
+            if (g_drive.viewed == c->player)
+                ff_wall(0);    /* (0x4037f) */
         }
     } else if (n[1] << 13 < off) {
         int w;
@@ -1145,6 +1148,8 @@ static void road_edges(race_car *c)
             side = 0x100;
             in = off - (w - 0x4ccc);
             kind = n[5] & 15;
+            if (g_drive.viewed == c->player)
+                ff_wall(1);    /* (0x4042a) */
         }
     } else
         c->surface = exe_i32(0xeab08);
@@ -1347,7 +1352,8 @@ static void physics(race_car *c)
         brake_rear = b - brake_front;
     }
     if (c->handbrake == 1) {
-        /* 0x78c30: EXPLODE's push on the cars around; not in the port yet */
+        /* (0x78c30 would push the cars around here with 0xf74f8 = 4, never written;
+           EXPLODE's push is the horn's, opponent.c) */
         drive_rear = 0;
         brake_rear = 0x280000;
     }
@@ -1370,6 +1376,8 @@ static void physics(race_car *c)
     if (c->braking < 0x28)
         c->abs_now = 0;
     if (c->gear != c->gear_now) {
+        if (g_drive.viewed == c->player)
+            ff_gear(c);        /* (0x40c26) */
         c->gear_shown = 0x10;
         c->gear_before = c->gear_now;
         c->gear_now = c->gear;

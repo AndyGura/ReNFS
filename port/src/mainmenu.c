@@ -47,7 +47,7 @@ int g_vegas_ok;                         /* 0xec460 (track 8 offered) */
 static int g_vegas_typed;               /* 0xec464 */
 int g_warrior_ok;                       /* 0xf7494 */
 static int g_no_mercy;                  /* 0xf7492: End held on head to head */
-static int g_explode, g_nitro;          /* 0xf74a4, 0x12cca0 (used in the race) */
+static int g_explode, g_nitro;          /* 0xf74a4, 0x12cca0 (the race's, g_race_codes) */
 static int g_letter;                    /* 0x12ccaa: a letter held */
 static int g_code_at[8];                /* 0xec4d8..: how far each code is typed */
 
@@ -663,6 +663,7 @@ int fe_main_menu(void)
                     g_race_codes.mirror = g_mirror;
                     g_race_codes.rally = g_rally;
                     g_race_codes.nitro = g_nitro;
+                    g_race_codes.explode = g_explode;
                     race_from_menu();
                     /* back: "No mercy" over, the menu loaded and faded in again */
                     g_no_mercy = 0;

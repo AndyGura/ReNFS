@@ -27,6 +27,9 @@ int collide_below(int n);
 /* the same on another state of six words (the tyres' dust keeps its own) */
 unsigned collide_rand_with(unsigned *s);
 int collide_below_with(unsigned *s, int n);
+/* 0x1e838: a car knocked over by a hard hit (a player's by the cars, EXPLODE's by the
+   horn) */
+void collide_knock(race_car *c);
 /* 0x1c878's loop: the police's catch (0x1c800), each car against those just ahead */
 void collide_world(void);
 

@@ -187,10 +187,9 @@ int race_menu_checkpoint(void)
                     break;
                 case STANDINGS:
                     /* the segment's standings again (a race's and a tournament's, the
-                       standings so far after them: 0x6f070, not yet), then this menu
-                       drawn again */
+                       standings so far after them, 0x1b12e), then this menu drawn again */
                     pal_fade_down(0, 256);
-                    standings_segment(0);
+                    standings_checkpoint();
                     place(sel);
                     first = redraw = 1;
                     break;

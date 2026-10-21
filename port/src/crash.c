@@ -649,8 +649,8 @@ static void land(race_car *c)
         c->gearbox = 2;
 }
 
-/* car_crash 0x1cb14: the car to kind 4, tumbling, put back in 300 steps at the latest.
-   (A highlight for the replay, 0x5c: not in the port.) The car heard falls silent */
+/* car_crash 0x1cb14: the car to kind 4, tumbling, put back in 300 steps at the latest;
+   a highlight for the replay (0x5c). The car heard falls silent */
 static void crash_begin(race_car *c)
 {
     body_from_car(c);
@@ -674,6 +674,12 @@ void crash_hard_hit(race_car *c, int a, int b, int s)
     c->body.spin.z += mulr(s, m[2]) + mulr(b, m[8]) - mulr(a, m[5]);
     if (c->bits[0] & 4)
         opponent_chase_drop(0);
+}
+
+void crash_push(race_car *c, int a, int b, int s)
+{
+    crash_hard_hit(c, a, b, s);
+    collide_knock(c);
 }
 
 /* the player's driving stopped: no pedals, the engine running down, out of gear */

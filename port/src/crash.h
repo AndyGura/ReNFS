@@ -62,6 +62,8 @@ void crash_body_from_model(race_car *c);
 /* car_hard_hit 0x78204: the crash begun, the hit's push a turn of the body: a about its
    axis up, b along, s across */
 void crash_hard_hit(race_car *c, int a, int b, int s);
+/* 0x78370: the same, then knocked over (0x1e838): EXPLODE's horn */
+void crash_push(race_car *c, int a, int b, int s);
 /* drive_crashed 0x1cfe0: a step of the tumbling car (state 4) */
 void crash_step(race_car *c);
 /* cars_meets_world 0x1c878: the hit's sound's timers, every fourth step

@@ -532,7 +532,7 @@ three settings in its entry). The attract mode (`fe_attract_mode` `0x34284`) put
   +0x5ea2 0, +0x5ea4 4, +0x5ea6 1, +0x5f50 0. Nothing else: the rest stays as the BSS
   leaves it (0). `cfg_load_config_dat` returns 1 when it made them (the front end then
   goes to the name), and after either corrects joystick keys (+0x5f36.. between 1 and 3,
-  with `0x12f1d8` = 0: not ported).
+  with `0x12f1d8` = 0: back to kind 0 and the arrows / A, Z; ported, `config.c`).
 
 ### 3.4 Still to read
 
@@ -2004,8 +2004,7 @@ the window and the horizon **`road_draw` `0x5a4f0(N = 0x136618, S = the camera's
 - **`traffic_police_tick` `0x7a040`** (3.7 KB, every 4th step = 8.3 times a second): every
   car that is not a racer (`+0x516` < 0 or ≥ `0x12da30`) and not crashed drives in its lane:
   `0x786d4` (939 b), the lane choices on the node's lanes (byte 4), `0x78c88` (2.2 KB, the
-  steering), `0x78a80`, `0x7850c` (a lane change), `0x78370` (slow down to 25 near the
-  player). Cars with `+0x174` & 8 are **police**: `police_pull_over` `0x79728`. Cars with
+  steering), `0x78a80`, `0x7850c` (a lane change), `0x78370` (EXPLODE's push, below; not a slowing down). Cars with `+0x174` & 8 are **police**: `police_pull_over` `0x79728`. Cars with
   `+0x174` & 4: `ai_car_engine` `0x79e28` (past the finish they pull to the side; the gear
   from the speed against the table at `+0x308`, the engine's revs `+0x3c1` eased by 1/8).
 - **`police_pull_over` `0x79728`** (in full: §4.17): (for a police car chasing, `+0x175` & 4) once it has
@@ -2518,7 +2517,16 @@ speed set seven ways (`tools/dash_emu.py`, the routines not yet ported left out 
 `0x2e4f0(car)` the gear lever's gate, only with the map off (`0x12b988` = 0): `gate` at
 its place, the knob (`nob1`, `lth3`..`lth1` at `0xea98c`, 4 when there are, `0x12b5e8`)
 at one of the gate's 9 points (`0x12b83c`) by the gear (`+0x421`, `+0x41d`, `+0x3ed`,
-`+0x3bd`), `gbak` without a gear (not ported). `0x30214` **the radar detector**: level
+`+0x3bd`), `gbak` without a gear. **Ported (2026-10-21, `hud.c` `gear_lever`):** the
+state by `+0x421` (shown): < 11 with the wait `+0x3bd` < 1 → the new gear `+0x3ed`'s point;
+≥ 14 the gear before `+0x41d`; 13 the gear before's x at neutral's y; 12 the new gear's x
+at neutral's y; 11 with no wait → state 5; shown ≤ 0 → `gbak` once (when the last state
+`0xea99c`, never reset, was not 0). Nothing drawn when the state is the last one. The
+stick: one knob (`nob1`, the 512TR and the Diablo) centred on the point, or (`0x12b5e8` =
+4: every other car) four parts from gate point 1 towards the point in quarter steps,
+`lth1`, `lth2`, `lth3`, `nob1`, see-through. `0xea800` = 0, only read. `tools/dash_emu.py`'s
+78 lever frames equal (512TR snapshots); the four-part stick seen equal in DOSBox (RX-7,
+every gear). `0x30214` **the radar detector**: level
 `0xea814` (5 at most): with any, `bglt` / `bgdk` (`0x12b9f8` flashing) at place 2; when
 the level differs from `0x12b938`: as many `smlt` as the level at places 3..7, the rest
 `smdk` (level 0: `bgdk` and five `smdk`). `0x2f644` the keys of the HUD (`0xf7b0a` the
@@ -2825,7 +2833,20 @@ settings read from the program equal to the snapshots' blocks. With two cars, th
 several cars in the lanes (`0x78c88` 241 of 618 instructions run, `0x7850c` 24 of 106,
 `0x78660`, `0x7e548`, `0x7e5e4` none) wait for the traffic to be checked. `--race cy1` races one
 opponent (`RENFS_SEED=n` for its random numbers). The traffic's coming and going: §4.16.
-The police: §4.17. Not yet: EXPLODE's push (`0x78370`), the horns and engines' sounds.
+The police: §4.17. The horns and engines' sounds: §4.18.
+
+**EXPLODE** (2026-10-21, ported). Typed in Control Central it sets `0xf74a4` (cleared in a
+tournament). Only one place reads it while racing: the lane planning, `0x7ac03`, between
+`0x78c88` and `0x78a80`: with one player (`0x12da30` = 1), the player's horn held (car 0
+`+0x4ba` = 1) and the car within 10 of the player's progress `+0x4c` (either way), `0x78370(car,
+0x190000, 0x190000, 0x190000)`: `car_crash` `0x1cb14`, the spin `+0x3c..` given `s·m[0..2] +
+b·m[6..8] − a·m[3..5]` (the port's `crash_hard_hit`), the chase dropped (`0x781ac(0)`) for a
+car with `+0x174` & 4, then the knock `0x1e838`. So every 4th step the horn throws the
+traffic and police around the player into the air. Dead: `0x78c30` (the handbrake's, needs
+`0xf74f8` = 4, never written) and `0x79ffc` (never called, the other caller of `0x78370`). **Checked**: `tools/opponent_emu.py`'s runs "explode" and
+"explode beside" (`0xf74a4` = 1, the horn in bursts or the throttle) equal on e1 and e3,
+with and without `--full`; the opponent beside thrown (it ends at node 113 / 88 against 186 /
+192 without the code). `RENFS_EXPLODE=1` in `--race`.
 
 ### 4.14 Cars meeting cars (2026-10-19)
 
@@ -3030,8 +3051,8 @@ port alike) to run the coming side too (`place_at`'s 0x7cbe2.., `place_speed`'s 
 Never run yet: `place_racer_grid` (the rival a traffic car).
 In `--race cy1` the six traffic cars wait off the road, come on ahead of the racers from
 about 25 s (at most 4 at a time), and go back to wait when they fall out of reach
-(`build/shots/traffic_beside.png`, `traffic_passing.png`, `traffic_ahead.png`). Not yet:
-the horns. The police: §4.17.
+(`build/shots/traffic_beside.png`, `traffic_passing.png`, `traffic_ahead.png`). The horns:
+§4.18. The police: §4.17.
 
 ### 4.17 The police (2026-10-20)
 
@@ -3113,7 +3134,14 @@ order and `0x14e5d0`) pixel for pixel on all 11. In `--race cy1` (`RENFS_SEED=6`
 throttle held, then the brake) the police comes out at node 170, chases, pulls up and
 gives a ticket (`build/shots/police_*.png`). Not yet: the view from the police car
 (camera mode 7) and the camera sent back to the player as it is placed, the siren and
-the horns, the arrest's film (`fe_cop_ticket_movie`), the replay's palette (`0x55ee0`).
+the horns, the arrest's film (`fe_cop_ticket_movie`). The replay's palette: in a replay
+(`0xf6b74` ≠ 1) `0x30424` leaves the race's colours alone and re-colours the ticket's
+pictures to them, `0x55ee0(ticket, !pal + 0x10)` (ported 2026-10-21, `hud_ticket` with
+`pal_remap`; before, a replay's ticket showed in the race's colours unconverted).
+The pause menu with a ticket up: `0x30340` (at `0x56577`) frees the mask and the ticket and
+puts the race's palette back; after the menu `0x306e8` loads the dashboard again and the
+next frame the ticket afresh. The port keeps the ticket and the palette it had over the
+menu instead: the same picture and colours after it.
 
 ### 4.18 The race's sounds (2026-10-20)
 
@@ -3333,8 +3361,14 @@ compared its laps with City's record and spoke "best time" every lap.
   by `0x12d9d5`, `0x1440c(0x12d9d4, 0x12d9d9)`: the detail min(`0x12d9d9`, 2), the view
   ahead in its own layout, the outside one in its own + `0x12d9d4`. After the race at
   320x200 `0x12d9d9` is kept at most 1 (`0x375e8`).
-- `0x12da04`: the keys End, Ins, the arrows, PgUp, PgDn, Space, Enter, Tab as bits, for the
-  replay (`0x5efb6`).
+- `0x12da04`: the keys End, Ins, the arrows, PgUp, PgDn, Space, Enter, Tab as bits (End
+  0x800000, Ins 0x1000000, up 0x40000000, down 0x80000000, left 0x10000000, right
+  0x20000000, PgUp 0x400000, PgDn 0x200000, Space 0x8000000, Enter 0x4000000, Tab
+  0x2000000). Read once only, `0x5efb6`: Ins alone, the result `0x13c178` set, not running
+  fast, steps played `0x14552c` > 0 → `0x13c17c` = the result and the replay's step skipped.
+  `0x13c178` and `0x13c17c` are set together everywhere, and the loop ends on `0x13c17c`
+  between frames: only a step after the end within the same frame of a replay sees it.
+  Nothing to port (2026-10-21).
 
 **Ported (`port/src/racekeys.c`, `camera.c`'s `camera_next` and modes 6 and 7, `view.c`'s
 `view_layout`): the view key equal to the original.** `tools/camera_emu.py` presses it
@@ -3497,8 +3531,7 @@ and rally tracks, NITRO), EA's and the race's random numbers seeded from the clo
 the loading picture (held a second: the port loads at once), back to Control Central after
 the race (the standings and menus between: next). Seen: Control Central → Race → the
 picture → City 1 → Esc, Quit → Control Central; a single race of 8 and a tournament's
-field on CY1 and TR1 for 85 s each; time trial; TURBO's clock (2 2 3). Not yet: EXPLODE's push,
-the network's records, the detail settings back after a race (the original puts them
+field on CY1 and TR1 for 85 s each; time trial; TURBO's clock (2 2 3). Not yet: the network's records, the detail settings back after a race (the original puts them
 back from its copy anyway).
 
 **After a race** (2026-10-20). **The session `0x15cb68`** (0x5b6 bytes, a saved game's
@@ -3573,7 +3606,9 @@ chal quil (dark `*d`), the mouse's rows y 0..0x91, 0x9c..0xbe, 0xcb..0xec, 0xf7.
 0x125..0x149, (chat 0x153..0x177, a network race only), 0x180..0x1e0; the keys put the
 mouse at x 320, y 128 173 219 266 312 358 404, up and down past the chat; Esc = Continue.
 Replay and Highlights run race_run again in replay mode (+0xaf 1 / 2), Options `0x12760`,
-Standings the segment's (0) and the final, Quit "End game ?" → 0. (The flag that fades
+Standings (`0x1b12e`, no network) the segment's (0), then with several racers or a
+tournament (+0x6d 2 or 3) the standings so far `0x6f070(1)` (ported 2026-10-21,
+`standings_checkpoint`), Quit "End game ?" → 0. (The flag that fades
 the music is the stack's, set only by Quit: Continue fades it.)
 
 **`race_menu_finish` `0x1b6a0`** (CHECK/FINMENU.QFS): rows conl repl higl gmol gmsl
@@ -3648,7 +3683,7 @@ past 0x1ac937 (60 mph) / 0x2ca666 (100 mph) the best steps into the race record 
 +0x19c; 0x53 of progress on (a quarter mile): steps < 1000 → +0x1ac (and the speed +0x1a8);
 braking > 0x32: the last step above 0x23b5c2 (80 mph) / 0x1ac937, standing (< 0x1999):
 the steps since into +0x1a0 / +0x1a4. Shown at once by `0x2d71c`/`0x2d778` (HUD values
-`0x12b968`.., not ported). The clocks are statics kept from race to race.
+`0x12b968`.., ported since: `hud.c`'s `0x2d8c0`). The clocks are statics kept from race to race.
 
 **After a race the menus get six colours back**: `0x31bf4` (race_main's end, the HUD
 freed) allows 0x5e, 0x5f, 0xfa..0xfd again; 0x47 and the racers' marks stay out of the
@@ -3662,8 +3697,8 @@ still on, let it go and set back the palette saved under it, the previous race's
 colours on midday pictures). `hud_free` now lets it go as `0x31bf4` does.
 
 **Ported** (`session.c`, `standings.c`, `racemenu.c`, `race.c`, `drive.c`): all of the
-above but the finish and checkpoint menus' Replay, Highlights and Options and the
-measurements' HUD. **Equal** to the original's screens by palette entry: an open road's
+above (the finish and checkpoint menus' Replay, Highlights and Options, and the
+measurements on the status bar, came later: §4.22, §4.2, §4.11). **Equal** to the original's screens by palette entry: an open road's
 segment, track and best standings, checkpoint and finish menus (all six rows); a circuit's
 page and lap page (Rusty Springs' time trial with its measurements, 16 laps in two
 columns; Autumn Valley's single race), the race's and the tournament's standings, all
@@ -3886,7 +3921,8 @@ fast to the last step recorded − 8 and race on (state `0xf6b78` = 1 after).
   throttle), `0x12f284` the third (the brake), `0x12f290` the buttons held (1 2 4 8).
   `joyopt.cfg`'s remapping (`0x4e580`, `0x12f254`), turned-round axes (`0x4e680`,
   `0x12f224`) and force feedback (`0x4d670`, `0x15d144`) work only with that file, which
-  nothing makes: not ported.
+  nothing makes: the remapping not ported; the force feedback ported (§4.26) and on
+  whenever something can play it.
 - **Start-up `0x4d1fc`** (`startup` at `0x4228c`, after the fonts): mask 0 none; 3 a
   stick; 0xc the throttle and pedals alone; else a stick, a throttle if the fourth count
   is above 0, pedals if the third is. `0x12f1c0` found, `0x12f1c4` X, `0x12f1c8` Y,
@@ -4056,6 +4092,75 @@ motion smoothed between the steps, whichever is cheaper.
 - **F11 in a race** turns it on and off, kept in the home folder's `renfs.cfg` (`smooth 1`,
   the port's file); on at first. The original reads no F10, F11 or F12 (no access to
   `0xf7b0c`, `0xf7b1f`, `0xf7b20`). `RENFS_SMOOTH=0|1` for tests (not kept).
+
+### 4.26 Force feedback (2026-10-21; `port/src/ff.c`, `ffdev.c`, equal)
+
+Danik asked (2026-10-21) for the groundwork of force feedback and a pad's rumble, to be
+used blindly on the MiSTer (he has no wheel). The original drives an **I-Force** device
+(Immersion's, the wheels and sticks of 1996) on a serial port, through a small driver of
+its own linked in.
+
+- **The driver's packets** (`0x4c258`): 0x2b, the command, the length, the bytes, an XOR of
+  them all; the serial port's routines `0x60b8c`, `0x60c10`, `0x60c30`; ready `0x145c6c`.
+  The commands, sizes in percent as signed bytes:
+  - **0xa1 a kick** [x, y, length / 10 ms] from `0x4ba10(strength ≤ 100, direction°, ms ≤
+    2500)`; its two parts from `0x4b948` and the quarter tables `0xecf8c` / `0xece20`
+    (100 · sin and cos of each degree). x is the wheel's axis: 90° → −s, 270° → +s, 45° →
+    −71 %, 315° → +71 %, 0° and 180° the other axis alone.
+  - **0xa4, 0xa5 two shakes** [a, b, rate ≤ 50] (`0x4bbdc`/`0x4bc70`, `0x4bcbc`/`0x4bd50`;
+    the second takes its two sizes the other way round); [0, 0, 0] stops one.
+  - **0xa6 the rumble** [s] (`0x4bd9c`); **0xa7 a steady push** [x, y] ±100 (`0x4bf1c`).
+  - **0x82** every effect stopped, **0x83** the forces on, **0x84** held off.
+- **The game's side** (`0x4d670` .. `0x4dcb6`; on `0x15d144`):
+  - `0x4d730` **an object hit**: strength min(mph/2 + 70, 100), length max(200 − mph, 80)
+    (both compared unsigned), 45° if the hit is to the right (across > 0), else 315°.
+  - `0x4d7a4` **cars meeting**: at most one every 25 ticks of `0xed100` (the last `0xed114`);
+    by the impulse j: < 0x2000 100 ms 80 %, < 0x5000 150/85, < 0x10000 200/90, < 0x100000
+    240/95, else 280/100; 45° if the push's x > 0 and the first car is not the one watched,
+    else 315°.
+  - `0x4d878` **a wall**: 70 %, 90° on the right, 270° on the left, 180 ms.
+  - `0x4d8c0` **a gear change** (none if the gear is −1): 12/22/32/42 % below revs 0x1000,
+    0x1300, 0x1700 and above; 180° if the gear is below the one engaged, else 0°; 80 ms.
+  - `0x4d9a8` **the road's shake**, each step: mph = mulr(|v|, 0x23d70) >> 16 (v the speed
+    while a player's car is watched, else the speed along the road); rate 5..13 and size
+    15..24 by brackets at 5, 10, 15, 20, 30, 40, 80 and 150 mph; by the surface `+0x4a2`:
+    0 none, 1 the first shake (size − 2, size − 2, rate − 2), 2 the first (size, size,
+    rate), 3 the first (size, size, 1) and the second (size − 4, 0, rate), above 3 none;
+    sent only when the rate or size changes (`0xed10c`, `0xed110`, `0xed120`, `0xed124`).
+  - `0x4d928` **the steady push**: the car's sideways and forward forces (`+0x411`, `+0x415`)
+    >> 13, clamped; not while the crash rumbles; sent when it changes (`0xed118`, `0xed11c`).
+    The original's slip: a forward force below −100 becomes +100.
+  - `0x4dc40` **the crash's rumble**: on → everything stopped, then 0xa6 80 (`0x12f1e0` = 1);
+    off → everything stopped. `0x4d714` stop (0x82, the rumble flag 0); `0x4d6ec` / `0x4d700`
+    off / on; `0x4d670` open, `0x4d6c8` close.
+- **Where they are called**: the walls in the driving (`0x4037f`, `0x4042a`, the car
+  watched), the gear change (`0x40c26`), an object under the car (`0x1ef40`), the boxes'
+  hit (`0x2b131`, when either car is the one watched), the knock (`0x1e9a4`: the rumble
+  on), the engine started again after a crash (`0x53295`: off), each step for the player's
+  car unless the race is in state 3 (`0x51f22`); P's hold off/on (`0x6312a`, `0x63238`);
+  the pause menu off at its start (`0x56572`), its Replay row a stop (`0x5780e`), on after
+  Continue, a stop after Quit; the race's start on and a stop (`0x63628`), its end a stop
+  and off (`0x63b61`); the program's end the close (`0x47219`).
+- **The port**: `ff.c` is the game's side and the driver's commands, step for step;
+  `ffdev.c` plays the commands on what is there. A wheel or stick with force feedback
+  (SDL's haptics: the joystick's own, else the first haptic device with a constant force,
+  since a wheel on the MiSTer may not be the joystick the game reads): kicks and the steady
+  push as constant forces, the shakes and the rumble as sine waves (the I-Force's rumble
+  rate is unknown: 20 Hz). Else a pad's rumble (`SDL_JoystickRumble`): the strong motor
+  the kicks and the crash's rumble, the weak one the shakes (and half a kick), held off by
+  0x84, refreshed every 100 ms; the steady push has no place on a pad. `renfs.cfg`
+  "forcefeedback 0..100" (`RENFS_FF`) sets the strength, 0 none; `RENFS_FFLOG=f` writes
+  every command with the race's step (`--race cy1`: 422 commands, the gear kicks
+  `a1 0 -42 8` and the steady pushes).
+- **Equal**: `tools/ff_emu.py` runs the original's routines in Unicorn (the packet sender
+  hooked, the serial port stepped over) against `ff.c` on random cars, globals and states,
+  40 calls a sequence with the state carried: **0 of 2000 calls differ** (packets and
+  state); two mistakes put in on purpose gave 206 of 1000. The race underneath is
+  unchanged (the CD's replays equal at every snapshot).
+- **The MiSTer**: the hybrid's SDL 2.32.10 is built with `-DSDL_HAPTIC=OFF`, so there only
+  the rumble works (Danik felt `SDL_JoystickRumble` on a DualSense through it). A wheel's
+  forces need that SDL built with haptics on; `ffdev.c` then finds it unchanged. Untried:
+  no wheel here.
 
 ## 5. The original in DOSBox (2026-10-19)
 

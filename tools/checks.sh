@@ -1,7 +1,7 @@
 #!/bin/bash
 # Every check of the port against the original's own code (Unicorn on the snapshots in
 # build/snap): the driving, the timing, the opponent and the field, cars meeting, the
-# cameras, the dashboard, the cars drawn, the road, the tyres' marks, the watching bar; at 320x200 and 640x480. Logs in build/logs/chk; a line each.
+# cameras, the dashboard, the cars drawn, the road, the tyres' marks, the watching bar; at 320x200 and 640x480; the force feedback. Logs in build/logs/chk; a line each.
 cd "$(dirname "$0")/.." || exit 1
 P=build/venv/bin/python; L=build/logs/chk; mkdir -p $L
 ALL="build/snap/d1.bin build/snap/d2.bin build/snap/d3.bin build/snap/d4.bin build/snap/e1.bin build/snap/e2.bin build/snap/e3.bin build/snap/e4.bin build/snap/e5.bin build/snap/r1a.bin build/snap/r1b.bin"
@@ -19,3 +19,5 @@ timeout 3000 $P tools/cars_emu.py cy1 build/snap/h1.bin build/snap/h6.bin build/
 timeout 3000 $P tools/skid_emu.py build/snap/h7.bin build/snap/e3.bin > $L/skid_emu.log 2>&1; echo "skid exit $?: $(tail -1 $L/skid_emu.log | cut -c1-150)"
 # the watching bar (another car watched): random steps and drawings, both sizes, two tracks
 ( timeout 3000 $P tools/watch_emu.py cy1 build/snap/e3.bin build/snap/h7.bin && timeout 3000 $P tools/watch_emu.py tr1 build/snap/t1.bin ) > $L/watch_emu.log 2>&1; echo "watch exit $?: $(grep -h "equal$" $L/watch_emu.log | tr '\n' ' ' | cut -c1-150)"
+# the force feedback: the original's game side and driver commands against ff.c, random sequences
+timeout 3000 $P tools/ff_emu.py --n=4000 build/snap/e1.bin > $L/ff_emu.log 2>&1; echo "ff exit $?: $(tail -1 $L/ff_emu.log | cut -c1-150)"

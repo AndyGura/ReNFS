@@ -1848,7 +1848,11 @@ void opponent_tick(void)
             s[2] -= 0x3e80000;
         a[0] = a[1] = a[2] = b[0] = b[1] = b[2] = c->speed_to;
         neighbours(c, bits, l, &occ, a, b, nb);
-        /* (EXPLODE's push, 0x78370: not yet) */
+        /* EXPLODE (0x7ac03): one player sounding the horn throws the cars within 10 of
+           its progress into the air (0x78370) */
+        if (g_humans == 1 && g_opp.explode && g_cars[0]->horn == 1
+            && iabs(c->progress - g_cars[0]->progress) < 10)
+            crash_push(c, 0x190000, 0x190000, 0x190000);
         score_speeds(c, a, b, s);
         if (BACKWARDS(c) && nb[1] && nb[1]->road_speed > 0xa0000)
             s[2] -= 0x1e0000;

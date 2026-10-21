@@ -34,8 +34,8 @@ import drive_emu as D
 
 SOURCES = [f for f in D.SOURCES if f not in ("opponent.c", "racesnd.c")]    # (sound_test.c has it)
 LEFT_OUT = dict(D.LEFT_OUT)
-# EXPLODE's push (a computer's horn wanted, 0x80a60, is the game's: its random number)
-LEFT_OUT.update({0x78370: 0})
+# (EXPLODE's push 0x78370 is run on both sides: the "explode" runs; a computer's horn
+# wanted, 0x80a60, is the game's: its random number)
 # with --sound the sounds are the original's too: the hits', the engine's on and off, where
 # a car is heard from
 SOUNDS = (0x52d2c, 0x52e40, 0x52ea8, 0x53214, 0x531dc, 0x7fb58)
@@ -123,6 +123,9 @@ VARIANTS = [("as is", {}, {}),
             ("tickets only", {0x15d2d8: 0}, {}),
             # one ticket already: the next ends the race (arrested)
             ("arrest", {0x15d2d8: 0, 0x14ec30: 1}, {}),
+            # EXPLODE typed: the player's horn throws the cars within 10 of it (0x7ac03)
+            ("explode", {0xf74a4: 1}, {}),
+            ("explode beside", {0xf74a4: 1}, {}, {}, (0.5, -1.7, 0)),
             ("before the start", {0x145c94: 250}, {}),
             # the player catching a slow opponent and passing it
             ("caught up", {0x145c94: 250}, {}, {0x170: 0x4000}),
@@ -157,7 +160,8 @@ RUNS = [("gas", "as is"), ("weave", "as is"), ("wait", "as is"), ("gas", "single
         ("weave", "caught up later"), ("gas", "two-way"), ("weave", "two-way"), ("wait", "two-way"),
         ("chase", "as is"), ("long", "as is"), ("twice", "as is"), ("twice", "tickets only"),
         ("chase", "two-way"), ("again", "tickets only"), ("long", "arrest"), ("chase", "arrest"),
-        ("horn", "as is"), ("horn", "beside")]
+        ("horn", "as is"), ("horn", "beside"), ("horn", "explode"), ("horn", "explode beside"),
+        ("gas", "explode")]
 
 
 def lib():

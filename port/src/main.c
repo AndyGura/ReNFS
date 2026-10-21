@@ -1,6 +1,7 @@
 /* ReNFS: The Need for Speed Special Edition (1996), written again from its DOS program.
    main 0x4716c -> startup 0x42054 -> fe_outer_loop 0x47000 (NOTES §4.1). */
 #include "joystick.h"
+#include "ff.h"
 #include "audio.h"
 #include "collide.h"
 #include "exe.h"
@@ -41,11 +42,15 @@ static const char usage[] =
     "  RENFS_LAPS=n     n laps of a circuit (tr1 ..; else the race length's, 8 by default)\n"
     "  RENFS_TOD=n      the track's time of day in --race: 0 morning, 1 midday, 2 evening\n"
     "  RENFS_MIRROR=1, RENFS_RALLY=1  the mirrored track or the rally in --race\n"
+    "  RENFS_EXPLODE=1           EXPLODE in --race (the horn throws the cars near)\n"
     "  RENFS_VIEW=n     a test: the race watched from camera n (2..5, 8..12 outside)\n"
     "  RENFS_RES=n      a test: races at 640 (640x480) or 320 (320x200), whatever the\n"
     "                   graphics screen says\n"
     "  RENFS_SMOOTH=0|1 a test: the race's motion smoothed between its steps or not,\n"
     "                   whatever F11 last left (not kept)\n"
+    "  RENFS_FF=0..100  force feedback and rumble's strength, 0 none (else renfs.cfg's\n"
+    "                   \"forcefeedback n\", 100)\n"
+    "  RENFS_FFLOG=f    every force-feedback command written to f with the race's step\n"
     "\n"
     "Keys: Space, Enter or Esc pass a movie or the title.\n"
     "In a race, F11: the motion smoothed between the race's steps (drawn at every\n"
@@ -112,6 +117,7 @@ int main(int argc, char **argv)
 
     if (shot)                  /* the program ended before the frame asked for */
         fprintf(stderr, "renfs: ended before frame %d\n", shot_frames);
+    ff_close();                /* (main 0x47219) */
     audio_done();
     video_done();
     return 0;

@@ -18,5 +18,8 @@ void standings_track(int take_records);
    segment's or the track's standings, a race's or tournament's standings so far, a
    tournament's points given */
 void standings_after(int finished, int last);
+/* race_menu_checkpoint's Standings (0x1b12e): the segment's again, and with several
+   racers or in a tournament the standings so far */
+void standings_checkpoint(void);
 
 #endif

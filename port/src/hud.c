@@ -624,15 +624,18 @@ int hud_ticket(int ticket, int warning, int over)
         }
         g_ticket_on = 1;
         video_get_palette(g_ticket_saved, 0, 256);
-        /* its colours over the race's, but the last two (setpalette 0, 0xfe); (in the
-           replay through 0x55ee0: not yet) */
-        if (g_hud.running && fsh_find(&g_ticket, "!pal", &s)) {
-            unsigned char p8[768];
-            int k;
+        /* racing, its colours over the race's but the last two (setpalette 0, 0xfe); in
+           a replay the race's colours kept and its pictures re-coloured to them (0x55ee0) */
+        if (fsh_find(&g_ticket, "!pal", &s)) {
+            if (g_hud.running) {
+                unsigned char p8[768];
+                int k;
 
-            for (k = 0; k < 3 * 0xfe; k++)
-                p8[k] = (unsigned char)((s.head[0x10 + k] & 0x3f) << 2);
-            video_palette(p8, 0, 0xfe);
+                for (k = 0; k < 3 * 0xfe; k++)
+                    p8[k] = (unsigned char)((s.head[0x10 + k] & 0x3f) << 2);
+                video_palette(p8, 0, 0xfe);
+            } else
+                pal_remap(g_ticket.d, s.head + 0x10);
         }
     }
     window_set(&g_hud_screen);
@@ -807,7 +810,7 @@ static void start_lights(void)
         const char *name = g_hud.steps >= 300 ? "sgrn"
                          : i < 3 ? (i > k ? "srdd" : "srdl") : (i > k ? "syld" : "syll");
 
-        /* (each light's sound as it comes on, 0x5257c: not yet) */
+        /* (0x5257c, each light's sound as it comes on, is an empty routine) */
         blit(named(&g_mask, name), H(0x41, 0x82) * i, H(0, 1), COPY);   /* (0x2dc13) */
     }
     g_bar_at = g_hud.steps + 10;

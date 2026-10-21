@@ -1,6 +1,8 @@
 /* A race (NOTES §4.3, §4.7): the loading of race_main 0x6356c and the frame of
    race_draw_frame 0x5bc40, as far as the port has them. */
 #include "race.h"
+#include "ff.h"
+#include "ffdev.h"
 #include "replay.h"
 #include "opponent.h"
 #include "camera.h"
@@ -321,6 +323,9 @@ static void race_step(race_car *player, race_camera *cam, int done)
     /* the sounds, heard from where the camera now is (the voices that played to their
        end freed first, as the mixer frees them) */
     snd_time(clock_ticks());
+    /* (0x51f22) the force feedback's road shake and steady push, the player's car */
+    if (g_drive.state != 3)
+        ff_step(g_cars[g_player]);
     rsnd_step();
     /* the cars to draw (0x51fa3): each one's heading as drawn its heading now (its pitch
        and roll too, read by nothing); those turned by their own matrix take it from that
@@ -406,6 +411,7 @@ int race_run(void)
     }
     g_drive.rally = rec_get(REC_RALLY);
     g_drive.nitro = g_race_codes.nitro;
+    g_opp.explode = g_race_codes.explode;
     g_road_mirror = rec_get(REC_MIRROR);
     /* the track's files: an open road's by its segment, Rusty Springs' rally tr5 */
     if (g_drive.kind < 3)
@@ -640,6 +646,11 @@ int race_run(void)
     /* the race's music, the loading's last (race_main 0x6356c: 0x63d88, with 0xf749a) */
     music_level_from(-1);      /* (heard at the stream's own volume) */
     race_music_start();
+    /* (0x63628) the force feedback's forces on, every effect stopped (a pad looked for
+       again: one plugged in since is felt too) */
+    ff_open();
+    ff_forces(1);
+    ff_stop();
     start = clock_ticks();
     /* (race_main 0x6368a, 0x639b0) the recording ready, its first step a snapshot */
     replay_start();
@@ -815,8 +826,11 @@ int race_run(void)
         /* (after the ticket, the screen round the view drawn again: 0xeaaa8) */
         if (k == 2)
             g_view_redraw = 1;
+        ffdev_tick();
         video_retrace();
     }
+    ff_stop();                 /* (0x63b61) */
+    ff_forces(0);
 
     mouse_show(0);             /* (the replay's pointer: the films and menus after show
                                   their own) */
@@ -993,6 +1007,7 @@ int race_test(const char *name)
     memset(&g_race_codes, 0, sizeof g_race_codes);
     g_race_codes.mirror = getenv("RENFS_MIRROR") != 0;
     g_race_codes.rally = getenv("RENFS_RALLY") != 0;
+    g_race_codes.explode = getenv("RENFS_EXPLODE") != 0;
     if (!strncasecmp(name, "tr5", 3)) {
         i = 3;
         g_race_codes.rally = 1;

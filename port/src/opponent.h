@@ -27,7 +27,7 @@ typedef struct {
     int lane_w;                /* 0x15d4bc: the last lane width worked out, 16.16 */
     int lane_rule;             /* 0x15d488: a lane change slowed for the car beside */
     int off;                   /* 0xf74ac: no ticks (the replay) */
-    int explode;               /* 0xf74a4 */
+    int explode;               /* 0xf74a4: EXPLODE (the horn throws the cars near) */
     int traffic;               /* 0x12da3c: traffic cars */
     int waiting;               /* 0x15d480: traffic cars waiting off the road (kind 6) */
     int sides[2];              /* 0x15d154, 0x15d158: traffic cars placed coming the

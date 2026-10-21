@@ -6,6 +6,7 @@
    retraces counted (70 a second in the 200-line modes, else 60): the n-th retrace's
    picture is written to the file (PPM) and the program ends. */
 #include "video.h"
+#include "ffdev.h"
 #include <SDL.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -173,6 +174,7 @@ int video_init(const char *shot, int shot_frames)
 {
     g_shot = shot;
     g_shot_at = shot_frames;
+    g_ffdev_joystick = joy_sdl;    /* (the force feedback's device) */
     if (shot)
         SDL_setenv("SDL_VIDEODRIVER", "dummy", 1);
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER) != 0) {
@@ -575,6 +577,15 @@ static SDL_Joystick *g_joy;
 static int joy_count(int v)                /* -32768..32767 as the game port's 0..511 */
 {
     return (v + 32768) >> 7;
+}
+
+void *joy_sdl(void)
+{
+    if (getenv("RENFS_JOY") || g_shot)
+        return 0;
+    if (g_pad && SDL_GameControllerGetAttached(g_pad))
+        return SDL_GameControllerGetJoystick(g_pad);
+    return g_joy && SDL_JoystickGetAttached(g_joy) ? g_joy : 0;
 }
 
 int joy_device(int count[4], int *buttons)

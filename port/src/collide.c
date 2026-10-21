@@ -4,6 +4,7 @@
    its half sizes along them are half[0..2]. The program's switches for these routines
    (0xea62c .. 0xea64c) are never written: only the paths they leave live are here. */
 #include "collide.h"
+#include "ff.h"
 #include "replay.h"
 #include "cardraw.h"
 #include "crash.h"
@@ -389,8 +390,8 @@ static int box_separate(car_body *a, car_body *b, vec3 *pt, vec3 *n)
 
 /* 0x2afb8: the hit's push between car a's and b's bodies at pt along n (a's side): as
    big as stops them closing there (both weights, both turns' resistance), times
-   0xea680; 0 if they are moving apart already. (A player's force feedback, 0x4d7a4:
-   not in the port) */
+   0xea680; 0 if they are moving apart already. A kick of the force feedback when one of
+   them is the car watched (0x4d7a4) */
 static int box_impulse(race_car *ca, race_car *cb, const vec3 *pt, const vec3 *n)
 {
     car_body *a = &ca->body, *b = &cb->body;
@@ -411,6 +412,8 @@ static int box_impulse(race_car *ca, race_car *cb, const vec3 *pt, const vec3 *n
     p.x = mulr(j, n->x);
     p.y = mulr(j, n->y);
     p.z = mulr(j, n->z);
+    if (ca->slot == g_drive.viewed || cb->slot == g_drive.viewed)
+        ff_cars(ca, p.x, j);
     a->vel.x += mulr(a->inv_mass, p.x);
     a->vel.y += mulr(a->inv_mass, p.y);
     a->vel.z += mulr(a->inv_mass, p.z);
@@ -435,9 +438,9 @@ static int human(const race_car *c)
     return c->slot >= 0 && c->slot < g_humans;
 }
 
-/* 0x1e838: a player's car knocked over by a hard hit: its spin cut to a third and given
+/* 0x1e838: a car knocked over by a hard hit: its spin cut to a third and given
    a turn about the road's across and along, a jump up its own axis */
-static void knock(race_car *c)
+void collide_knock(race_car *c)
 {
     car_body *b = &c->body;
     int k = exe_i32(0xea5b8) >> 8, s = exe_i32(0xea5bc) >> 8, f = exe_i32(0xea5c0) >> 8;
@@ -455,6 +458,9 @@ static void knock(race_car *c)
     b->vel.x += u * (b->m[3] >> 8);
     b->vel.y += u * (b->m[4] >> 8);
     b->vel.z += u * (b->m[5] >> 8);
+    /* the car watched: the force feedback's crash rumble (0x1e9a4) */
+    if (c->slot == g_drive.viewed)
+        ff_crash(1);
 }
 
 static int moving(const car_body *b)
@@ -502,12 +508,12 @@ static int impact(race_car *a, race_car *b)
     if (ha && !a->crashing) {
         crash_road_frame(a);
         a->crashing = 1;
-        knock(a);
+        collide_knock(a);
     }
     if (hb && !b->crashing) {
         crash_road_frame(b);
         b->crashing = 1;
-        knock(b);
+        collide_knock(b);
     }
     return 1;
 }
@@ -549,7 +555,7 @@ static int collide(race_car *a, race_car *b)
 
 /* 0x1ee80: is the point (x, z) under the car, within half its model's width across it
    and half its length along it? Then the knock heard, near the camera (-8 .. 9 nodes
-   from it). (The force feedback 0x4d730: not in the port) */
+   from it), the force feedback's kick (0x4d730) before */
 static int object_under(const race_car *c, int x, int z)
 {
     int dx = x - c->pos.x, dz = z - c->pos.z, a = c->yaw >> 8;
@@ -561,6 +567,7 @@ static int object_under(const race_car *c, int x, int z)
     along = mulr(si, dx) + mulr(co, dz);
     if (along > c->size[2] >> 1 || along < -(c->size[2] >> 1))
         return 0;
+    ff_object(c, across);
     a = c->node - g_camera->node;
     if (a <= 9 && a > -9) {
         int angle, dist;

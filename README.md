@@ -56,3 +56,11 @@ horn and the map); the shoulders shift either way.
 
 The mouse can steer as well (Controls: Mouse): move it left and right; its buttons give
 gas and brake.
+
+## Rumble and force feedback
+
+The original could drive a force-feedback wheel or stick. ReNFS sends the same effects to
+what you have: **a pad rumbles** (the strong motor for hits, walls and the crash, the weak
+one for the road's surface and speed), and **a wheel or stick with force feedback** gets the
+kicks, the road's shaking and the steady pull of the car's forces. Their strength is the
+line `forcefeedback 50` in `renfs.cfg` (0 to 100; 0 turns them off; 100 at first).

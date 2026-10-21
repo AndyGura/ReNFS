@@ -88,14 +88,29 @@ static void smooth_save(void)
     char path[1024];
     FILE *f;
 
+    char keep[4096], line[256];
+    size_t n = 0;
+
     if (getenv("RENFS_SMOOTH"))
         return;
     cfg_path(path, sizeof path);
+    /* the file's other settings kept (forcefeedback, ffdev.c) */
+    keep[0] = 0;
+    if ((f = fopen(path, "r"))) {
+        while (fgets(line, sizeof line, f))
+            if (strncmp(line, "smooth", 6) && strncmp(line, "# smooth", 8)
+                && strncmp(line, "# race's steps", 14) && strncmp(line, "# ReNFS's own", 13)
+                && n + strlen(line) < sizeof keep) {
+                strcpy(keep + n, line);
+                n += strlen(line);
+            }
+        fclose(f);
+    }
     if ((f = fopen(path, "w"))) {
-        fprintf(f, "# ReNFS's own settings\n"
+        fprintf(f, "# ReNFS's own settings\n%s"
                    "# smooth 1: the race drawn at every retrace, its motion between the\n"
                    "# race's steps (F11 in a race); 0: as the original, a new picture a step\n"
-                   "smooth %d\n", g_smooth);
+                   "smooth %d\n", keep, g_smooth);
         fclose(f);
     }
 }

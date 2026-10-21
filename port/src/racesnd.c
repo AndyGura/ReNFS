@@ -1,5 +1,6 @@
 /* The race's sounds (NOTES §4.18). */
 #include "racesnd.h"
+#include "ff.h"
 #include "cardraw.h"
 #include "collide.h"
 #include "config.h"
@@ -292,6 +293,7 @@ void rsnd_engine_on(void)
     g_rsnd.voice[5] = snd_play(0x29, 0x40, 0, 0x40);
     g_rsnd.engine = 1;
     g_rsnd.sound[5] = 0x29;
+    ff_crash(0);               /* (0x53295: the crash's rumble over) */
 }
 
 void rsnd_stop_all(void)

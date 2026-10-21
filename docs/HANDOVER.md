@@ -265,7 +265,7 @@ Ghidra project and `build/decomp`, one command). The git history was started aga
   `tools/drive_emu.py` and `tools/opponent_emu.py` on all 11 snapshots. In `--race cy1`
   (`RENFS_SEED=7`, gas from retrace 420) the "65" sign falls at about retrace 1100;
   `RENFS_VIEW=n` (a test) watches the race from camera n (`build/shots/knock_sign.png`,
-  camera 4). Not yet: its force feedback and sound.
+  camera 4). Its force feedback since (§4.26).
 
 - **The traffic** (`port/src/opponent.c`, NOTES §4.16): six traffic cars wait off the road
   (kind 6, `0x7e0c8`) and come on ahead of the racers (on CY1, a one-way road, all going
@@ -399,6 +399,24 @@ stood on the grid (the heading drawn, `+0x351`, now copied from the heading ever
 `0x51fa3` does); after an arrest, the next race drawn in the previous race's colours (the
 ticket still up as the race ended: `hud_free` now lets it go, as `0x31bf4`). Both in NOTES
 (§4.10 `0x68258`, the six colours after a race).
+
+**What was left of the PC game (Danik 2026-10-21: everything but the network)**: the game
+mode screen's Modem/Serial greyed out with the file's own dimmed button; the dashboard's
+gear lever (`0x2e4f0`, map off: gate, knob or four-part stick, `tools/dash_emu.py`); EXPLODE
+(the horn throws the cars within 10 of the player into the air, `0x78370`; `RENFS_EXPLODE=1`
+in `--race`); the checkpoint menu's Standings with the standings so far (`0x1b12e`); the
+police ticket in a replay re-coloured to the race's colours (`0x55ee0`). Found to need
+nothing: the replay's keys `0x12da04` (read at a moment that does not come), the start
+lights' sound `0x5257c` (an empty routine). Left out on purpose: the network race, the chat.
+
+**Force feedback and rumble** (Danik 2026-10-21: groundwork for the MiSTer, no wheel to try;
+`port/src/ff.c`, `ffdev.c`, NOTES §4.26): the original's I-Force side ported whole (kicks
+for walls, objects, cars and gear changes, the road's shakes by speed and surface, the
+steady push, the crash's rumble; on/off with the pause), **equal** to the original's
+routines (`tools/ff_emu.py`, 0 of 2000 calls differ, in `tools/checks.sh`). Played on SDL's
+haptics (a wheel: untried) or a pad's two motors; `renfs.cfg` `forcefeedback 0..100`,
+`RENFS_FFLOG`. For the MiSTer: the hybrid's SDL (`~/MiSTer-ReNFS/hybrid/sdl2/build.sh`) has
+`-DSDL_HAPTIC=OFF`, so only the rumble works there until it is built with haptics on. Next: the MiSTer (memory `order-of-work`), once Danik has tried the PC game.
 
 **Progress page for Danik**: https://claude.ai/artifact/VZdxTpYC3oLXYeBVJpoDoM (every step,
 its percent done and weight). Update its steps file after each finished step.

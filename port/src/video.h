@@ -64,6 +64,8 @@ void mouse_show(int on);
    at rest 511, pressed 0; 0 an axis it lacks), the buttons held (1, 2, 4, 8); returns
    the axes it has (bits 0..3), 0 without a joystick */
 int joy_device(int count[4], int *buttons);
+/* the SDL_Joystick read there (a pad's own), 0 none or a test's; for the force feedback */
+void *joy_sdl(void);
 
 /* called at every retrace (the music is fed from it) */
 extern void (*g_retrace_hook)(void);
