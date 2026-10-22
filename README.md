@@ -27,7 +27,8 @@ On the MiSTer, races can also be 320x240, 640x240 and 640x200, made for 15 kHz s
 | ![The city at 320x240: the 3D view drawn with all 240 lines](docs/screenshots/race_city_320x240.png) | ![Alpine at evening, 640x240 (shown at 4:3)](docs/screenshots/race_alpine_evening_640x240.png) |
 | ![The desert at 640x200 (shown at 4:3)](docs/screenshots/race_desert_640x200.png) | ![A replay at 320x240 with the bottom of the screen kept clear](docs/screenshots/replay_hud_bottom_320x240.png) |
 
-**Beta, version 0.6.0b.** Please report problems on the
+**Beta**: the latest version is on the
+[releases page](https://github.com/ItsDanik/ReNFS/releases). Please report problems on the
 [issues page](https://github.com/ItsDanik/ReNFS/issues).
 
 ## You need the game's CD
