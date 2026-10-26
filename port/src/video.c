@@ -291,6 +291,13 @@ static void write_shot(void)
    menu in a race, back in the menus) */
 static int g_pad_esc;
 
+/* Alt+Enter, on macOS Cmd+Enter too */
+#ifdef __APPLE__
+#define FULLSCREEN_MOD (KMOD_ALT | KMOD_GUI)
+#else
+#define FULLSCREEN_MOD KMOD_ALT
+#endif
+
 static void poll(void)
 {
     SDL_Event e;
@@ -320,7 +327,7 @@ static void poll(void)
                 scan_put(1);
                 key_put(0x1b);
             }
-        } else if (e.type == SDL_KEYDOWN && (e.key.keysym.mod & KMOD_ALT)
+        } else if (e.type == SDL_KEYDOWN && (e.key.keysym.mod & FULLSCREEN_MOD)
                    && (e.key.keysym.sym == SDLK_RETURN || e.key.keysym.sym == SDLK_KP_ENTER)) {
             /* (the port's) Alt+Enter: the whole screen or a window, kept in renfs.cfg; the
                game sees no Enter */
