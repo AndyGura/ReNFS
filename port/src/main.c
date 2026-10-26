@@ -104,12 +104,17 @@ int main(int argc, char **argv)
         }
     }
     if (!files_init(data, home)) {
+#ifdef __APPLE__
+        char text[1400];   /* (the home folder made, ready for the files) */
+        snprintf(text, sizeof text, "The game's files were not found. Copy the whole CD of The "
+                 "Need for Speed SE into a folder named NFSSE next to ReNFS.app (after moving "
+                 "ReNFS.app out of Downloads) or into %s/NFSSE, or name the folder with -data "
+                 "<folder>.", files_home());
+#endif
         files_error(data || getenv("RENFS_DATA")
                     ? "The game's files are not in the folder given (FRONTEND/ART/TITLE.QFS is missing)."
 #ifdef __APPLE__
-                    : "The game's files were not found. Copy the whole CD of The Need for Speed SE "
-                      "into a folder named NFSSE next to ReNFS.app (after moving ReNFS.app out of "
-                      "Downloads), or into ~/Library/Application Support/renfs/NFSSE.");
+                    : text);
 #else
                     : "The game's files were not found. Copy the whole CD of The Need for Speed SE "
                       "into a folder named NFSSE next to ReNFS, or name the folder with -data <folder>.");
